@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src", "*.config.js", "upload.mjs"],
+  "exclude": ["node_modules", "dist"]
+}

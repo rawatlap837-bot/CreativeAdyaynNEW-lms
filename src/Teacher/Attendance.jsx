@@ -1,0 +1,785 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  CheckCircle2,
+  Clock3,
+  XCircle,
+  Users,
+  Search,
+  RefreshCw,
+  BookOpen,
+  ClipboardCheck,
+} from "lucide-react";
+
+import { auth, db } from "../firebase/Firebase";
+import { getCourseAttendance } from "../services/AttendanceService";
+
+/* ============================================================
+   DATE FORMAT
+   ============================================================ */
+
+function formatDate(value) {
+  if (!value) return "—";
+
+  if (value?.toDate) {
+    return value.toDate().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/* ============================================================
+   STATUS CONFIG
+   ============================================================ */
+
+function statusConfig(status) {
+  switch (status) {
+    case "present":
+      return {
+        label: "Present",
+        icon: CheckCircle2,
+        className: "bg-emerald-50 text-emerald-700",
+      };
+
+    case "late":
+      return {
+        label: "Late",
+        icon: Clock3,
+        className: "bg-amber-50 text-amber-700",
+      };
+
+    case "absent":
+      return {
+        label: "Absent",
+        icon: XCircle,
+        className: "bg-red-50 text-red-700",
+      };
+
+    default:
+      return {
+        label: status || "Unknown",
+        icon: Clock3,
+        className: "bg-slate-100 text-slate-600",
+      };
+  }
+}
+
+/* ============================================================
+   TEACHER ATTENDANCE
+   ============================================================ */
+
+export default function Attendance() {
+  const [teacher, setTeacher] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+
+  const [selectedCourse, setSelectedCourse] = useState("all");
+  const [search, setSearch] = useState("");
+
+  const [loading, setLoading] = useState(true);
+  const [attendanceLoading, setAttendanceLoading] =
+    useState(false);
+
+  const [error, setError] = useState("");
+
+  /* ==========================================================
+     AUTH
+     ========================================================== */
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        setTeacher(user || null);
+      }
+    );
+
+    return unsubscribe;
+  }, []);
+
+  /* ==========================================================
+     LOAD TEACHER COURSES
+     ========================================================== */
+
+  useEffect(() => {
+    if (!teacher?.uid) return;
+
+    let cancelled = false;
+
+    async function loadCourses() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const coursesQuery = query(
+          collection(db, "courses"),
+          where(
+            "instructorId",
+            "==",
+            teacher.uid
+          )
+        );
+
+        const snapshot =
+          await getDocs(coursesQuery);
+
+        if (cancelled) return;
+
+        const courseList =
+          snapshot.docs.map((courseDoc) => ({
+            id: courseDoc.id,
+            ...courseDoc.data(),
+          }));
+
+        setCourses(courseList);
+      } catch (err) {
+        console.error(
+          "Failed to load teacher courses:",
+          err
+        );
+
+        if (!cancelled) {
+          setError(
+            "Unable to load your courses."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadCourses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [teacher]);
+
+  /* ==========================================================
+     LOAD ATTENDANCE
+     ========================================================== */
+
+  useEffect(() => {
+    if (!teacher?.uid) return;
+
+    if (
+      selectedCourse === "all" &&
+      courses.length === 0
+    ) {
+      setAttendance([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadAttendance() {
+      setAttendanceLoading(true);
+      setError("");
+
+      try {
+        let records = [];
+
+        if (selectedCourse === "all") {
+          const results = await Promise.all(
+            courses.map((course) =>
+              getCourseAttendance(course.id)
+            )
+          );
+
+          records = results.flat();
+        } else {
+          records =
+            await getCourseAttendance(
+              selectedCourse
+            );
+        }
+
+        if (cancelled) return;
+
+        const courseMap = new Map(
+          courses.map((course) => [
+            course.id,
+            course,
+          ])
+        );
+
+        const enriched = records.map(
+          (record) => ({
+            ...record,
+            course:
+              courseMap.get(
+                record.courseId
+              ) || null,
+          })
+        );
+
+        setAttendance(enriched);
+      } catch (err) {
+        console.error(
+          "Failed to load attendance:",
+          err
+        );
+
+        if (!cancelled) {
+          setError(
+            "Unable to load attendance records."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setAttendanceLoading(false);
+        }
+      }
+    }
+
+    loadAttendance();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    teacher,
+    courses,
+    selectedCourse,
+  ]);
+
+  /* ==========================================================
+     SEARCH
+     ========================================================== */
+
+  const filteredAttendance =
+    useMemo(() => {
+      const term =
+        search.trim().toLowerCase();
+
+      if (!term) {
+        return attendance;
+      }
+
+      return attendance.filter(
+        (record) => {
+          const courseName =
+            record.course?.title ||
+            record.course?.name ||
+            "";
+
+          return (
+            record.studentId
+              ?.toLowerCase()
+              .includes(term) ||
+            courseName
+              .toLowerCase()
+              .includes(term) ||
+            record.status
+              ?.toLowerCase()
+              .includes(term)
+          );
+        }
+      );
+    }, [attendance, search]);
+
+  /* ==========================================================
+     SUMMARY
+     ========================================================== */
+
+  const totalRecords =
+    filteredAttendance.length;
+
+  const presentCount =
+    filteredAttendance.filter(
+      (item) =>
+        item.status === "present"
+    ).length;
+
+  const lateCount =
+    filteredAttendance.filter(
+      (item) =>
+        item.status === "late"
+    ).length;
+
+  const absentCount =
+    filteredAttendance.filter(
+      (item) =>
+        item.status === "absent"
+    ).length;
+
+  /* ==========================================================
+     REFRESH
+     ========================================================== */
+
+  const refreshAttendance =
+    async () => {
+      if (!teacher?.uid) return;
+
+      setAttendanceLoading(true);
+      setError("");
+
+      try {
+        let records = [];
+
+        if (selectedCourse === "all") {
+          const results =
+            await Promise.all(
+              courses.map((course) =>
+                getCourseAttendance(
+                  course.id
+                )
+              )
+            );
+
+          records = results.flat();
+        } else {
+          records =
+            await getCourseAttendance(
+              selectedCourse
+            );
+        }
+
+        const courseMap = new Map(
+          courses.map((course) => [
+            course.id,
+            course,
+          ])
+        );
+
+        setAttendance(
+          records.map((record) => ({
+            ...record,
+            course:
+              courseMap.get(
+                record.courseId
+              ) || null,
+          }))
+        );
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          "Unable to refresh attendance."
+        );
+      } finally {
+        setAttendanceLoading(false);
+      }
+    };
+
+  /* ==========================================================
+     AUTH FALLBACK
+     ========================================================== */
+
+  if (!teacher) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+        <p className="text-sm font-semibold text-slate-600">
+          Please log in to view attendance.
+        </p>
+      </div>
+    );
+  }
+
+  /* ==========================================================
+     UI
+     ========================================================== */
+
+  return (
+    <div className="space-y-6">
+
+      {/* ======================================================
+          HEADER
+          ====================================================== */}
+
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+
+        <div className="flex items-center gap-3">
+
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+            <ClipboardCheck className="h-5 w-5" />
+          </div>
+
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">
+              Attendance
+            </h1>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Monitor attendance for your courses.
+            </p>
+          </div>
+
+        </div>
+
+        <button
+          type="button"
+          onClick={refreshAttendance}
+          disabled={attendanceLoading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${
+              attendanceLoading
+                ? "animate-spin"
+                : ""
+            }`}
+          />
+
+          Refresh
+        </button>
+
+      </div>
+
+      {/* ======================================================
+          ERROR
+          ====================================================== */}
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* ======================================================
+          COURSE FILTER
+          ====================================================== */}
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+          <div className="flex items-center gap-2">
+
+            <BookOpen className="h-4 w-4 text-violet-600" />
+
+            <span className="text-sm font-semibold text-slate-900">
+              Course
+            </span>
+
+          </div>
+
+          <select
+            value={selectedCourse}
+            onChange={(e) =>
+              setSelectedCourse(
+                e.target.value
+              )
+            }
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+          >
+            <option value="all">
+              All my courses
+            </option>
+
+            {courses.map((course) => (
+              <option
+                key={course.id}
+                value={course.id}
+              >
+                {course.title ||
+                  course.name ||
+                  "Untitled course"}
+              </option>
+            ))}
+          </select>
+
+        </div>
+
+      </div>
+
+      {/* ======================================================
+          SUMMARY
+          ====================================================== */}
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+
+        <SummaryCard
+          label="Total Records"
+          value={totalRecords}
+          icon={Users}
+        />
+
+        <SummaryCard
+          label="Present"
+          value={presentCount}
+          icon={CheckCircle2}
+          iconClass="text-emerald-600 bg-emerald-50"
+        />
+
+        <SummaryCard
+          label="Late"
+          value={lateCount}
+          icon={Clock3}
+          iconClass="text-amber-600 bg-amber-50"
+        />
+
+        <SummaryCard
+          label="Absent"
+          value={absentCount}
+          icon={XCircle}
+          iconClass="text-red-600 bg-red-50"
+        />
+
+      </div>
+
+      {/* ======================================================
+          SEARCH
+          ====================================================== */}
+
+      <div className="relative">
+
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+        <input
+          type="text"
+          value={search}
+          onChange={(e) =>
+            setSearch(e.target.value)
+          }
+          placeholder="Search student ID, course or status..."
+          className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+        />
+
+      </div>
+
+      {/* ======================================================
+          TABLE
+          ====================================================== */}
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+        <div className="overflow-x-auto">
+
+          <table className="w-full min-w-[720px] text-left">
+
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+
+                <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Student
+                </th>
+
+                <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Course
+                </th>
+
+                <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Session
+                </th>
+
+                <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Status
+                </th>
+
+                <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Marked
+                </th>
+
+              </tr>
+            </thead>
+
+            <tbody>
+
+              {loading ||
+              attendanceLoading ? (
+
+                <tr>
+                  <td
+                    colSpan="5"
+                    className="px-5 py-14 text-center"
+                  >
+                    <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-500">
+
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+
+                      Loading attendance...
+
+                    </div>
+                  </td>
+                </tr>
+
+              ) : filteredAttendance.length ===
+                0 ? (
+
+                <tr>
+                  <td
+                    colSpan="5"
+                    className="px-5 py-14 text-center"
+                  >
+
+                    <div className="mx-auto flex max-w-sm flex-col items-center">
+
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                        <Users className="h-5 w-5" />
+                      </div>
+
+                      <p className="mt-4 text-sm font-semibold text-slate-900">
+                        No attendance records
+                      </p>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        Attendance marked by students
+                        will appear here.
+                      </p>
+
+                    </div>
+
+                  </td>
+                </tr>
+
+              ) : (
+
+                filteredAttendance.map(
+                  (record) => {
+
+                    const config =
+                      statusConfig(
+                        record.status
+                      );
+
+                    const StatusIcon =
+                      config.icon;
+
+                    return (
+                      <tr
+                        key={record.id}
+                        className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"
+                      >
+
+                        {/* STUDENT */}
+
+                        <td className="px-5 py-4">
+
+                          <p className="text-sm font-semibold text-slate-900">
+                            {record.studentId}
+                          </p>
+
+                        </td>
+
+                        {/* COURSE */}
+
+                        <td className="px-5 py-4">
+
+                          <p className="max-w-[220px] truncate text-sm font-medium text-slate-700">
+                            {record.course
+                              ?.title ||
+                              record.course
+                                ?.name ||
+                              record.courseId}
+                          </p>
+
+                        </td>
+
+                        {/* SESSION */}
+
+                        <td className="px-5 py-4">
+
+                          <p className="text-xs font-medium text-slate-500">
+                            {record.sessionId}
+                          </p>
+
+                        </td>
+
+                        {/* STATUS */}
+
+                        <td className="px-5 py-4">
+
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold ${config.className}`}
+                          >
+
+                            <StatusIcon className="h-3.5 w-3.5" />
+
+                            {config.label}
+
+                          </span>
+
+                        </td>
+
+                        {/* DATE */}
+
+                        <td className="px-5 py-4">
+
+                          <p className="text-xs font-medium text-slate-500">
+                            {formatDate(
+                              record.markedAt
+                            )}
+                          </p>
+
+                        </td>
+
+                      </tr>
+                    );
+                  }
+                )
+
+              )}
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+/* ============================================================
+   SUMMARY CARD
+   ============================================================ */
+
+function SummaryCard({
+  label,
+  value,
+  icon: Icon,
+  iconClass = "bg-violet-50 text-violet-600",
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {label}
+          </p>
+
+          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+            {value}
+          </p>
+
+        </div>
+
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+
+      </div>
+
+    </div>
+  );
+}

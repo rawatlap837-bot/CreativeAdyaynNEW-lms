@@ -1,0 +1,15 @@
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*firebase-adminsdk*.json
+*serviceAccountKey*.json
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
