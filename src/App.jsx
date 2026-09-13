@@ -107,37 +107,37 @@ const Admins = lazy(() =>
 
 // Teacher dashboard
 const TeacherDashboard = lazy(() =>
-  import("./teacher/Dashboard.jsx")
+  import("./Teacher/Dashboard.jsx")
 );
 
 // Teacher courses
 const TeacherCourses = lazy(() =>
-  import("./teacher/Courses.jsx")
+  import("./Teacher/Courses.jsx")
 );
 
 // Teacher attendance
 const TeacherAttendance = lazy(() =>
-  import("./teacher/Attendance.jsx")
+  import("./Teacher/Attendance.jsx")
 );
 
 // Create course
 const CreateCourse = lazy(() =>
-  import("./teacher/CreateCourse.jsx")
+  import("./Teacher/CreateCourse.jsx")
 );
 
 // Edit course
 const EditCourse = lazy(() =>
-  import("./teacher/EditCourse.jsx")
+  import("./Teacher/EditCourse.jsx")
 );
 
 // Manage course content
 const CourseContent = lazy(() =>
-  import("./teacher/CourseContent.jsx")
+  import("./Teacher/CourseContent.jsx")
 );
 
 // Edit lesson
 const LessonEditor = lazy(() =>
-  import("./teacher/LessonEditor.jsx")
+  import("./Teacher/LessonEditor.jsx")
 );
 
 /* ============================================================
