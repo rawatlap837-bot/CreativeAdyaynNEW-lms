@@ -27,7 +27,7 @@ import {
   createLesson,
   updateLesson,
   deleteLesson,
-} from "../services/CourseContentService";
+} from "./CourseContentService";
 
 
 const CourseContent = () => {

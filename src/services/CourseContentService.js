@@ -4,6 +4,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -695,3 +696,76 @@ export async function setLessonPublished(
 
   return true;
 }
+
+/* ============================================================
+   LIVE LISTENERS
+
+   These subscribe to Firestore in real time and return an
+   unsubscribe function (the standard onSnapshot pattern), rather
+   than a one-time Promise like the getX functions above. Because
+   onSnapshot must attach synchronously, these do NOT call
+   requireCourseOwner first — ownership/visibility must instead be
+   enforced by Firestore security rules for the "courses",
+   "modules", and "lessons" collections.
+   ============================================================ */
+
+// Subscribes to the current instructor's own courses in real time.
+export function listenToCourses(callback) {
+  const user = requireUser();
+
+  const coursesQuery = query(
+    collection(db, COURSES_COLLECTION)
+  );
+
+  return onSnapshot(coursesQuery, (snapshot) => {
+    const courses = snapshot.docs
+      .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+      .filter((course) => course.instructorId === user.uid);
+
+    callback(courses);
+  });
+}
+
+// Subscribes to a course's modules in real time, ordered by `order`.
+export function listenToModules(courseId, callback) {
+  const modulesQuery = query(
+    getModulesCollection(courseId),
+    orderBy("order", "asc")
+  );
+
+  return onSnapshot(modulesQuery, (snapshot) => {
+    const modules = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+
+    callback(modules);
+  });
+}
+
+// Subscribes to a module's lessons in real time, ordered by `order`.
+export function listenToLessons(courseId, moduleId, callback) {
+  const lessonsQuery = query(
+    getLessonsCollection(courseId, moduleId),
+    orderBy("order", "asc")
+  );
+
+  return onSnapshot(lessonsQuery, (snapshot) => {
+    const lessons = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+
+    callback(lessons);
+  });
+}
+
+/* ============================================================
+   NAME ALIASES
+
+   Lessons.jsx imports addModule/addLesson; the underlying
+   implementations are createModule/createLesson defined above.
+   ============================================================ */
+
+export const addModule = createModule;
+export const addLesson = createLesson;

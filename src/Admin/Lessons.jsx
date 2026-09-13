@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus, Pencil, Trash2, GripVertical, PlayCircle, FileText, HelpCircle,
   ChevronDown, ChevronRight, FolderPlus, ArrowUp, ArrowDown, UploadCloud,
@@ -9,8 +9,10 @@ import {
   listenToCourses, listenToModules, listenToLessons,
   addModule, updateModule, deleteModule, reorderModules,
   addLesson, updateLesson, deleteLesson, reorderLessons,
-  uploadLessonVideo, uploadLessonThumbnail, deleteFileByPath,
-} from "../services/CourseContent.js";
+} from "../services/CourseContentService";
+import {
+  uploadLessonVideo, uploadLessonThumbnail, deleteStorageFile,
+} from "../services/StorageService";
 
 const typeIcon = { video: PlayCircle, quiz: HelpCircle, reading: FileText };
 
@@ -422,7 +424,6 @@ function LessonForm({ courseId, moduleId, initial, onCancel, onSave }) {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const videoTaskRef = useRef(null);
 
   const onPickVideo = async (e) => {
     const file = e.target.files?.[0];
@@ -459,10 +460,6 @@ function LessonForm({ courseId, moduleId, initial, onCancel, onSave }) {
     setThumbPreview(URL.createObjectURL(file));
   };
 
-  const cancelVideoUpload = () => {
-    videoTaskRef.current?.cancel();
-  };
-
   const submit = async () => {
     if (!form.title.trim() || saving || uploading) return;
     if (videoSource === "link" && form.type === "video" && !form.videoUrl.trim() && !initial?.videoPath) {
@@ -485,33 +482,36 @@ function LessonForm({ courseId, moduleId, initial, onCancel, onSave }) {
         // Replacing an existing uploaded video — remove the old file once
         // the new one is safely up, so a failed upload never destroys the
         // still-working original.
-        const { task, promise } = uploadLessonVideo(courseId, moduleId, lessonId, videoFile);
-        videoTaskRef.current = task;
-        task.on("state_changed", (snap) => {
-          setVideoProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100));
-        });
-        const result = await promise;
+        const result = await uploadLessonVideo(
+          videoFile,
+          courseId,
+          moduleId,
+          lessonId,
+          (progress) => setVideoProgress(progress)
+        );
         if (initial?.videoPath && initial.videoPath !== result.path) {
-          await deleteFileByPath(initial.videoPath).catch(() => {});
+          await deleteStorageFile(initial.videoPath).catch(() => { });
         }
         nextForm = { ...nextForm, videoUrl: result.url, videoPath: result.path, videoSize: result.size };
       } else if (videoSource === "link") {
         // Switching to an external link on an edit — drop the old uploaded file.
         if (initial?.videoPath) {
-          await deleteFileByPath(initial.videoPath).catch(() => {});
+          await deleteStorageFile(initial.videoPath).catch(() => { });
         }
         nextForm = { ...nextForm, videoPath: "", videoSize: null };
       }
 
       if (thumbFile) {
         setThumbProgress(0);
-        const { task, promise } = uploadLessonThumbnail(courseId, moduleId, lessonId, thumbFile);
-        task.on("state_changed", (snap) => {
-          setThumbProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100));
-        });
-        const result = await promise;
+        const result = await uploadLessonThumbnail(
+          thumbFile,
+          courseId,
+          moduleId,
+          lessonId,
+          (progress) => setThumbProgress(progress)
+        );
         if (initial?.thumbnailPath && initial.thumbnailPath !== result.path) {
-          await deleteFileByPath(initial.thumbnailPath).catch(() => {});
+          await deleteStorageFile(initial.thumbnailPath).catch(() => { });
         }
         nextForm = { ...nextForm, thumbnail: result.url, thumbnailPath: result.path };
       }
@@ -541,7 +541,7 @@ function LessonForm({ courseId, moduleId, initial, onCancel, onSave }) {
   const busy = saving || uploading;
 
   return (
-    <Modal title={initial ? "Edit lesson" : "Add lesson"} onClose={busy ? () => {} : onCancel}>
+    <Modal title={initial ? "Edit lesson" : "Add lesson"} onClose={busy ? () => { } : onCancel}>
       <div className="max-h-[70vh] overflow-y-auto pr-1">
         {error && (
           <div className="text-xs rounded-lg px-3 py-2 mb-3" style={{ background: AT.dangerSoft, color: AT.danger }}>{error}</div>
@@ -626,9 +626,8 @@ function LessonForm({ courseId, moduleId, initial, onCancel, onSave }) {
                         <div className="h-1.5 rounded-full overflow-hidden" style={{ background: AT.line }}>
                           <div className="h-full rounded-full" style={{ width: `${videoProgress}%`, background: AT.accentDeep, transition: "width 0.2s" }} />
                         </div>
-                        <div className="flex items-center justify-between text-xs" style={{ color: AT.sub }}>
-                          <span>Uploading… {videoProgress}%</span>
-                          <button type="button" onClick={cancelVideoUpload} style={{ color: AT.danger }}>Cancel</button>
+                        <div className="text-xs" style={{ color: AT.sub }}>
+                          Uploading… {videoProgress}%
                         </div>
                       </div>
                     )}
