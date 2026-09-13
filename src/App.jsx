@@ -350,7 +350,7 @@ function App() {
               ==================================================== */}
 
           <Route
-            path="/teacher"
+            path="/Teacher"
             element={<TeacherLayout />}
           >
 
