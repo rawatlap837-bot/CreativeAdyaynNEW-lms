@@ -1163,7 +1163,7 @@ export default function CourseContent() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <button
                 type="button"
                 onClick={() =>
@@ -1172,7 +1172,7 @@ export default function CourseContent() {
                   )
                 }
                 disabled={saving || submitting}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
               >
                 <Pencil size={17} />
                 Course Details
@@ -1188,7 +1188,7 @@ export default function CourseContent() {
                     disabled={
                       saving || submitting
                     }
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
                   >
                     {submitting ? (
                       <Loader2
@@ -1301,7 +1301,7 @@ export default function CourseContent() {
             type="button"
             onClick={openAddModule}
             disabled={isLocked || saving}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             <Plus size={18} />
             Add Module
@@ -1612,12 +1612,12 @@ export default function CourseContent() {
             />
           </div>
 
-          <div className="mt-6 flex justify-end gap-3">
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={closeModuleModal}
               disabled={saving}
-              className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
             >
               Cancel
             </button>
@@ -1626,7 +1626,7 @@ export default function CourseContent() {
               type="button"
               onClick={saveModule}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
             >
               {saving && (
                 <Loader2
@@ -1788,7 +1788,7 @@ export default function CourseContent() {
                       className="max-h-[300px] w-full"
                     />
 
-                    <div className="flex items-center justify-between bg-white px-4 py-3">
+                    <div className="flex items-center justify-between gap-3 bg-white px-4 py-3">
                       <span className="max-w-[70%] truncate text-xs text-slate-500">
                         {lessonVideo?.name}
                       </span>
@@ -1959,14 +1959,14 @@ export default function CourseContent() {
             )}
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5">
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={closeLessonModal}
                 disabled={
                   saving || uploadingVideo
                 }
-                className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
               >
                 Cancel
               </button>
@@ -1977,7 +1977,7 @@ export default function CourseContent() {
                 disabled={
                   saving || uploadingVideo
                 }
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
               >
                 {saving || uploadingVideo ? (
                   <Loader2
@@ -2023,7 +2023,7 @@ function LessonRow({
     lesson.type === LESSON_TYPES.VIDEO;
 
   return (
-    <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:px-5 sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
         <div className="text-slate-300">
           <GripVertical size={18} />
@@ -2075,7 +2075,7 @@ function LessonRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-1 pl-12 sm:pl-0">
+      <div className="flex flex-wrap items-center gap-1 pl-12 sm:pl-0">
         {!locked && (
           <>
             <IconButton
@@ -2148,13 +2148,13 @@ function Modal({
   wide = false,
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4 backdrop-blur-sm">
       <div
-        className={`max-h-[90vh] w-full overflow-y-auto rounded-2xl bg-white shadow-2xl ${
+        className={`max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-2xl ${
           wide ? "max-w-2xl" : "max-w-lg"
         }`}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4 sm:px-5">
           <h2 className="text-lg font-semibold text-slate-900">
             {title}
           </h2>
@@ -2169,7 +2169,7 @@ function Modal({
           </button>
         </div>
 
-        <div className="p-5">{children}</div>
+        <div className="p-4 sm:p-5">{children}</div>
       </div>
     </div>
   );

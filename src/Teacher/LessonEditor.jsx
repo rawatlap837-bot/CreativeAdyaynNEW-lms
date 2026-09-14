@@ -579,7 +579,7 @@ const LessonEditor = () => {
         </button>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">
               {course.title}
             </p>
@@ -588,7 +588,7 @@ const LessonEditor = () => {
               Edit Lesson
             </h1>
 
-            <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
               <BookOpen size={15} />
               <span>{module.title}</span>
               <span className="text-slate-300">/</span>
@@ -756,7 +756,7 @@ const LessonEditor = () => {
                   className="max-h-[420px] w-full"
                 />
 
-                <div className="flex items-center justify-between gap-3 border-t border-slate-800 bg-slate-900 px-4 py-3">
+                <div className="flex flex-col gap-3 border-t border-slate-800 bg-slate-900 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-white">
                       Current video
@@ -771,7 +771,7 @@ const LessonEditor = () => {
                     type="button"
                     onClick={handleDeleteVideo}
                     disabled={saving || uploadingVideo}
-                    className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                    className="w-full shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50 sm:w-auto"
                   >
                     Remove
                   </button>
@@ -909,7 +909,7 @@ const LessonEditor = () => {
                   className="aspect-video w-full object-cover"
                 />
 
-                <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
+                <div className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-xs text-slate-400">
                     Current thumbnail
                   </p>
@@ -918,7 +918,7 @@ const LessonEditor = () => {
                     type="button"
                     onClick={handleDeleteThumbnail}
                     disabled={saving || uploadingThumbnail}
-                    className="text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50"
+                    className="text-left text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50 sm:text-right"
                   >
                     Remove
                   </button>
@@ -1049,7 +1049,7 @@ const LessonEditor = () => {
           <div className="p-5 sm:p-6">
 
             {form.resourceUrl && (
-              <div className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-5 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
 
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-violet-600 shadow-sm">
@@ -1076,7 +1076,7 @@ const LessonEditor = () => {
                   type="button"
                   onClick={handleDeleteResource}
                   disabled={saving || uploadingResource}
-                  className="shrink-0 text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50"
+                  className="text-left text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50 sm:shrink-0 sm:text-right"
                 >
                   Remove
                 </button>

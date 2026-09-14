@@ -53,17 +53,13 @@ import { db } from "../firebase/Firebase";
 function toDate(value) {
   if (!value) return null;
 
-  if (
-    typeof value.toDate === "function"
-  ) {
+  if (typeof value.toDate === "function") {
     return value.toDate();
   }
 
   const date = new Date(value);
 
-  return Number.isNaN(date.getTime())
-    ? null
-    : date;
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 
@@ -72,42 +68,32 @@ function formatDate(value) {
 
   if (!date) return "—";
 
-  return date.toLocaleDateString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 
 function formatPrice(course) {
-  const currency =
-    course.currency || "INR";
+  const currency = course.currency || "INR";
 
   const price =
     course.discountPrice ??
     course.price ??
     0;
 
-  if (
-    price === 0 ||
-    price === "0"
-  ) {
+  if (price === 0 || price === "0") {
     return "Free";
   }
 
   try {
-    return new Intl.NumberFormat(
-      "en-IN",
-      {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 0,
-      }
-    ).format(Number(price));
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(Number(price));
   } catch {
     return `₹${price}`;
   }
@@ -161,15 +147,13 @@ function getStatusStyle(status) {
 
 
 function StatusBadge({ status }) {
-  const style =
-    getStatusStyle(status);
+  const style = getStatusStyle(status);
 
   return (
     <span
-      className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium capitalize"
+      className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium capitalize whitespace-nowrap"
       style={{
-        background:
-          style.background,
+        background: style.background,
         color: style.color,
       }}
     >
@@ -182,7 +166,7 @@ function StatusBadge({ status }) {
 function TypeBadge({ type }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap"
       style={{
         background:
           type === "long"
@@ -211,20 +195,15 @@ function TypeBadge({ type }) {
 // ============================================================
 
 export default function Courses() {
-  const [courses, setCourses] =
-    useState([]);
+  const [courses, setCourses] = useState([]);
 
-  const [instructors, setInstructors] =
-    useState({});
+  const [instructors, setInstructors] = useState({});
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [search, setSearch] =
-    useState("");
+  const [search, setSearch] = useState("");
 
   const [statusFilter, setStatusFilter] =
     useState("all");
@@ -253,9 +232,10 @@ export default function Courses() {
   const [actionError, setActionError] =
     useState("");
 
-  // ----------------------------------------------------------
+
+  // ==========================================================
   // LOAD COURSES
-  // ----------------------------------------------------------
+  // ==========================================================
 
   useEffect(() => {
     setLoading(true);
@@ -289,48 +269,41 @@ export default function Courses() {
   }, []);
 
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // LOAD INSTRUCTORS
-  // ----------------------------------------------------------
+  // ==========================================================
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadInstructors() {
       try {
-        const snapshot =
-          await getDocs(
-            collection(db, "users")
-          );
+        const snapshot = await getDocs(
+          collection(db, "users")
+        );
 
         if (cancelled) return;
 
         const map = {};
 
-        snapshot.docs.forEach(
-          (userDoc) => {
-            const data =
-              userDoc.data();
+        snapshot.docs.forEach((userDoc) => {
+          const data = userDoc.data();
 
-            if (
-              data.role === "teacher"
-            ) {
-              map[userDoc.id] = {
-                id: userDoc.id,
+          if (data.role === "teacher") {
+            map[userDoc.id] = {
+              id: userDoc.id,
 
-                name:
-                  data.displayName ||
-                  data.name ||
-                  data.fullName ||
-                  data.email ||
-                  "Teacher",
+              name:
+                data.displayName ||
+                data.name ||
+                data.fullName ||
+                data.email ||
+                "Teacher",
 
-                email:
-                  data.email || "",
-              };
-            }
+              email: data.email || "",
+            };
           }
-        );
+        });
 
         setInstructors(map);
       } catch (firebaseError) {
@@ -353,103 +326,78 @@ export default function Courses() {
   // FILTER OPTIONS
   // ==========================================================
 
-  const instructorOptions =
-    useMemo(() => {
-      const ids = new Set();
+  const instructorOptions = useMemo(() => {
+    const ids = new Set();
 
-      courses.forEach(
-        (course) => {
-          if (course.instructorId) {
-            ids.add(
-              course.instructorId
-            );
-          }
-        }
-      );
+    courses.forEach((course) => {
+      if (course.instructorId) {
+        ids.add(course.instructorId);
+      }
+    });
 
-      return Array.from(ids).map(
-        (id) => ({
-          id,
-          name:
-            instructors[id]?.name ||
-            "Unknown Instructor",
-        })
-      );
-    }, [courses, instructors]);
+    return Array.from(ids).map((id) => ({
+      id,
+      name:
+        instructors[id]?.name ||
+        "Unknown Instructor",
+    }));
+  }, [courses, instructors]);
 
 
   // ==========================================================
   // FILTERED COURSES
   // ==========================================================
 
-  const filteredCourses =
-    useMemo(() => {
-      const term =
-        search
-          .trim()
-          .toLowerCase();
+  const filteredCourses = useMemo(() => {
+    const term = search.trim().toLowerCase();
 
-      return courses.filter(
-        (course) => {
-          const instructor =
-            instructors[
-              course.instructorId
-            ];
+    return courses.filter((course) => {
+      const instructor =
+        instructors[course.instructorId];
 
-          const instructorName =
-            instructor?.name ||
-            "";
+      const instructorName =
+        instructor?.name || "";
 
-          const matchesSearch =
-            !term ||
-            String(
-              course.title || ""
-            )
-              .toLowerCase()
-              .includes(term) ||
+      const matchesSearch =
+        !term ||
+        String(course.title || "")
+          .toLowerCase()
+          .includes(term) ||
+        String(course.category || "")
+          .toLowerCase()
+          .includes(term) ||
+        instructorName
+          .toLowerCase()
+          .includes(term);
 
-            String(
-              course.category || ""
-            )
-              .toLowerCase()
-              .includes(term) ||
+      const matchesStatus =
+        statusFilter === "all" ||
+        course.status === statusFilter;
 
-            instructorName
-              .toLowerCase()
-              .includes(term);
+      const matchesType =
+        typeFilter === "all" ||
+        course.type === typeFilter;
 
-          const matchesStatus =
-            statusFilter === "all" ||
-            course.status ===
-              statusFilter;
+      const matchesInstructor =
+        instructorFilter === "all" ||
+        course.instructorId ===
+          instructorFilter;
 
-          const matchesType =
-            typeFilter === "all" ||
-            course.type ===
-              typeFilter;
-
-          const matchesInstructor =
-            instructorFilter ===
-              "all" ||
-            course.instructorId ===
-              instructorFilter;
-
-          return (
-            matchesSearch &&
-            matchesStatus &&
-            matchesType &&
-            matchesInstructor
-          );
-        }
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesType &&
+        matchesInstructor
       );
-    }, [
-      courses,
-      instructors,
-      search,
-      statusFilter,
-      typeFilter,
-      instructorFilter,
-    ]);
+    });
+  }, [
+    courses,
+    instructors,
+    search,
+    statusFilter,
+    typeFilter,
+    instructorFilter,
+  ]);
 
 
   // ==========================================================
@@ -472,32 +420,27 @@ export default function Courses() {
 
       published: courses.filter(
         (course) =>
-          course.status ===
-          "published"
+          course.status === "published"
       ).length,
 
       pending: courses.filter(
         (course) =>
-          course.status ===
-          "pending"
+          course.status === "pending"
       ).length,
 
       draft: courses.filter(
         (course) =>
-          course.status ===
-          "draft"
+          course.status === "draft"
       ).length,
 
       rejected: courses.filter(
         (course) =>
-          course.status ===
-          "rejected"
+          course.status === "rejected"
       ).length,
 
       archived: courses.filter(
         (course) =>
-          course.status ===
-          "archived"
+          course.status === "archived"
       ).length,
 
       featured: courses.filter(
@@ -512,10 +455,7 @@ export default function Courses() {
   // ACTION WRAPPER
   // ==========================================================
 
-  async function runAction(
-    key,
-    action
-  ) {
+  async function runAction(key, action) {
     setBusyAction(key);
     setActionError("");
 
@@ -546,9 +486,7 @@ export default function Courses() {
       `approve-${course.id}`,
 
       async () => {
-        await approveCourse(
-          course.id
-        );
+        await approveCourse(course.id);
 
         setSelectedCourse(null);
       }
@@ -561,9 +499,7 @@ export default function Courses() {
   // ==========================================================
 
   async function handleReject() {
-    if (!rejectingCourse) {
-      return;
-    }
+    if (!rejectingCourse) return;
 
     if (!rejectReason.trim()) {
       setActionError(
@@ -593,17 +529,12 @@ export default function Courses() {
   // UNPUBLISH
   // ==========================================================
 
-  async function handleUnpublish(
-    course
-  ) {
-    const confirmed =
-      window.confirm(
-        `Unpublish "${course.title}"?\n\nThis will remove the course from the public LMS.`
-      );
+  async function handleUnpublish(course) {
+    const confirmed = window.confirm(
+      `Unpublish "${course.title}"?\n\nThis will remove the course from the public LMS.`
+    );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     await runAction(
       `unpublish-${course.id}`,
@@ -622,9 +553,7 @@ export default function Courses() {
   // ==========================================================
 
   async function handleDelete() {
-    if (!deleteCourse) {
-      return;
-    }
+    if (!deleteCourse) return;
 
     await runAction(
       `delete-${deleteCourse.id}`,
@@ -645,20 +574,8 @@ export default function Courses() {
   // FEATURED
   // ==========================================================
 
-  async function handleFeatured(
-    course
-  ) {
-    /**
-     * Featured is an admin-only platform
-     * curation control.
-     *
-     * Only published courses should
-     * normally be featured.
-     */
-    if (
-      course.status !==
-      "published"
-    ) {
+  async function handleFeatured(course) {
+    if (course.status !== "published") {
       return;
     }
 
@@ -693,36 +610,36 @@ export default function Courses() {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen w-full min-w-0 overflow-x-hidden"
       style={{
-        background:
-          AT.canvas,
+        background: AT.canvas,
         color: AT.ink,
       }}
     >
-      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto">
+      <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-6 lg:px-8 lg:py-8">
 
         {/* ==================================================
             HEADER
         ================================================== */}
 
-        <div className="mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="mb-5 sm:mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <BookOpen
-                  size={22}
+                  size={21}
                   color={AT.accentDeep}
+                  className="shrink-0"
                 />
 
-                <h1 className="text-2xl font-semibold">
+                <h1 className="text-xl font-semibold sm:text-2xl">
                   Course Approvals
                 </h1>
               </div>
 
               <p
-                className="text-sm mt-1"
+                className="mt-1 max-w-2xl text-xs leading-5 sm:text-sm"
                 style={{
                   color: AT.sub,
                 }}
@@ -732,7 +649,7 @@ export default function Courses() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="w-full sm:w-auto">
               <GhostButton
                 onClick={() => {
                   window.location.reload();
@@ -750,17 +667,13 @@ export default function Courses() {
             ACTION ERROR
         ================================================== */}
 
-        {(error ||
-          actionError) && (
+        {(error || actionError) && (
           <div
-            className="mb-5 rounded-xl px-4 py-3 flex items-start gap-3"
+            className="mb-5 flex items-start gap-3 rounded-xl px-3 py-3 sm:px-4"
             style={{
-              background:
-                AT.dangerSoft,
-              color:
-                AT.danger,
-              border:
-                `1px solid ${AT.danger}`,
+              background: AT.dangerSoft,
+              color: AT.danger,
+              border: `1px solid ${AT.danger}`,
             }}
           >
             <AlertCircle
@@ -768,9 +681,8 @@ export default function Courses() {
               className="mt-0.5 shrink-0"
             />
 
-            <div className="text-sm">
-              {actionError ||
-                error}
+            <div className="min-w-0 text-xs leading-5 sm:text-sm break-words">
+              {actionError || error}
             </div>
           </div>
         )}
@@ -780,8 +692,7 @@ export default function Courses() {
             STATS
         ================================================== */}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-6">
-
+        <div className="mb-5 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4 xl:grid-cols-8">
           <StatCard
             label="Total Courses"
             value={stats.total}
@@ -837,9 +748,9 @@ export default function Courses() {
         ================================================== */}
 
         <Card>
-          <div className="p-4">
+          <div className="p-3 sm:p-4">
 
-            <div className="flex items-center gap-2 mb-3">
+            <div className="mb-3 flex items-center gap-2">
               <Filter
                 size={16}
                 color={AT.sub}
@@ -851,11 +762,11 @@ export default function Courses() {
             </div>
 
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-5">
 
               {/* Search */}
 
-              <div className="relative xl:col-span-2">
+              <div className="relative sm:col-span-2 xl:col-span-2">
                 <Search
                   size={16}
                   className="absolute left-3 top-1/2 -translate-y-1/2"
@@ -870,10 +781,9 @@ export default function Courses() {
                     )
                   }
                   placeholder="Search course, category or instructor..."
-                  className="w-full rounded-lg border pl-9 pr-3 py-2 text-sm outline-none"
+                  className="w-full rounded-lg border py-2.5 pl-9 pr-3 text-sm outline-none"
                   style={{
-                    borderColor:
-                      AT.line,
+                    borderColor: AT.line,
                   }}
                 />
               </div>
@@ -888,10 +798,9 @@ export default function Courses() {
                     event.target.value
                   )
                 }
-                className="rounded-lg border px-3 py-2 text-sm outline-none"
+                className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
                 style={{
-                  borderColor:
-                    AT.line,
+                  borderColor: AT.line,
                 }}
               >
                 <option value="all">
@@ -929,10 +838,9 @@ export default function Courses() {
                     event.target.value
                   )
                 }
-                className="rounded-lg border px-3 py-2 text-sm outline-none"
+                className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
                 style={{
-                  borderColor:
-                    AT.line,
+                  borderColor: AT.line,
                 }}
               >
                 <option value="all">
@@ -952,18 +860,15 @@ export default function Courses() {
               {/* Instructor */}
 
               <select
-                value={
-                  instructorFilter
-                }
+                value={instructorFilter}
                 onChange={(event) =>
                   setInstructorFilter(
                     event.target.value
                   )
                 }
-                className="rounded-lg border px-3 py-2 text-sm outline-none"
+                className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none sm:col-span-2 xl:col-span-1"
                 style={{
-                  borderColor:
-                    AT.line,
+                  borderColor: AT.line,
                 }}
               >
                 <option value="all">
@@ -973,12 +878,8 @@ export default function Courses() {
                 {instructorOptions.map(
                   (instructor) => (
                     <option
-                      key={
-                        instructor.id
-                      }
-                      value={
-                        instructor.id
-                      }
+                      key={instructor.id}
+                      value={instructor.id}
                     >
                       {instructor.name}
                     </option>
@@ -988,8 +889,7 @@ export default function Courses() {
             </div>
 
 
-            <div className="flex justify-between items-center mt-3">
-
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p
                 className="text-xs"
                 style={{
@@ -1008,20 +908,14 @@ export default function Courses() {
               </p>
 
               {(search ||
-                statusFilter !==
-                  "all" ||
-                typeFilter !==
-                  "all" ||
-                instructorFilter !==
-                  "all") && (
+                statusFilter !== "all" ||
+                typeFilter !== "all" ||
+                instructorFilter !== "all") && (
                 <button
-                  onClick={
-                    resetFilters
-                  }
-                  className="text-xs font-medium"
+                  onClick={resetFilters}
+                  className="self-start text-xs font-medium sm:self-auto"
                   style={{
-                    color:
-                      AT.accentDeep,
+                    color: AT.accentDeep,
                   }}
                 >
                   Clear filters
@@ -1033,16 +927,17 @@ export default function Courses() {
 
 
         {/* ==================================================
-            COURSE TABLE
+            COURSE LIST
         ================================================== */}
 
-        <div className="mt-5">
+        <div className="mt-4 sm:mt-5">
           <Card title="All Courses">
+
             {loading ? (
-              <div className="px-5 py-12 text-center">
+              <div className="px-4 py-12 text-center sm:px-5">
                 <RefreshCw
                   size={22}
-                  className="animate-spin mx-auto mb-3"
+                  className="mx-auto mb-3 animate-spin"
                   color={AT.accentDeep}
                 />
 
@@ -1055,8 +950,7 @@ export default function Courses() {
                   Loading courses...
                 </p>
               </div>
-            ) : filteredCourses.length ===
-              0 ? (
+            ) : filteredCourses.length === 0 ? (
               <EmptyState
                 text={
                   courses.length === 0
@@ -1065,450 +959,283 @@ export default function Courses() {
                 }
               />
             ) : (
-              <div className="overflow-x-auto">
+              <>
+                {/* ==================================================
+                    MOBILE / TABLET CARD LIST
+                ================================================== */}
 
-                <table className="w-full min-w-[1050px]">
+                <div className="space-y-3 p-3 md:hidden">
+                  {filteredCourses.map((course) => {
+                    const instructor =
+                      instructors[
+                        course.instructorId
+                      ];
 
-                  <thead>
-                    <tr
-                      className="border-b"
-                      style={{
-                        borderColor:
-                          AT.line,
-                      }}
-                    >
-                      <th className="text-left px-5 py-3 text-xs font-semibold">
-                        Course
-                      </th>
+                    const studentCount =
+                      course.students ??
+                      course.studentCount ??
+                      0;
 
-                      <th className="text-left px-4 py-3 text-xs font-semibold">
-                        Type
-                      </th>
-
-                      <th className="text-left px-4 py-3 text-xs font-semibold">
-                        Instructor
-                      </th>
-
-                      <th className="text-left px-4 py-3 text-xs font-semibold">
-                        Price
-                      </th>
-
-                      <th className="text-left px-4 py-3 text-xs font-semibold">
-                        Students
-                      </th>
-
-                      <th className="text-left px-4 py-3 text-xs font-semibold">
-                        Status
-                      </th>
-
-                      <th className="text-left px-4 py-3 text-xs font-semibold">
-                        Updated
-                      </th>
-
-                      <th className="text-right px-5 py-3 text-xs font-semibold">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-
-
-                  <tbody>
-
-                    {filteredCourses.map(
-                      (course) => {
-                        const instructor =
-                          instructors[
-                            course.instructorId
-                          ];
-
-                        const studentCount =
-                          course.students ??
-                          course.studentCount ??
-                          0;
-
-                        return (
-                          <tr
-                            key={
-                              course.id
-                            }
-                            className="border-b last:border-b-0 hover:bg-slate-50"
-                            style={{
-                              borderColor:
-                                AT.line,
-                            }}
-                          >
-
-                            {/* Course */}
-
-                            <td className="px-5 py-4">
-
-                              <div className="flex items-center gap-3">
-
-                                <div
-                                  className="w-12 h-12 rounded-lg overflow-hidden shrink-0"
-                                  style={{
-                                    background:
-                                      AT.line,
-                                  }}
-                                >
-                                  {course.thumbnailUrl ? (
-                                    <img
-                                      src={
-                                        course.thumbnailUrl
-                                      }
-                                      alt={
-                                        course.title ||
-                                        "Course"
-                                      }
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                      <BookOpen
-                                        size={19}
-                                        color={
-                                          AT.sub
-                                        }
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="min-w-0">
-
-                                  <p className="font-medium text-sm truncate max-w-[300px]">
-                                    {course.title ||
-                                      "Untitled Course"}
-                                  </p>
-
-                                  <p
-                                    className="text-xs mt-0.5 truncate max-w-[300px]"
-                                    style={{
-                                      color:
-                                        AT.sub,
-                                    }}
-                                  >
-                                    {course.category ||
-                                      "Uncategorized"}
-                                  </p>
-
-                                  {course.featured ===
-                                    true && (
-                                    <span
-                                      className="inline-flex items-center gap-1 text-[10px] mt-1 font-medium"
-                                      style={{
-                                        color:
-                                          AT.warn,
-                                      }}
-                                    >
-                                      <Star
-                                        size={10}
-                                        fill="currentColor"
-                                      />
-                                      Featured
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
+                    return (
+                      <MobileCourseCard
+                        key={course.id}
+                        course={course}
+                        instructor={instructor}
+                        studentCount={
+                          studentCount
+                        }
+                        busyAction={
+                          busyAction
+                        }
+                        onView={() =>
+                          setSelectedCourse(
+                            course
+                          )
+                        }
+                        onApprove={() =>
+                          handleApprove(
+                            course
+                          )
+                        }
+                        onReject={() => {
+                          setRejectingCourse(
+                            course
+                          );
+                          setRejectReason("");
+                          setActionError("");
+                        }}
+                        onFeatured={() =>
+                          handleFeatured(
+                            course
+                          )
+                        }
+                        onUnpublish={() =>
+                          handleUnpublish(
+                            course
+                          )
+                        }
+                        onDelete={() =>
+                          setDeleteCourse(
+                            course
+                          )
+                        }
+                      />
+                    );
+                  })}
+                </div>
 
 
-                            {/* Type */}
+                {/* ==================================================
+                    DESKTOP TABLE
+                ================================================== */}
 
-                            <td className="px-4 py-4">
-                              <TypeBadge
-                                type={
-                                  course.type
-                                }
-                              />
-                            </td>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full min-w-[1050px]">
 
+                    <thead>
+                      <tr
+                        className="border-b"
+                        style={{
+                          borderColor:
+                            AT.line,
+                        }}
+                      >
+                        <th className="px-5 py-3 text-left text-xs font-semibold">
+                          Course
+                        </th>
 
-                            {/* Instructor */}
+                        <th className="px-4 py-3 text-left text-xs font-semibold">
+                          Type
+                        </th>
 
-                            <td className="px-4 py-4">
+                        <th className="px-4 py-3 text-left text-xs font-semibold">
+                          Instructor
+                        </th>
 
-                              <div className="flex items-center gap-2">
+                        <th className="px-4 py-3 text-left text-xs font-semibold">
+                          Price
+                        </th>
 
-                                <div
-                                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                                  style={{
-                                    background:
-                                      AT.accentSoft,
-                                  }}
-                                >
-                                  <Users
-                                    size={14}
-                                    color={
-                                      AT.accentDeep
-                                    }
-                                  />
-                                </div>
+                        <th className="px-4 py-3 text-left text-xs font-semibold">
+                          Students
+                        </th>
 
-                                <div>
-                                  <p className="text-sm font-medium">
-                                    {instructor?.name ||
-                                      "Unknown Instructor"}
-                                  </p>
+                        <th className="px-4 py-3 text-left text-xs font-semibold">
+                          Status
+                        </th>
 
-                                  {instructor?.email && (
-                                    <p
-                                      className="text-xs"
-                                      style={{
-                                        color:
-                                          AT.sub,
-                                      }}
-                                    >
-                                      {instructor.email}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
+                        <th className="px-4 py-3 text-left text-xs font-semibold">
+                          Updated
+                        </th>
+
+                        <th className="px-5 py-3 text-right text-xs font-semibold">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
 
 
-                            {/* Price */}
+                    <tbody>
+                      {filteredCourses.map(
+                        (course) => {
+                          const instructor =
+                            instructors[
+                              course.instructorId
+                            ];
 
-                            <td className="px-4 py-4">
-                              <span className="text-sm font-medium">
-                                {formatPrice(
-                                  course
-                                )}
-                              </span>
-                            </td>
+                          const studentCount =
+                            course.students ??
+                            course.studentCount ??
+                            0;
 
+                          return (
+                            <tr
+                              key={course.id}
+                              className="border-b last:border-b-0 hover:bg-slate-50"
+                              style={{
+                                borderColor:
+                                  AT.line,
+                              }}
+                            >
 
-                            {/* Students */}
+                              {/* Course */}
 
-                            <td className="px-4 py-4">
-                              <span className="text-sm">
-                                {Number(
-                                  studentCount
-                                ).toLocaleString(
-                                  "en-IN"
-                                )}
-                              </span>
-                            </td>
-
-
-                            {/* Status */}
-
-                            <td className="px-4 py-4">
-                              <StatusBadge
-                                status={
-                                  course.status
-                                }
-                              />
-                            </td>
+                              <td className="px-5 py-4">
+                                <CourseIdentity
+                                  course={course}
+                                />
+                              </td>
 
 
-                            {/* Updated */}
+                              {/* Type */}
 
-                            <td className="px-4 py-4">
-                              <span
-                                className="text-xs"
-                                style={{
-                                  color:
-                                    AT.sub,
-                                }}
-                              >
-                                {formatDate(
-                                  course.updatedAt ||
-                                    course.createdAt
-                                )}
-                              </span>
-                            </td>
-
-
-                            {/* Actions */}
-
-                            <td className="px-5 py-4">
-
-                              <div className="flex items-center justify-end gap-1.5">
-
-                                {/* View */}
-
-                                <button
-                                  title="View"
-                                  onClick={() =>
-                                    setSelectedCourse(
-                                      course
-                                    )
+                              <td className="px-4 py-4">
+                                <TypeBadge
+                                  type={
+                                    course.type
                                   }
-                                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100"
+                                />
+                              </td>
+
+
+                              {/* Instructor */}
+
+                              <td className="px-4 py-4">
+                                <InstructorCell
+                                  instructor={
+                                    instructor
+                                  }
+                                />
+                              </td>
+
+
+                              {/* Price */}
+
+                              <td className="px-4 py-4">
+                                <span className="text-sm font-medium">
+                                  {formatPrice(
+                                    course
+                                  )}
+                                </span>
+                              </td>
+
+
+                              {/* Students */}
+
+                              <td className="px-4 py-4">
+                                <span className="text-sm">
+                                  {Number(
+                                    studentCount
+                                  ).toLocaleString(
+                                    "en-IN"
+                                  )}
+                                </span>
+                              </td>
+
+
+                              {/* Status */}
+
+                              <td className="px-4 py-4">
+                                <StatusBadge
+                                  status={
+                                    course.status
+                                  }
+                                />
+                              </td>
+
+
+                              {/* Updated */}
+
+                              <td className="px-4 py-4">
+                                <span
+                                  className="text-xs"
                                   style={{
                                     color:
                                       AT.sub,
                                   }}
                                 >
-                                  <Eye
-                                    size={16}
-                                  />
-                                </button>
+                                  {formatDate(
+                                    course.updatedAt ||
+                                      course.createdAt
+                                  )}
+                                </span>
+                              </td>
 
 
-                                {/* Approve */}
+                              {/* Actions */}
 
-                                {course.status ===
-                                  "pending" && (
-                                  <button
-                                    title="Approve"
-                                    disabled={
-                                      busyAction ===
-                                      `approve-${course.id}`
-                                    }
-                                    onClick={() =>
-                                      handleApprove(
-                                        course
-                                      )
-                                    }
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-50"
-                                    style={{
-                                      color:
-                                        AT.success,
-                                      background:
-                                        AT.successSoft,
-                                    }}
-                                  >
-                                    <Check
-                                      size={16}
-                                    />
-                                  </button>
-                                )}
-
-
-                                {/* Reject */}
-
-                                {course.status ===
-                                  "pending" && (
-                                  <button
-                                    title="Reject"
-                                    onClick={() => {
-                                      setRejectingCourse(
-                                        course
-                                      );
-                                      setRejectReason(
-                                        ""
-                                      );
-                                      setActionError(
-                                        ""
-                                      );
-                                    }}
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                    style={{
-                                      color:
-                                        AT.danger,
-                                      background:
-                                        AT.dangerSoft,
-                                    }}
-                                  >
-                                    <X
-                                      size={16}
-                                    />
-                                  </button>
-                                )}
-
-
-                                {/* Featured */}
-
-                                {course.status ===
-                                  "published" && (
-                                  <button
-                                    title={
-                                      course.featured
-                                        ? "Remove featured"
-                                        : "Make featured"
-                                    }
-                                    disabled={
-                                      busyAction ===
-                                      `featured-${course.id}`
-                                    }
-                                    onClick={() =>
-                                      handleFeatured(
-                                        course
-                                      )
-                                    }
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-50"
-                                    style={{
-                                      color:
-                                        course.featured
-                                          ? AT.warn
-                                          : AT.sub,
-                                      background:
-                                        course.featured
-                                          ? AT.warnSoft
-                                          : "transparent",
-                                    }}
-                                  >
-                                    <Star
-                                      size={16}
-                                      fill={
-                                        course.featured
-                                          ? "currentColor"
-                                          : "none"
-                                      }
-                                    />
-                                  </button>
-                                )}
-
-
-                                {/* Emergency Unpublish */}
-
-                                {course.status ===
-                                  "published" && (
-                                  <button
-                                    title="Emergency unpublish"
-                                    disabled={
-                                      busyAction ===
-                                      `unpublish-${course.id}`
-                                    }
-                                    onClick={() =>
-                                      handleUnpublish(
-                                        course
-                                      )
-                                    }
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-50"
-                                    style={{
-                                      color:
-                                        AT.warn,
-                                    }}
-                                  >
-                                    <Archive
-                                      size={16}
-                                    />
-                                  </button>
-                                )}
-
-
-                                {/* Emergency Delete */}
-
-                                <button
-                                  title="Emergency delete"
-                                  onClick={() =>
+                              <td className="px-5 py-4">
+                                <CourseActions
+                                  course={course}
+                                  busyAction={
+                                    busyAction
+                                  }
+                                  onView={() =>
+                                    setSelectedCourse(
+                                      course
+                                    )
+                                  }
+                                  onApprove={() =>
+                                    handleApprove(
+                                      course
+                                    )
+                                  }
+                                  onReject={() => {
+                                    setRejectingCourse(
+                                      course
+                                    );
+                                    setRejectReason(
+                                      ""
+                                    );
+                                    setActionError(
+                                      ""
+                                    );
+                                  }}
+                                  onFeatured={() =>
+                                    handleFeatured(
+                                      course
+                                    )
+                                  }
+                                  onUnpublish={() =>
+                                    handleUnpublish(
+                                      course
+                                    )
+                                  }
+                                  onDelete={() =>
                                     setDeleteCourse(
                                       course
                                     )
                                   }
-                                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                  style={{
-                                    color:
-                                      AT.danger,
-                                  }}
-                                >
-                                  <Trash2
-                                    size={16}
-                                  />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      }
-                    )}
-
-                  </tbody>
-                </table>
-              </div>
+                                />
+                              </td>
+                            </tr>
+                          );
+                        }
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </Card>
         </div>
@@ -1528,8 +1255,6 @@ export default function Courses() {
         >
           <div className="max-h-[75vh] overflow-y-auto">
 
-            {/* Thumbnail */}
-
             {selectedCourse.thumbnailUrl && (
               <img
                 src={
@@ -1538,19 +1263,18 @@ export default function Courses() {
                 alt={
                   selectedCourse.title
                 }
-                className="w-full h-44 object-cover rounded-xl mb-4"
+                className="mb-4 h-36 w-full rounded-xl object-cover sm:h-44"
               />
             )}
 
 
-            {/* Title */}
-
-            <h2 className="text-xl font-semibold">
+            <h2 className="break-words text-lg font-semibold sm:text-xl">
               {selectedCourse.title ||
                 "Untitled Course"}
             </h2>
 
-            <div className="flex flex-wrap gap-2 mt-2">
+
+            <div className="mt-2 flex flex-wrap gap-2">
               <TypeBadge
                 type={
                   selectedCourse.type
@@ -1569,8 +1293,7 @@ export default function Courses() {
                   style={{
                     background:
                       AT.warnSoft,
-                    color:
-                      AT.warn,
+                    color: AT.warn,
                   }}
                 >
                   <Star
@@ -1585,16 +1308,14 @@ export default function Courses() {
 
             {/* Information */}
 
-            <div className="grid grid-cols-2 gap-3 mt-5">
-
+            <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
               <InfoItem
                 label="Instructor"
                 value={
                   instructors[
                     selectedCourse
                       .instructorId
-                  ]?.name ||
-                  "Unknown"
+                  ]?.name || "Unknown"
                 }
               />
 
@@ -1659,12 +1380,12 @@ export default function Courses() {
 
             {selectedCourse.shortDescription && (
               <div className="mt-5">
-                <h3 className="text-sm font-semibold mb-1">
+                <h3 className="mb-1 text-sm font-semibold">
                   Short Description
                 </h3>
 
                 <p
-                  className="text-sm leading-6"
+                  className="break-words text-sm leading-6"
                   style={{
                     color: AT.sub,
                   }}
@@ -1679,12 +1400,12 @@ export default function Courses() {
 
             {selectedCourse.description && (
               <div className="mt-4">
-                <h3 className="text-sm font-semibold mb-1">
+                <h3 className="mb-1 text-sm font-semibold">
                   Description
                 </h3>
 
                 <p
-                  className="text-sm leading-6 whitespace-pre-wrap"
+                  className="whitespace-pre-wrap break-words text-sm leading-6"
                   style={{
                     color: AT.sub,
                   }}
@@ -1718,7 +1439,7 @@ export default function Courses() {
                 </p>
 
                 <p
-                  className="text-sm mt-1"
+                  className="mt-1 break-words text-sm"
                   style={{
                     color:
                       AT.danger,
@@ -1734,7 +1455,7 @@ export default function Courses() {
 
             {/* Dates */}
 
-            <div className="mt-5 pt-4 border-t grid grid-cols-2 gap-3">
+            <div className="mt-5 grid grid-cols-1 gap-2.5 border-t pt-4 sm:grid-cols-2 sm:gap-3">
               <InfoItem
                 label="Created"
                 value={formatDate(
@@ -1753,7 +1474,14 @@ export default function Courses() {
 
             {/* Admin Actions */}
 
-            <div className="flex flex-wrap justify-end gap-2 mt-6">
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+              <GhostButton
+                onClick={() =>
+                  setSelectedCourse(null)
+                }
+              >
+                Close
+              </GhostButton>
 
               {selectedCourse.status ===
                 "pending" && (
@@ -1764,9 +1492,7 @@ export default function Courses() {
                         selectedCourse
                       );
 
-                      setRejectReason(
-                        ""
-                      );
+                      setRejectReason("");
 
                       setSelectedCourse(
                         null
@@ -1803,20 +1529,10 @@ export default function Courses() {
                     )
                   }
                 >
-                  <Archive
-                    size={15}
-                  />
+                  <Archive size={15} />
                   Unpublish
                 </GhostButton>
               )}
-
-              <GhostButton
-                onClick={() =>
-                  setSelectedCourse(null)
-                }
-              >
-                Close
-              </GhostButton>
             </div>
           </div>
         </Modal>
@@ -1831,15 +1547,12 @@ export default function Courses() {
         <Modal
           title="Reject Course"
           onClose={() => {
-            setRejectingCourse(
-              null
-            );
-
+            setRejectingCourse(null);
             setRejectReason("");
           }}
         >
           <p
-            className="text-sm mb-4"
+            className="mb-4 text-sm leading-6"
             style={{
               color: AT.sub,
             }}
@@ -1865,21 +1578,16 @@ export default function Courses() {
             rows={5}
             autoFocus
             placeholder="Example: Please update the course thumbnail and correct the pricing information."
-            className="w-full rounded-lg border px-3 py-2 text-sm outline-none resize-none"
+            className="w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none"
             style={{
-              borderColor:
-                AT.line,
+              borderColor: AT.line,
             }}
           />
 
-          <div className="flex justify-end gap-2 mt-4">
-
+          <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <GhostButton
               onClick={() => {
-                setRejectingCourse(
-                  null
-                );
-
+                setRejectingCourse(null);
                 setRejectReason("");
               }}
             >
@@ -1887,17 +1595,14 @@ export default function Courses() {
             </GhostButton>
 
             <button
-              onClick={
-                handleReject
-              }
+              onClick={handleReject}
               disabled={
                 busyAction ===
                 `reject-${rejectingCourse.id}`
               }
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg text-white disabled:opacity-50"
+              className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
               style={{
-                background:
-                  AT.danger,
+                background: AT.danger,
               }}
             >
               <X size={15} />
@@ -1925,11 +1630,551 @@ export default function Courses() {
           onCancel={() =>
             setDeleteCourse(null)
           }
-          onConfirm={
-            handleDelete
-          }
+          onConfirm={handleDelete}
         />
       )}
+    </div>
+  );
+}
+
+
+// ============================================================
+// COURSE IDENTITY
+// ============================================================
+
+function CourseIdentity({ course }) {
+  return (
+    <div className="flex items-center gap-3">
+
+      <div
+        className="h-12 w-12 shrink-0 overflow-hidden rounded-lg"
+        style={{
+          background: AT.line,
+        }}
+      >
+        {course.thumbnailUrl ? (
+          <img
+            src={course.thumbnailUrl}
+            alt={
+              course.title || "Course"
+            }
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <BookOpen
+              size={19}
+              color={AT.sub}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="min-w-0">
+        <p className="max-w-[300px] truncate text-sm font-medium">
+          {course.title ||
+            "Untitled Course"}
+        </p>
+
+        <p
+          className="mt-0.5 max-w-[300px] truncate text-xs"
+          style={{
+            color: AT.sub,
+          }}
+        >
+          {course.category ||
+            "Uncategorized"}
+        </p>
+
+        {course.featured === true && (
+          <span
+            className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium"
+            style={{
+              color: AT.warn,
+            }}
+          >
+            <Star
+              size={10}
+              fill="currentColor"
+            />
+            Featured
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// ============================================================
+// INSTRUCTOR CELL
+// ============================================================
+
+function InstructorCell({ instructor }) {
+  return (
+    <div className="flex items-center gap-2">
+
+      <div
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+        style={{
+          background:
+            AT.accentSoft,
+        }}
+      >
+        <Users
+          size={14}
+          color={AT.accentDeep}
+        />
+      </div>
+
+      <div className="min-w-0">
+        <p className="max-w-[190px] truncate text-sm font-medium">
+          {instructor?.name ||
+            "Unknown Instructor"}
+        </p>
+
+        {instructor?.email && (
+          <p
+            className="max-w-[190px] truncate text-xs"
+            style={{
+              color: AT.sub,
+            }}
+          >
+            {instructor.email}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// ============================================================
+// COURSE ACTIONS
+// ============================================================
+
+function CourseActions({
+  course,
+  busyAction,
+  onView,
+  onApprove,
+  onReject,
+  onFeatured,
+  onUnpublish,
+  onDelete,
+}) {
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+
+      {/* View */}
+
+      <button
+        title="View"
+        onClick={onView}
+        className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-slate-100"
+        style={{
+          color: AT.sub,
+        }}
+      >
+        <Eye size={16} />
+      </button>
+
+
+      {/* Approve */}
+
+      {course.status === "pending" && (
+        <button
+          title="Approve"
+          disabled={
+            busyAction ===
+            `approve-${course.id}`
+          }
+          onClick={onApprove}
+          className="flex h-8 w-8 items-center justify-center rounded-lg disabled:opacity-50"
+          style={{
+            color: AT.success,
+            background:
+              AT.successSoft,
+          }}
+        >
+          <Check size={16} />
+        </button>
+      )}
+
+
+      {/* Reject */}
+
+      {course.status === "pending" && (
+        <button
+          title="Reject"
+          onClick={onReject}
+          className="flex h-8 w-8 items-center justify-center rounded-lg"
+          style={{
+            color: AT.danger,
+            background:
+              AT.dangerSoft,
+          }}
+        >
+          <X size={16} />
+        </button>
+      )}
+
+
+      {/* Featured */}
+
+      {course.status === "published" && (
+        <button
+          title={
+            course.featured
+              ? "Remove featured"
+              : "Make featured"
+          }
+          disabled={
+            busyAction ===
+            `featured-${course.id}`
+          }
+          onClick={onFeatured}
+          className="flex h-8 w-8 items-center justify-center rounded-lg disabled:opacity-50"
+          style={{
+            color: course.featured
+              ? AT.warn
+              : AT.sub,
+            background:
+              course.featured
+                ? AT.warnSoft
+                : "transparent",
+          }}
+        >
+          <Star
+            size={16}
+            fill={
+              course.featured
+                ? "currentColor"
+                : "none"
+            }
+          />
+        </button>
+      )}
+
+
+      {/* Unpublish */}
+
+      {course.status === "published" && (
+        <button
+          title="Emergency unpublish"
+          disabled={
+            busyAction ===
+            `unpublish-${course.id}`
+          }
+          onClick={onUnpublish}
+          className="flex h-8 w-8 items-center justify-center rounded-lg disabled:opacity-50"
+          style={{
+            color: AT.warn,
+          }}
+        >
+          <Archive size={16} />
+        </button>
+      )}
+
+
+      {/* Delete */}
+
+      <button
+        title="Emergency delete"
+        onClick={onDelete}
+        className="flex h-8 w-8 items-center justify-center rounded-lg"
+        style={{
+          color: AT.danger,
+        }}
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
+  );
+}
+
+
+// ============================================================
+// MOBILE COURSE CARD
+// ============================================================
+
+function MobileCourseCard({
+  course,
+  instructor,
+  studentCount,
+  busyAction,
+  onView,
+  onApprove,
+  onReject,
+  onFeatured,
+  onUnpublish,
+  onDelete,
+}) {
+  return (
+    <div
+      className="overflow-hidden rounded-xl border bg-white"
+      style={{
+        borderColor: AT.line,
+      }}
+    >
+
+      {/* Course top */}
+
+      <div className="flex gap-3 p-3">
+
+        <div
+          className="h-16 w-16 shrink-0 overflow-hidden rounded-lg"
+          style={{
+            background: AT.line,
+          }}
+        >
+          {course.thumbnailUrl ? (
+            <img
+              src={course.thumbnailUrl}
+              alt={
+                course.title || "Course"
+              }
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <BookOpen
+                size={20}
+                color={AT.sub}
+              />
+            </div>
+          )}
+        </div>
+
+
+        <div className="min-w-0 flex-1">
+
+          <div className="flex items-start justify-between gap-2">
+            <p className="line-clamp-2 text-sm font-semibold leading-5">
+              {course.title ||
+                "Untitled Course"}
+            </p>
+
+            {course.featured && (
+              <Star
+                size={15}
+                fill="currentColor"
+                className="mt-0.5 shrink-0"
+                color={AT.warn}
+              />
+            )}
+          </div>
+
+          <p
+            className="mt-0.5 truncate text-xs"
+            style={{
+              color: AT.sub,
+            }}
+          >
+            {course.category ||
+              "Uncategorized"}
+          </p>
+
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <TypeBadge
+              type={course.type}
+            />
+
+            <StatusBadge
+              status={course.status}
+            />
+          </div>
+        </div>
+      </div>
+
+
+      {/* Course details */}
+
+      <div
+        className="grid grid-cols-2 gap-px border-y"
+        style={{
+          background: AT.line,
+          borderColor: AT.line,
+        }}
+      >
+        <MobileInfo
+          label="Instructor"
+          value={
+            instructor?.name ||
+            "Unknown"
+          }
+        />
+
+        <MobileInfo
+          label="Price"
+          value={formatPrice(course)}
+        />
+
+        <MobileInfo
+          label="Students"
+          value={Number(
+            studentCount
+          ).toLocaleString("en-IN")}
+        />
+
+        <MobileInfo
+          label="Updated"
+          value={formatDate(
+            course.updatedAt ||
+              course.createdAt
+          )}
+        />
+      </div>
+
+
+      {/* Actions */}
+
+      <div className="flex items-center justify-between gap-2 p-3">
+
+        <button
+          onClick={onView}
+          className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium"
+          style={{
+            borderColor: AT.line,
+            color: AT.ink,
+          }}
+        >
+          <Eye size={14} />
+          View
+        </button>
+
+
+        <div className="flex items-center gap-1.5">
+
+          {course.status === "pending" && (
+            <>
+              <button
+                onClick={onApprove}
+                disabled={
+                  busyAction ===
+                  `approve-${course.id}`
+                }
+                title="Approve"
+                className="flex h-9 w-9 items-center justify-center rounded-lg disabled:opacity-50"
+                style={{
+                  color: AT.success,
+                  background:
+                    AT.successSoft,
+                }}
+              >
+                <Check size={16} />
+              </button>
+
+              <button
+                onClick={onReject}
+                title="Reject"
+                className="flex h-9 w-9 items-center justify-center rounded-lg"
+                style={{
+                  color: AT.danger,
+                  background:
+                    AT.dangerSoft,
+                }}
+              >
+                <X size={16} />
+              </button>
+            </>
+          )}
+
+
+          {course.status === "published" && (
+            <>
+              <button
+                onClick={onFeatured}
+                disabled={
+                  busyAction ===
+                  `featured-${course.id}`
+                }
+                title={
+                  course.featured
+                    ? "Remove featured"
+                    : "Make featured"
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-lg disabled:opacity-50"
+                style={{
+                  color: course.featured
+                    ? AT.warn
+                    : AT.sub,
+                  background:
+                    course.featured
+                      ? AT.warnSoft
+                      : AT.line,
+                }}
+              >
+                <Star
+                  size={16}
+                  fill={
+                    course.featured
+                      ? "currentColor"
+                      : "none"
+                  }
+                />
+              </button>
+
+              <button
+                onClick={onUnpublish}
+                disabled={
+                  busyAction ===
+                  `unpublish-${course.id}`
+                }
+                title="Unpublish"
+                className="flex h-9 w-9 items-center justify-center rounded-lg disabled:opacity-50"
+                style={{
+                  color: AT.warn,
+                  background:
+                    AT.warnSoft,
+                }}
+              >
+                <Archive size={16} />
+              </button>
+            </>
+          )}
+
+
+          <button
+            onClick={onDelete}
+            title="Delete"
+            className="flex h-9 w-9 items-center justify-center rounded-lg"
+            style={{
+              color: AT.danger,
+              background:
+                AT.dangerSoft,
+            }}
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ============================================================
+// MOBILE INFO
+// ============================================================
+
+function MobileInfo({ label, value }) {
+  return (
+    <div
+      className="min-w-0 bg-white px-3 py-2.5"
+    >
+      <p
+        className="text-[10px] uppercase tracking-wide"
+        style={{
+          color: AT.sub,
+        }}
+      >
+        {label}
+      </p>
+
+      <p className="mt-0.5 truncate text-xs font-medium">
+        {value}
+      </p>
     </div>
   );
 }
@@ -1945,14 +2190,13 @@ function InfoItem({
 }) {
   return (
     <div
-      className="rounded-lg p-3"
+      className="min-w-0 rounded-lg p-3"
       style={{
-        background:
-          AT.canvas,
+        background: AT.canvas,
       }}
     >
       <p
-        className="text-[11px] mb-1"
+        className="mb-1 text-[11px]"
         style={{
           color: AT.sub,
         }}
@@ -1960,7 +2204,7 @@ function InfoItem({
         {label}
       </p>
 
-      <p className="text-sm font-medium break-words">
+      <p className="break-words text-sm font-medium">
         {value}
       </p>
     </div>

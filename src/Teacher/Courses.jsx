@@ -468,7 +468,7 @@ export default function TeacherCourses() {
             onClick={
               handleCreateCourse
             }
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-slate-800 transition"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-slate-800 transition sm:w-auto"
           >
             <Plus size={17} />
 
@@ -615,7 +615,7 @@ export default function TeacherCourses() {
                   event.target.value
                 )
               }
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none lg:w-auto"
             >
               <option value="all">
                 All Course Types
@@ -640,7 +640,7 @@ export default function TeacherCourses() {
                   event.target.value
                 )
               }
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none lg:w-auto"
             >
               <option value="all">
                 All Statuses
@@ -943,7 +943,7 @@ function CourseRow({
               ACTIONS
           ================================================= */}
 
-          <div className="flex lg:flex-col items-center lg:items-stretch gap-2 lg:w-40 shrink-0">
+          <div className="grid grid-cols-2 gap-2 sm:flex lg:flex-col lg:items-stretch lg:w-40 shrink-0">
 
             {/* Content */}
 
@@ -954,7 +954,7 @@ function CourseRow({
                   course
                 )
               }
-              className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 text-white px-3 py-2 text-xs font-medium hover:bg-slate-800 transition"
+                className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 text-white px-3 py-2 text-xs font-medium hover:bg-slate-800 transition"
             >
               <FileText
                 size={14}
@@ -974,7 +974,7 @@ function CourseRow({
                     course
                   )
                 }
-                className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 text-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-50 transition"
+                className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 text-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-50 transition"
               >
                 <Edit3
                   size={14}
@@ -996,7 +996,7 @@ function CourseRow({
                     course
                   )
                 }
-                className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 text-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-50 transition"
+                className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 text-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-50 transition"
               >
                 <Eye
                   size={14}
@@ -1020,7 +1020,7 @@ function CourseRow({
                     course
                   )
                 }
-                className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-2 text-xs font-medium hover:bg-emerald-100 disabled:opacity-50 transition"
+                className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-2 text-xs font-medium hover:bg-emerald-100 disabled:opacity-50 transition"
               >
                 <Send
                   size={14}
@@ -1046,7 +1046,7 @@ function CourseRow({
                     course
                   )
                 }
-                className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg text-red-600 px-3 py-2 text-xs font-medium hover:bg-red-50 disabled:opacity-50 transition"
+                className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg text-red-600 px-3 py-2 text-xs font-medium hover:bg-red-50 disabled:opacity-50 transition"
               >
                 <Trash2
                   size={14}

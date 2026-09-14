@@ -1,11 +1,12 @@
 rules_version = '2';
 
 service cloud.firestore {
+
   match /databases/{database}/documents {
 
-    // =========================================================
-    // HELPERS
-    // =========================================================
+    // ============================================================
+    // AUTH / ROLE HELPERS
+    // ============================================================
 
     function isSignedIn() {
       return request.auth != null;
@@ -24,7 +25,10 @@ service cloud.firestore {
 
     function isTeacher() {
       return isSignedIn()
-        && userDoc().data.role == "teacher";
+        && (
+          userDoc().data.role == "teacher"
+          || userDoc().data.role == "instructor"
+        );
     }
 
     function isStudent() {
@@ -32,8 +36,16 @@ service cloud.firestore {
         && userDoc().data.role == "student";
     }
 
+
+    // ============================================================
+    // COURSE HELPERS
+    // ============================================================
+
     function isCourseOwner(courseId) {
       return isTeacher()
+        && exists(
+          /databases/$(database)/documents/courses/$(courseId)
+        )
         && get(
           /databases/$(database)/documents/courses/$(courseId)
         ).data.instructorId == request.auth.uid;
@@ -50,14 +62,12 @@ service cloud.firestore {
     }
 
 
-    // =========================================================
+    // ============================================================
     // USERS
-    // =========================================================
+    // ============================================================
 
     match /users/{userId} {
 
-      // User reads own profile
-      // Admin reads all profiles
       allow read: if
         isSignedIn()
         && (
@@ -65,461 +75,753 @@ service cloud.firestore {
           || isAdmin()
         );
 
-      // User creates own profile
       allow create: if
         isSignedIn()
-        && request.auth.uid == userId;
+        && (
+          request.auth.uid == userId
+          || isAdmin()
+        );
 
-      // User can update own profile,
-      // but cannot change their role.
-      // Admin can update anyone.
       allow update: if
         isSignedIn()
         && (
-          isAdmin()
-          ||
-          (
-            request.auth.uid == userId
-            && request.resource.data.role == resource.data.role
-          )
+          request.auth.uid == userId
+          || isAdmin()
         );
 
-      // Only admin can delete users
       allow delete: if isAdmin();
-
-
-      // =======================================================
-      // LEGACY USER ENROLLMENTS
-      // =======================================================
-
-      match /enrollments/{courseId} {
-
-        allow read: if
-          isSignedIn()
-          && (
-            request.auth.uid == userId
-            || isAdmin()
-          );
-
-        allow create, update: if
-          isSignedIn()
-          && request.auth.uid == userId;
-
-        allow delete: if isAdmin();
-      }
     }
 
 
-    // =========================================================
+    // ============================================================
     // COURSES
-    // =========================================================
+    // ============================================================
 
     match /courses/{courseId} {
 
-      // =======================================================
-      // COURSE READ
-      // =======================================================
-
-      // Public:
-      //   published courses only
-      //
-      // Teacher:
-      //   own courses
-      //
-      // Admin:
-      //   all courses
-
       allow read: if
-        resource.data.status == "published"
-        || isAdmin()
-        ||
-        (
-          isTeacher()
-          && resource.data.instructorId == request.auth.uid
-        );
-
-
-      // =======================================================
-      // TEACHER CREATE
-      // =======================================================
+        isAdmin()
+        || isCourseOwner(courseId)
+        || resource.data.status == "published";
 
       allow create: if
-        isTeacher()
-        && request.resource.data.instructorId == request.auth.uid
-        && request.resource.data.status == "draft"
-        && request.resource.data.featured == false
-        && request.resource.data.order == 0;
-
-
-      // =======================================================
-      // TEACHER UPDATE
-      // =======================================================
-
-      allow update: if
-        isTeacher()
-        && resource.data.instructorId == request.auth.uid
-        && request.resource.data.instructorId == resource.data.instructorId
-        && request.resource.data.featured == resource.data.featured
-        && request.resource.data.order == resource.data.order
-        && (
-          request.resource.data.status == "draft"
-          || request.resource.data.status == "pending"
-          || request.resource.data.status == "rejected"
+        isAdmin()
+        || (
+          isTeacher()
+          && request.resource.data.instructorId == request.auth.uid
         );
 
-
-      // =======================================================
-      // ADMIN COURSE CONTROL
-      // =======================================================
-
-      allow update: if isAdmin();
-
-
-      // =======================================================
-      // COURSE DELETE
-      // =======================================================
+      allow update: if
+        isAdmin()
+        || (
+          isCourseOwner(courseId)
+          && request.resource.data.instructorId == request.auth.uid
+        );
 
       allow delete: if
         isAdmin()
-        ||
-        (
-          isTeacher()
-          && resource.data.instructorId == request.auth.uid
-        );
-
-
-      // =======================================================
-      // MODULES
-      // =======================================================
-
-      match /modules/{moduleId} {
-
-        // -------------------------------------------------------
-        // MODULE READ
-        // -------------------------------------------------------
-
-        allow read: if
-          get(
-            /databases/$(database)/documents/courses/$(courseId)
-          ).data.status == "published"
-          || isAdmin()
-          ||
-          (
-            isTeacher()
-            &&
-            get(
-              /databases/$(database)/documents/courses/$(courseId)
-            ).data.instructorId == request.auth.uid
-          );
-
-
-        // -------------------------------------------------------
-        // TEACHER MODULE MANAGEMENT
-        // -------------------------------------------------------
-
-        allow create, update, delete: if
-          isCourseOwner(courseId)
-          &&
-          get(
-            /databases/$(database)/documents/courses/$(courseId)
-          ).data.status != "pending"
-          &&
-          get(
-            /databases/$(database)/documents/courses/$(courseId)
-          ).data.status != "archived";
-
-
-        // -------------------------------------------------------
-        // ADMIN MODULE CONTROL
-        // -------------------------------------------------------
-
-        allow update, delete: if isAdmin();
-
-
-        // =======================================================
-        // LESSONS
-        // =======================================================
-
-        match /lessons/{lessonId} {
-
-          // -----------------------------------------------------
-          // LESSON READ
-          // -----------------------------------------------------
-
-          allow read: if
-            get(
-              /databases/$(database)/documents/courses/$(courseId)
-            ).data.status == "published"
-            || isAdmin()
-            ||
-            (
-              isTeacher()
-              &&
-              get(
-                /databases/$(database)/documents/courses/$(courseId)
-              ).data.instructorId == request.auth.uid
-            );
-
-
-          // -----------------------------------------------------
-          // TEACHER LESSON MANAGEMENT
-          // -----------------------------------------------------
-
-          allow create, update, delete: if
-            isCourseOwner(courseId)
-            &&
-            get(
-              /databases/$(database)/documents/courses/$(courseId)
-            ).data.status != "pending"
-            &&
-            get(
-              /databases/$(database)/documents/courses/$(courseId)
-            ).data.status != "archived";
-
-
-          // -----------------------------------------------------
-          // ADMIN LESSON CONTROL
-          // -----------------------------------------------------
-
-          allow update, delete: if isAdmin();
-        }
-      }
+        || isCourseOwner(courseId);
     }
 
 
-    // =========================================================
-    // ENROLLMENTS
-    // =========================================================
+    // ============================================================
+    // COURSE MODULES
+    // ============================================================
 
-    match /enrollments/{enrollmentId} {
-
-      // =======================================================
-      // GET — SINGLE ENROLLMENT
-      // =======================================================
-
-      allow get: if
-        isAdmin()
-        ||
-        (
-          isSignedIn()
-          && enrollmentId.startsWith(request.auth.uid + "_")
-        );
-
-
-      // =======================================================
-      // LIST — MY ENROLLMENTS
-      // =======================================================
-
-      allow list: if
-        isAdmin()
-        ||
-        (
-          isSignedIn()
-          && resource.data.uid == request.auth.uid
-        );
-
-
-      // =======================================================
-      // CREATE ENROLLMENT
-      // =======================================================
-
-      allow create: if
-        isStudent()
-        && request.auth.uid == request.resource.data.uid
-        && request.resource.data.studentId == request.auth.uid
-        && request.resource.data.courseId is string
-        && request.resource.data.status in [
-          "active",
-          "pending"
-        ]
-        &&
-        (
-          (
-            request.resource.data.status == "active"
-            && request.resource.data.paymentStatus == "free"
-          )
-          ||
-          (
-            request.resource.data.status == "pending"
-            && request.resource.data.paymentStatus == "pending"
-          )
-        );
-
-
-      // =======================================================
-      // STUDENT PROGRESS UPDATE
-      // =======================================================
-
-      allow update: if
-        isStudent()
-        && resource.data.uid == request.auth.uid
-
-        // Identity cannot change
-        && request.resource.data.uid == resource.data.uid
-        && request.resource.data.studentId == resource.data.studentId
-        && request.resource.data.courseId == resource.data.courseId
-
-        // Payment/access state cannot change
-        && request.resource.data.status == resource.data.status
-        && request.resource.data.paymentStatus == resource.data.paymentStatus
-        && request.resource.data.paymentId == resource.data.paymentId
-
-        // Progress validation
-        && request.resource.data.progress >= 0
-        && request.resource.data.progress <= 100;
-
-
-      // =======================================================
-      // ADMIN ENROLLMENT CONTROL
-      // =======================================================
-
-      allow update, delete: if isAdmin();
-    }
-
-
-    // =========================================================
-    // ATTENDANCE
-    // =========================================================
-
-    match /attendance/{attendanceId} {
-
-      // =======================================================
-      // READ ATTENDANCE
-      // =======================================================
-
-      // Admin:
-      //   Can read everything.
-      //
-      // Student:
-      //   Can read only their own attendance.
-      //
-      // Teacher:
-      //   Can read attendance belonging to their own courses.
+    match /courses/{courseId}/modules/{moduleId} {
 
       allow read: if
         isAdmin()
-        ||
-        (
-          isStudent()
-          && resource.data.studentId == request.auth.uid
+        || isCourseOwner(courseId)
+        || isEnrolled(courseId)
+        || (
+          isSignedIn() == false
+          && get(
+            /databases/$(database)/documents/courses/$(courseId)
+          ).data.status == "published"
         )
-        ||
-        (
-          isTeacher()
-          && isCourseOwner(resource.data.courseId)
+        || (
+          isSignedIn()
+          && get(
+            /databases/$(database)/documents/courses/$(courseId)
+          ).data.status == "published"
         );
 
-
-      // =======================================================
-      // STUDENT MARKS ATTENDANCE
-      // =======================================================
-
-      // Student can create ONLY their own attendance.
-      //
-      // Students can mark themselves PRESENT.
-      //
-      // They cannot create attendance for:
-      // - another student
-      // - another user
-      // - arbitrary status
-
       allow create: if
-        isStudent()
-        && request.resource.data.studentId == request.auth.uid
-        && request.resource.data.markedBy == request.auth.uid
-        && request.resource.data.courseId is string
-        && request.resource.data.sessionId is string
-        && request.resource.data.status == "present";
-
-
-      // =======================================================
-      // UPDATE ATTENDANCE
-      // =======================================================
-
-      // Student cannot modify attendance after marking.
-      //
-      // Teacher can update attendance for their own courses.
-      //
-      // Admin can update everything.
+        isAdmin()
+        || isCourseOwner(courseId);
 
       allow update: if
         isAdmin()
-        ||
-        (
+        || isCourseOwner(courseId);
+
+      allow delete: if
+        isAdmin()
+        || isCourseOwner(courseId);
+    }
+
+
+    // ============================================================
+    // COURSE LESSONS
+    // ============================================================
+
+    match /courses/{courseId}/modules/{moduleId}/lessons/{lessonId} {
+
+      allow read: if
+        isAdmin()
+        || isCourseOwner(courseId)
+        || (
+          isEnrolled(courseId)
+          && resource.data.published == true
+        )
+        || (
+          isSignedIn() == false
+          && get(
+            /databases/$(database)/documents/courses/$(courseId)
+          ).data.status == "published"
+          && resource.data.published == true
+        );
+
+      allow create: if
+        isAdmin()
+        || isCourseOwner(courseId);
+
+      allow update: if
+        isAdmin()
+        || isCourseOwner(courseId);
+
+      allow delete: if
+        isAdmin()
+        || isCourseOwner(courseId);
+    }
+
+
+    // ============================================================
+    // ENROLLMENTS
+    // ============================================================
+
+    match /enrollments/{enrollmentId} {
+
+      allow read: if
+        isAdmin()
+        || (
+          isStudent()
+          && resource.data.uid == request.auth.uid
+        )
+        || (
           isTeacher()
+          && resource.data.courseId is string
           && isCourseOwner(resource.data.courseId)
         );
 
+      // Trusted backend/admin creates enrollments
+      allow create: if isAdmin();
 
-      // =======================================================
-      // DELETE ATTENDANCE
-      // =======================================================
-
-      // Only admin can permanently delete attendance.
+      allow update: if isAdmin();
 
       allow delete: if isAdmin();
     }
 
 
-    // =========================================================
+    // ============================================================
+    // ATTENDANCE SESSIONS
+    //
+    // Structure:
+    //
+    // attendanceSessions/{sessionId}
+    //
+    // {
+    //   courseId,
+    //   teacherId,
+    //   title,
+    //   date,
+    //   status: "open" | "closed",
+    //   createdAt,
+    //   updatedAt
+    // }
+    // ============================================================
+
+    match /attendanceSessions/{sessionId} {
+
+      // ----------------------------------------------------------
+      // READ
+      // ----------------------------------------------------------
+
+      allow read: if
+        // Admin can see every session
+        isAdmin()
+
+        // Teacher can see sessions for their own courses
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        )
+
+        // Student can only see OPEN sessions
+        // for courses they are actively enrolled in
+        || (
+          isStudent()
+          && resource.data.courseId is string
+          && resource.data.status == "open"
+          && isEnrolled(resource.data.courseId)
+        );
+
+
+      // ----------------------------------------------------------
+      // CREATE
+      // ----------------------------------------------------------
+
+      allow create: if
+        // Admin can create any session
+        isAdmin()
+
+        // Teacher can create only for their own course
+        || (
+          isTeacher()
+          && request.resource.data.courseId is string
+          && isCourseOwner(request.resource.data.courseId)
+          && request.resource.data.teacherId == request.auth.uid
+          && request.resource.data.status == "open"
+        );
+
+
+      // ----------------------------------------------------------
+      // UPDATE
+      // ----------------------------------------------------------
+
+      allow update: if
+        // Admin can update anything
+        isAdmin()
+
+        // Teacher can update their own course session
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+          && resource.data.teacherId == request.auth.uid
+          && request.resource.data.courseId == resource.data.courseId
+          && request.resource.data.teacherId == resource.data.teacherId
+        );
+
+
+      // ----------------------------------------------------------
+      // DELETE
+      // ----------------------------------------------------------
+
+      allow delete: if
+        isAdmin()
+
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+          && resource.data.teacherId == request.auth.uid
+        );
+    }
+
+
+    // ============================================================
+    // ATTENDANCE RECORDS
+    //
+    // Structure:
+    //
+    // attendance/{sessionId_studentId}
+    //
+    // {
+    //   sessionId,
+    //   courseId,
+    //   studentId,
+    //   status,
+    //   markedAt,
+    //   markedBy
+    // }
+    // ============================================================
+
+    match /attendance/{attendanceId} {
+
+      // ----------------------------------------------------------
+      // READ
+      // ----------------------------------------------------------
+
+      allow read: if
+        // Admin sees everything
+        isAdmin()
+
+        // Student sees ONLY their own attendance
+        || (
+          isStudent()
+          && resource.data.studentId == request.auth.uid
+        )
+
+        // Teacher sees attendance for their own course
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        );
+
+
+      // ----------------------------------------------------------
+      // CREATE
+      //
+      // Students can only create:
+      //
+      // - their own record
+      // - for an enrolled course
+      // - while the session is OPEN
+      // - status = present
+      // ----------------------------------------------------------
+
+      allow create: if
+        isStudent()
+
+        && request.resource.data.studentId == request.auth.uid
+
+        && request.resource.data.markedBy == request.auth.uid
+
+        && request.resource.data.courseId is string
+
+        && request.resource.data.sessionId is string
+
+        && request.resource.data.status == "present"
+
+        && isEnrolled(request.resource.data.courseId)
+
+        && exists(
+          /databases/$(database)/documents/attendanceSessions/$(request.resource.data.sessionId)
+        )
+
+        && get(
+          /databases/$(database)/documents/attendanceSessions/$(request.resource.data.sessionId)
+        ).data.courseId == request.resource.data.courseId
+
+        && get(
+          /databases/$(database)/documents/attendanceSessions/$(request.resource.data.sessionId)
+        ).data.status == "open";
+
+
+      // ----------------------------------------------------------
+      // UPDATE
+      //
+      // Teacher/Admin can correct attendance.
+      // Students cannot modify their attendance.
+      // ----------------------------------------------------------
+
+      allow update: if
+        isAdmin()
+
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+
+          // Do not allow teacher to move the record
+          // to another student/session/course.
+          && request.resource.data.studentId == resource.data.studentId
+          && request.resource.data.sessionId == resource.data.sessionId
+          && request.resource.data.courseId == resource.data.courseId
+        );
+
+
+      // ----------------------------------------------------------
+      // DELETE
+      // ----------------------------------------------------------
+
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================================
     // PAYMENTS
-    // =========================================================
+    // ============================================================
 
     match /payments/{paymentId} {
 
-      // Student creates own payment
-      allow create: if
-        isSignedIn()
-        && request.resource.data.uid == request.auth.uid;
-
-      // Student reads own payments
-      // Admin reads all payments
       allow read: if
         isAdmin()
-        ||
-        (
-          isSignedIn()
-          && resource.data.uid == request.auth.uid
+        || (
+          isStudent()
+          && resource.data.userId == request.auth.uid
+        )
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
         );
 
-      // Only admin can modify/delete payments
-      allow update, delete: if isAdmin();
+      allow create: if isAdmin();
+
+      allow update: if isAdmin();
+
+      allow delete: if isAdmin();
     }
 
 
-    // =========================================================
+    // ============================================================
     // STUDENTS
-    // =========================================================
+    // ============================================================
 
     match /students/{studentId} {
 
-      // Admin full access
-      allow read, write: if isAdmin();
-
-      // Student reads own student record
       allow read: if
-        isSignedIn()
-        && request.auth.uid == studentId;
+        isAdmin()
+        || (
+          isSignedIn()
+          && request.auth.uid == studentId
+        )
+        || isTeacher();
+
+      allow create: if
+        isAdmin()
+        || (
+          isSignedIn()
+          && request.auth.uid == studentId
+        );
+
+      allow update: if
+        isAdmin()
+        || (
+          isSignedIn()
+          && request.auth.uid == studentId
+        );
+
+      allow delete: if isAdmin();
     }
 
 
-    // =========================================================
-    // INSTRUCTORS
-    // =========================================================
+    // ============================================================
+    // INSTRUCTORS / TEACHERS
+    // ============================================================
 
     match /instructors/{instructorId} {
 
-      // Public instructor information
-      allow read: if true;
+      allow read: if isSignedIn();
 
-      // Admin manages instructors
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin();
+
+      allow update: if
+        isAdmin()
+        || (
+          isTeacher()
+          && request.auth.uid == instructorId
+        );
+
+      allow delete: if isAdmin();
     }
 
 
-    // =========================================================
+    // ============================================================
+    // ANNOUNCEMENTS
+    // ============================================================
+
+    match /announcements/{announcementId} {
+
+      // ----------------------------------------------------------
+      // READ
+      // ----------------------------------------------------------
+
+      allow read: if
+
+        // ADMIN
+        isAdmin()
+
+        // --------------------------------------------------------
+        // TEACHER - GLOBAL ANNOUNCEMENTS
+        // --------------------------------------------------------
+        ||
+        (
+          isTeacher()
+          && resource.data.audienceType == "global"
+          && resource.data.status == "published"
+        )
+
+        // --------------------------------------------------------
+        // TEACHER - THEIR OWN COURSE ANNOUNCEMENTS
+        // --------------------------------------------------------
+        ||
+        (
+          isTeacher()
+          && resource.data.audienceType == "course"
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        )
+
+        // --------------------------------------------------------
+        // STUDENT - GLOBAL
+        // --------------------------------------------------------
+        ||
+        (
+          isStudent()
+          && resource.data.audienceType == "global"
+          && resource.data.status == "published"
+        )
+
+        // --------------------------------------------------------
+        // STUDENT - ENROLLED COURSE
+        // --------------------------------------------------------
+        ||
+        (
+          isStudent()
+          && resource.data.audienceType == "course"
+          && resource.data.status == "published"
+          && resource.data.courseId is string
+          && isEnrolled(resource.data.courseId)
+        );
+
+
+      // ----------------------------------------------------------
+      // CREATE
+      // ----------------------------------------------------------
+
+      allow create: if
+
+        // ADMIN CAN CREATE ANY TYPE
+        isAdmin()
+
+        // TEACHER CAN ONLY CREATE COURSE ANNOUNCEMENTS
+        ||
+        (
+          isTeacher()
+          && request.resource.data.audienceType == "course"
+          && request.resource.data.courseId is string
+          && isCourseOwner(request.resource.data.courseId)
+          && request.resource.data.authorId == request.auth.uid
+          && (
+            request.resource.data.authorRole == "teacher"
+            || request.resource.data.authorRole == "instructor"
+          )
+        );
+
+
+      // ----------------------------------------------------------
+      // UPDATE
+      // ----------------------------------------------------------
+
+      allow update: if
+
+        // ADMIN
+        isAdmin()
+
+        // TEACHER - OWN COURSE ANNOUNCEMENT
+        ||
+        (
+          isTeacher()
+          && resource.data.audienceType == "course"
+          && resource.data.courseId is string
+          && resource.data.authorId == request.auth.uid
+          && isCourseOwner(resource.data.courseId)
+
+          // Keep ownership fields unchanged
+          && request.resource.data.authorId == resource.data.authorId
+          && request.resource.data.courseId == resource.data.courseId
+          && request.resource.data.audienceType == resource.data.audienceType
+        );
+
+
+      // ----------------------------------------------------------
+      // DELETE
+      // ----------------------------------------------------------
+
+      allow delete: if
+
+        // ADMIN
+        isAdmin()
+
+        // TEACHER - OWN COURSE ANNOUNCEMENT
+        ||
+        (
+          isTeacher()
+          && resource.data.audienceType == "course"
+          && resource.data.courseId is string
+          && resource.data.authorId == request.auth.uid
+          && isCourseOwner(resource.data.courseId)
+        );
+    }
+
+
+    // ============================================================
+    // DISCUSSIONS
+    // ============================================================
+
+    match /discussions/{discussionId} {
+
+      allow read: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        )
+        || (
+          isStudent()
+          && resource.data.courseId is string
+          && isEnrolled(resource.data.courseId)
+        );
+
+      allow create: if
+        isAdmin()
+
+        || (
+          isTeacher()
+          && request.resource.data.courseId is string
+          && isCourseOwner(request.resource.data.courseId)
+          && request.resource.data.authorId == request.auth.uid
+        )
+
+        || (
+          isStudent()
+          && request.resource.data.courseId is string
+          && isEnrolled(request.resource.data.courseId)
+          && request.resource.data.authorId == request.auth.uid
+        );
+
+      allow update: if
+        isAdmin()
+
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        )
+
+        || (
+          isStudent()
+          && resource.data.authorId == request.auth.uid
+        );
+
+      allow delete: if
+        isAdmin()
+
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        )
+
+        || (
+          isStudent()
+          && resource.data.authorId == request.auth.uid
+        );
+
+
+      // ==========================================================
+      // DISCUSSION REPLIES
+      // ==========================================================
+
+      match /replies/{replyId} {
+
+        allow read: if
+          isAdmin()
+
+          || (
+            isTeacher()
+            && get(
+              /databases/$(database)/documents/discussions/$(discussionId)
+            ).data.courseId is string
+            && isCourseOwner(
+              get(
+                /databases/$(database)/documents/discussions/$(discussionId)
+              ).data.courseId
+            )
+          )
+
+          || (
+            isStudent()
+            && get(
+              /databases/$(database)/documents/discussions/$(discussionId)
+            ).data.courseId is string
+            && isEnrolled(
+              get(
+                /databases/$(database)/documents/discussions/$(discussionId)
+              ).data.courseId
+            )
+          );
+
+
+        allow create: if
+          isAdmin()
+
+          || (
+            isTeacher()
+            && get(
+              /databases/$(database)/documents/discussions/$(discussionId)
+            ).data.courseId is string
+            && isCourseOwner(
+              get(
+                /databases/$(database)/documents/discussions/$(discussionId)
+              ).data.courseId
+            )
+            && request.resource.data.authorId == request.auth.uid
+          )
+
+          || (
+            isStudent()
+            && get(
+              /databases/$(database)/documents/discussions/$(discussionId)
+            ).data.courseId is string
+            && isEnrolled(
+              get(
+                /databases/$(database)/documents/discussions/$(discussionId)
+              ).data.courseId
+            )
+            && request.resource.data.authorId == request.auth.uid
+          );
+
+
+        allow update: if
+          isAdmin()
+          || (
+            isSignedIn()
+            && resource.data.authorId == request.auth.uid
+          );
+
+
+        allow delete: if
+          isAdmin()
+          || (
+            isSignedIn()
+            && resource.data.authorId == request.auth.uid
+          );
+      }
+    }
+
+
+    // ============================================================
+    // NOTIFICATIONS
+    // ============================================================
+
+    match /notifications/{notificationId} {
+
+      allow read: if
+        isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.recipientId == request.auth.uid
+        );
+
+      // Notifications should be created by admin/backend
+      allow create: if isAdmin();
+
+      allow update: if
+        isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.recipientId == request.auth.uid
+        );
+
+      allow delete: if
+        isAdmin()
+        || (
+          isSignedIn()
+          && resource.data.recipientId == request.auth.uid
+        );
+    }
+
+
+    // ============================================================
     // DEFAULT DENY
-    // =========================================================
+    // ============================================================
 
     match /{document=**} {
       allow read, write: if false;

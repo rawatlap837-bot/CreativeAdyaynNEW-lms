@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { onAuthStateChanged } from "firebase/auth";
+
 import Attendance from "./Attendance";
+import Certificates from "./Certificates.jsx";
+import MyCourses from "./MyCourses.jsx";
 
 import {
   collection,
@@ -37,21 +40,55 @@ import {
   LayoutGrid,
   Award,
   BookOpen,
+  Megaphone,
+  Pin,
+  Globe2,
+  GraduationCap,
 } from "lucide-react";
 
-import { ListRowSkeleton, Skeleton } from "../components/Skeleton";
-import Certificates from "./Certificates.jsx";
-import MyCourses from "./MyCourses.jsx";
+import {
+  ListRowSkeleton,
+  Skeleton,
+} from "../components/Skeleton";
+
+import {
+  getAccessibleAnnouncements,
+} from "../services/CommunicationService";
+
+/* =========================================================
+   DESIGN
+========================================================= */
 
 const ACCENT = "#5227FF";
 const AMBER = "#E8A33D";
 const VIOLET = "#2E1A55";
 const CANVAS = "#ECEEF3";
 
-const cardShadow = "shadow-lg shadow-violet-900/[0.06]";
+const cardShadow =
+  "shadow-lg shadow-violet-900/[0.06]";
+
+const WEEK_DAYS = [
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+  "Sun",
+];
+
+const COURSES_ROUTE = "/ShortCourses";
+
+/* =========================================================
+   ANIMATION
+========================================================= */
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 14 },
+  hidden: {
+    opacity: 0,
+    y: 14,
+  },
+
   show: (i = 0) => ({
     opacity: 1,
     y: 0,
@@ -63,9 +100,9 @@ const fadeUp = {
   }),
 };
 
-const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const COURSES_ROUTE = "/ShortCourses";
+/* =========================================================
+   QUICK ACTIONS
+========================================================= */
 
 const QUICK_ACTIONS = [
   {
@@ -81,6 +118,10 @@ const QUICK_ACTIONS = [
     to: "#live",
   },
 ];
+
+/* =========================================================
+   DASHBOARD TABS
+========================================================= */
 
 const DASHBOARD_TABS = [
   {
@@ -100,21 +141,39 @@ const DASHBOARD_TABS = [
   },
 ];
 
+/* =========================================================
+   DATE HELPERS
+========================================================= */
+
 function getWeekRange(offset = 0) {
   const now = new Date();
   const day = now.getDay();
 
-  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const mondayOffset =
+    day === 0 ? -6 : 1 - day;
 
   const monday = new Date(now);
+
   monday.setHours(0, 0, 0, 0);
+
   monday.setDate(
-    now.getDate() + mondayOffset + offset * 7
+    now.getDate() +
+      mondayOffset +
+      offset * 7
   );
 
   const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
+
+  sunday.setDate(
+    monday.getDate() + 6
+  );
+
+  sunday.setHours(
+    23,
+    59,
+    59,
+    999
+  );
 
   return {
     start: monday,
@@ -124,15 +183,30 @@ function getWeekRange(offset = 0) {
 
 function dayLabelFromDate(date) {
   const idx = date.getDay();
-  return WEEK_DAYS[idx === 0 ? 6 : idx - 1];
+
+  return WEEK_DAYS[
+    idx === 0 ? 6 : idx - 1
+  ];
 }
 
 function startEndOfToday() {
   const start = new Date();
-  start.setHours(0, 0, 0, 0);
+
+  start.setHours(
+    0,
+    0,
+    0,
+    0
+  );
 
   const end = new Date();
-  end.setHours(23, 59, 59, 999);
+
+  end.setHours(
+    23,
+    59,
+    59,
+    999
+  );
 
   return {
     start,
@@ -141,46 +215,224 @@ function startEndOfToday() {
 }
 
 function formatTime(date) {
+  if (!date) return "";
+
   return date.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
   });
 }
 
-function timeAgo(date) {
-  const diffMs = Date.now() - date.getTime();
-  const mins = Math.round(diffMs / 60000);
+/* =========================================================
+   ANNOUNCEMENT DATE HELPERS
+========================================================= */
 
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins} min ago`;
-
-  const hrs = Math.round(mins / 60);
-
-  if (hrs < 24) {
-    return `${hrs} hr${hrs > 1 ? "s" : ""} ago`;
+function formatAnnouncementDate(date) {
+  if (!date) {
+    return "";
   }
 
-  const days = Math.round(hrs / 24);
+  const now = new Date();
 
-  if (days === 1) return "Yesterday";
+  if (
+    now.toDateString() ===
+    date.toDateString()
+  ) {
+    return `Today · ${formatTime(date)}`;
+  }
+
+  const yesterday = new Date(now);
+
+  yesterday.setDate(
+    now.getDate() - 1
+  );
+
+  if (
+    yesterday.toDateString() ===
+    date.toDateString()
+  ) {
+    return `Yesterday · ${formatTime(date)}`;
+  }
+
+  return date.toLocaleDateString([], {
+    day: "numeric",
+    month: "short",
+    year:
+      date.getFullYear() !==
+      now.getFullYear()
+        ? "numeric"
+        : undefined,
+  });
+}
+
+/* =========================================================
+   TIME AGO
+========================================================= */
+
+function timeAgo(date) {
+  if (!date) {
+    return "";
+  }
+
+  const diffMs =
+    Date.now() -
+    date.getTime();
+
+  const mins = Math.round(
+    diffMs / 60000
+  );
+
+  if (mins < 1) {
+    return "Just now";
+  }
+
+  if (mins < 60) {
+    return `${mins} min ago`;
+  }
+
+  const hrs = Math.round(
+    mins / 60
+  );
+
+  if (hrs < 24) {
+    return `${hrs} hr${
+      hrs > 1 ? "s" : ""
+    } ago`;
+  }
+
+  const days = Math.round(
+    hrs / 24
+  );
+
+  if (days === 1) {
+    return "Yesterday";
+  }
 
   return `${days} days ago`;
 }
 
+/* =========================================================
+   NORMALIZE ANNOUNCEMENT
+========================================================= */
+
+function normalizeAnnouncement(item) {
+  if (!item) {
+    return null;
+  }
+
+  const rawDate =
+    item.createdAt ||
+    item.updatedAt ||
+    item.date;
+
+  let date = null;
+
+  if (
+    rawDate instanceof Timestamp
+  ) {
+    date = rawDate.toDate();
+  } else if (
+    rawDate instanceof Date
+  ) {
+    date = rawDate;
+  } else if (
+    rawDate &&
+    typeof rawDate.toDate ===
+      "function"
+  ) {
+    date = rawDate.toDate();
+  } else if (rawDate) {
+    const parsed =
+      new Date(rawDate);
+
+    if (
+      !Number.isNaN(
+        parsed.getTime()
+      )
+    ) {
+      date = parsed;
+    }
+  }
+
+  return {
+    id: item.id,
+
+    title:
+      item.title ||
+      "Announcement",
+
+    message:
+      item.body ||
+      item.message ||
+      "",
+
+    body:
+      item.body ||
+      item.message ||
+      "",
+
+    courseId:
+      item.courseId ||
+      null,
+
+    audienceType:
+      item.audienceType ||
+      item.audience ||
+      "global",
+
+    status:
+      item.status ||
+      "published",
+
+    pinned:
+      Boolean(item.pinned),
+
+    authorName:
+      item.authorName ||
+      item.author ||
+      "Creative Adhyayan",
+
+    date,
+  };
+}
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
 
-  const activeTab = DASHBOARD_TABS.some(
-    (t) => t.key === searchParams.get("tab")
-  )
-    ? searchParams.get("tab")
-    : "overview";
+  const [
+    searchParams,
+    setSearchParams,
+  ] = useSearchParams();
+
+  /* =======================================================
+     ACTIVE TAB
+  ======================================================= */
+
+  const requestedTab =
+    searchParams.get("tab");
+
+  const activeTab =
+    DASHBOARD_TABS.some(
+      (tab) =>
+        tab.key === requestedTab
+    )
+      ? requestedTab
+      : "overview";
 
   const setActiveTab = (key) => {
     setSearchParams(
-      key === "overview" ? {} : { tab: key },
-      { replace: true }
+      key === "overview"
+        ? {}
+        : {
+            tab: key,
+          },
+      {
+        replace: true,
+      }
     );
 
     window.scrollTo({
@@ -189,436 +441,917 @@ export default function Dashboard() {
     });
   };
 
-  const [uid, setUid] = useState(null);
-  const [firstName, setFirstName] = useState("there");
+  /* =======================================================
+     AUTH
+  ======================================================= */
 
-  const [notifications, setNotifications] = useState([]);
-  const [notifLoading, setNotifLoading] = useState(true);
+  const [uid, setUid] =
+    useState(null);
 
-  const [tasks, setTasks] = useState([]);
-  const [tasksLoading, setTasksLoading] = useState(true);
+  const [
+    firstName,
+    setFirstName,
+  ] = useState("there");
 
-  const [scheduleEvents, setScheduleEvents] = useState([]);
-  const [scheduleLoading, setScheduleLoading] = useState(true);
+  /* =======================================================
+     NOTIFICATIONS
+  ======================================================= */
 
-  const [liveClass, setLiveClass] = useState(null);
-  const [liveClassLoading, setLiveClassLoading] = useState(true);
+  const [
+    notifications,
+    setNotifications,
+  ] = useState([]);
 
-  const [activeDay, setActiveDay] = useState(() => {
-    const idx = new Date().getDay();
+  const [
+    notifLoading,
+    setNotifLoading,
+  ] = useState(true);
+
+  /* =======================================================
+     TASKS
+  ======================================================= */
+
+  const [
+    tasks,
+    setTasks,
+  ] = useState([]);
+
+  const [
+    tasksLoading,
+    setTasksLoading,
+  ] = useState(true);
+
+  /* =======================================================
+     SCHEDULE
+  ======================================================= */
+
+  const [
+    scheduleEvents,
+    setScheduleEvents,
+  ] = useState([]);
+
+  const [
+    scheduleLoading,
+    setScheduleLoading,
+  ] = useState(true);
+
+  /* =======================================================
+     LIVE CLASS
+  ======================================================= */
+
+  const [
+    liveClass,
+    setLiveClass,
+  ] = useState(null);
+
+  const [
+    liveClassLoading,
+    setLiveClassLoading,
+  ] = useState(true);
+
+  /* =======================================================
+     ANNOUNCEMENTS
+  ======================================================= */
+
+  const [
+    announcements,
+    setAnnouncements,
+  ] = useState([]);
+
+  const [
+    announcementsLoading,
+    setAnnouncementsLoading,
+  ] = useState(true);
+
+  const [
+    announcementsError,
+    setAnnouncementsError,
+  ] = useState(false);
+
+  const [
+    showAllAnnouncements,
+    setShowAllAnnouncements,
+  ] = useState(false);
+
+  /* =======================================================
+     SCHEDULE STATE
+  ======================================================= */
+
+  const [
+    activeDay,
+    setActiveDay,
+  ] = useState(() => {
+    const idx =
+      new Date().getDay();
 
     return WEEK_DAYS[
       idx === 0 ? 6 : idx - 1
     ];
   });
 
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [
+    weekOffset,
+    setWeekOffset,
+  ] = useState(0);
 
-  const scheduleSectionRef = useRef(null);
-  const liveClassSectionRef = useRef(null);
+  const scheduleSectionRef =
+    useRef(null);
+
+  const liveClassSectionRef =
+    useRef(null);
+
+  /* =======================================================
+     AUTH LISTENER
+  ======================================================= */
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      setUid(user?.uid ?? null);
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        (user) => {
+          if (!user) {
+            setUid(null);
+            setFirstName("there");
+            return;
+          }
 
-      const name = user?.displayName?.split(" ")[0];
+          setUid(user.uid);
 
-      if (name) {
-        setFirstName(name);
-      }
-    });
+          const name =
+            user.displayName
+              ?.trim()
+              ?.split(" ")[0];
 
-    return unsub;
+          if (name) {
+            setFirstName(name);
+          }
+        }
+      );
+
+    return unsubscribe;
   }, []);
 
-  /* ---------------------------------------------
-     NOTIFICATIONS
-  --------------------------------------------- */
+  /* =======================================================
+     LOAD ANNOUNCEMENTS
+  ======================================================= */
 
   useEffect(() => {
-    if (!uid) return;
+    if (!uid) {
+      setAnnouncements([]);
+      setAnnouncementsLoading(
+        false
+      );
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAnnouncements =
+      async () => {
+        setAnnouncementsLoading(
+          true
+        );
+
+        setAnnouncementsError(
+          false
+        );
+
+        try {
+          const result =
+            await getAccessibleAnnouncements();
+
+          if (cancelled) {
+            return;
+          }
+
+          const normalized =
+            (
+              Array.isArray(result)
+                ? result
+                : []
+            )
+              .map(
+                normalizeAnnouncement
+              )
+              .filter(Boolean)
+              .filter(
+                (item) =>
+                  item.status ===
+                  "published"
+              )
+              .sort(
+                (a, b) => {
+                  /* Pinned announcements first */
+                  if (
+                    a.pinned &&
+                    !b.pinned
+                  ) {
+                    return -1;
+                  }
+
+                  if (
+                    !a.pinned &&
+                    b.pinned
+                  ) {
+                    return 1;
+                  }
+
+                  /* Newest first */
+                  const aTime =
+                    a.date?.getTime() ||
+                    0;
+
+                  const bTime =
+                    b.date?.getTime() ||
+                    0;
+
+                  return (
+                    bTime - aTime
+                  );
+                }
+              );
+
+          setAnnouncements(
+            normalized
+          );
+        } catch (error) {
+          console.error(
+            "Failed to load announcements:",
+            error
+          );
+
+          if (!cancelled) {
+            setAnnouncements([]);
+            setAnnouncementsError(
+              true
+            );
+          }
+        } finally {
+          if (!cancelled) {
+            setAnnouncementsLoading(
+              false
+            );
+          }
+        }
+      };
+
+    loadAnnouncements();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
+
+  /* =======================================================
+     NOTIFICATIONS
+  ======================================================= */
+
+  useEffect(() => {
+    if (!uid) {
+      setNotifications([]);
+      setNotifLoading(false);
+      return;
+    }
 
     setNotifLoading(true);
 
     const q = query(
-      collection(db, "notifications"),
-      where("uid", "==", uid),
-      orderBy("createdAt", "desc"),
+      collection(
+        db,
+        "notifications"
+      ),
+      where(
+        "uid",
+        "==",
+        uid
+      ),
+      orderBy(
+        "createdAt",
+        "desc"
+      ),
       limit(10)
     );
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setNotifications(
-          snap.docs.map((d) => {
-            const data = d.data();
+    const unsubscribe =
+      onSnapshot(
+        q,
+        (snapshot) => {
+          const items =
+            snapshot.docs.map(
+              (item) => {
+                const data =
+                  item.data();
 
-            const createdAt =
-              data.createdAt instanceof Timestamp
-                ? data.createdAt.toDate()
-                : new Date();
+                const createdAt =
+                  data.createdAt instanceof
+                  Timestamp
+                    ? data.createdAt.toDate()
+                    : new Date();
 
-            return {
-              id: d.id,
-              title: data.title,
-              body: data.body,
-              time: timeAgo(createdAt),
-            };
-          })
-        );
+                return {
+                  id: item.id,
 
-        setNotifLoading(false);
-      },
-      () => setNotifLoading(false)
-    );
+                  title:
+                    data.title ||
+                    "Notification",
 
-    return unsub;
+                  body:
+                    data.body ||
+                    "",
+
+                  time:
+                    timeAgo(
+                      createdAt
+                    ),
+                };
+              }
+            );
+
+          setNotifications(items);
+          setNotifLoading(false);
+        },
+        (error) => {
+          console.error(
+            "Notification listener failed:",
+            error
+          );
+
+          setNotifLoading(false);
+        }
+      );
+
+    return unsubscribe;
   }, [uid]);
 
-  /* ---------------------------------------------
+  /* =======================================================
      TODAY'S TASKS
-  --------------------------------------------- */
+  ======================================================= */
 
   useEffect(() => {
-    if (!uid) return;
+    if (!uid) {
+      setTasks([]);
+      setTasksLoading(false);
+      return;
+    }
 
     setTasksLoading(true);
 
-    const { start, end } = startEndOfToday();
+    const {
+      start,
+      end,
+    } = startEndOfToday();
 
     const q = query(
-      collection(db, "tasks"),
-      where("uid", "==", uid),
+      collection(
+        db,
+        "tasks"
+      ),
+      where(
+        "uid",
+        "==",
+        uid
+      ),
       where(
         "date",
         ">=",
-        Timestamp.fromDate(start)
+        Timestamp.fromDate(
+          start
+        )
       ),
       where(
         "date",
         "<=",
-        Timestamp.fromDate(end)
+        Timestamp.fromDate(
+          end
+        )
       )
     );
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setTasks(
-          snap.docs.map((d) => {
-            const data = d.data();
+    const unsubscribe =
+      onSnapshot(
+        q,
+        (snapshot) => {
+          const items =
+            snapshot.docs.map(
+              (item) => {
+                const data =
+                  item.data();
 
-            return {
-              id: d.id,
-              title: data.title,
-              duration: data.duration,
-              progress: data.progress ?? 0,
-              prevProgress:
-                data.prevProgress ??
-                data.progress ??
-                0,
-            };
-          })
-        );
+                return {
+                  id: item.id,
 
-        setTasksLoading(false);
-      },
-      () => setTasksLoading(false)
-    );
+                  title:
+                    data.title ||
+                    "Task",
 
-    return unsub;
+                  duration:
+                    data.duration ||
+                    "",
+
+                  progress:
+                    data.progress ??
+                    0,
+
+                  prevProgress:
+                    data.prevProgress ??
+                    data.progress ??
+                    0,
+                };
+              }
+            );
+
+          setTasks(items);
+          setTasksLoading(false);
+        },
+        (error) => {
+          console.error(
+            "Tasks listener failed:",
+            error
+          );
+
+          setTasksLoading(false);
+        }
+      );
+
+    return unsubscribe;
   }, [uid]);
 
-  /* ---------------------------------------------
+  /* =======================================================
      WEEKLY SCHEDULE
-  --------------------------------------------- */
+  ======================================================= */
 
   useEffect(() => {
-    if (!uid) return;
+    if (!uid) {
+      setScheduleEvents([]);
+      setScheduleLoading(false);
+      return;
+    }
 
     setScheduleLoading(true);
 
-    const { start, end } =
-      getWeekRange(weekOffset);
+    const {
+      start,
+      end,
+    } = getWeekRange(
+      weekOffset
+    );
 
     const q = query(
-      collection(db, "scheduleEvents"),
-      where("uid", "==", uid),
+      collection(
+        db,
+        "scheduleEvents"
+      ),
+      where(
+        "uid",
+        "==",
+        uid
+      ),
       where(
         "date",
         ">=",
-        Timestamp.fromDate(start)
+        Timestamp.fromDate(
+          start
+        )
       ),
       where(
         "date",
         "<=",
-        Timestamp.fromDate(end)
+        Timestamp.fromDate(
+          end
+        )
       ),
-      orderBy("date", "asc")
+      orderBy(
+        "date",
+        "asc"
+      )
     );
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setScheduleEvents(
-          snap.docs.map((d) => {
-            const data = d.data();
+    const unsubscribe =
+      onSnapshot(
+        q,
+        (snapshot) => {
+          const items =
+            snapshot.docs.map(
+              (item) => {
+                const data =
+                  item.data();
 
-            const date =
-              data.date instanceof Timestamp
-                ? data.date.toDate()
-                : new Date();
+                const date =
+                  data.date instanceof
+                  Timestamp
+                    ? data.date.toDate()
+                    : new Date();
 
-            return {
-              id: d.id,
-              day: dayLabelFromDate(date),
-              time:
-                data.time ||
-                formatTime(date),
-              label: data.label,
-            };
-          })
-        );
+                return {
+                  id: item.id,
 
-        setScheduleLoading(false);
-      },
-      () => setScheduleLoading(false)
-    );
+                  day:
+                    dayLabelFromDate(
+                      date
+                    ),
 
-    return unsub;
-  }, [uid, weekOffset]);
+                  time:
+                    data.time ||
+                    formatTime(
+                      date
+                    ),
 
-  const agendaByDay = useMemo(() => {
-    const map = {};
+                  label:
+                    data.label ||
+                    "Scheduled session",
+                };
+              }
+            );
 
-    WEEK_DAYS.forEach((d) => {
-      map[d] = [];
-    });
+          setScheduleEvents(items);
+          setScheduleLoading(false);
+        },
+        (error) => {
+          console.error(
+            "Schedule listener failed:",
+            error
+          );
 
-    scheduleEvents.forEach((e) => {
-      if (map[e.day]) {
-        map[e.day].push(e);
-      }
-    });
+          setScheduleLoading(false);
+        }
+      );
 
-    return map;
-  }, [scheduleEvents]);
+    return unsubscribe;
+  }, [
+    uid,
+    weekOffset,
+  ]);
 
-  /* ---------------------------------------------
+  /* =======================================================
+     AGENDA BY DAY
+  ======================================================= */
+
+  const agendaByDay =
+    useMemo(() => {
+      const map = {};
+
+      WEEK_DAYS.forEach(
+        (day) => {
+          map[day] = [];
+        }
+      );
+
+      scheduleEvents.forEach(
+        (event) => {
+          if (
+            map[event.day]
+          ) {
+            map[event.day].push(
+              event
+            );
+          }
+        }
+      );
+
+      return map;
+    }, [
+      scheduleEvents,
+    ]);
+
+  /* =======================================================
      LIVE CLASS
-  --------------------------------------------- */
+  ======================================================= */
 
   useEffect(() => {
-    if (!uid) return;
+    if (!uid) {
+      setLiveClass(null);
+      setLiveClassLoading(false);
+      return;
+    }
 
     setLiveClassLoading(true);
 
     const q = query(
-      collection(db, "liveClasses"),
-      where("uid", "==", uid),
+      collection(
+        db,
+        "liveClasses"
+      ),
+      where(
+        "uid",
+        "==",
+        uid
+      ),
       where(
         "startTime",
         ">=",
-        Timestamp.fromDate(new Date())
+        Timestamp.fromDate(
+          new Date()
+        )
       ),
-      orderBy("startTime", "asc"),
+      orderBy(
+        "startTime",
+        "asc"
+      ),
       limit(1)
     );
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        if (snap.empty) {
-          setLiveClass(null);
-        } else {
-          const d = snap.docs[0];
-          const data = d.data();
+    const unsubscribe =
+      onSnapshot(
+        q,
+        (snapshot) => {
+          if (snapshot.empty) {
+            setLiveClass(null);
+            setLiveClassLoading(
+              false
+            );
+            return;
+          }
+
+          const item =
+            snapshot.docs[0];
+
+          const data =
+            item.data();
 
           const start =
-            data.startTime instanceof Timestamp
+            data.startTime instanceof
+            Timestamp
               ? data.startTime.toDate()
               : new Date();
 
           const end =
-            data.endTime instanceof Timestamp
+            data.endTime instanceof
+            Timestamp
               ? data.endTime.toDate()
               : null;
 
           setLiveClass({
-            id: d.id,
-            title: data.title,
-            location: data.location,
+            id: item.id,
+
+            title:
+              data.title ||
+              "Live class",
+
+            location:
+              data.location ||
+              "",
+
             status:
-              data.status || "upcoming",
+              data.status ||
+              "upcoming",
+
             timeLabel: end
               ? `Today · ${formatTime(
                   start
-                )}–${formatTime(end)}`
-              : `Today · ${formatTime(start)}`,
+                )}–${formatTime(
+                  end
+                )}`
+              : `Today · ${formatTime(
+                  start
+                )}`,
           });
+
+          setLiveClassLoading(
+            false
+          );
+        },
+        (error) => {
+          console.error(
+            "Live class listener failed:",
+            error
+          );
+
+          setLiveClassLoading(false);
         }
+      );
 
-        setLiveClassLoading(false);
-      },
-      () => setLiveClassLoading(false)
-    );
-
-    return unsub;
+    return unsubscribe;
   }, [uid]);
 
-  const scrollToSchedule = () => {
-    scheduleSectionRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
+  /* =======================================================
+     SCROLL HELPERS
+  ======================================================= */
+
+  const scrollToSchedule =
+    () => {
+      scheduleSectionRef.current?.scrollIntoView(
+        {
+          behavior: "smooth",
+          block: "start",
+        }
+      );
+    };
 
   const scrollToLive = () => {
-    liveClassSectionRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    liveClassSectionRef.current?.scrollIntoView(
+      {
+        behavior: "smooth",
+        block: "start",
+      }
+    );
   };
 
-  const handleQuickAction = (to) => {
-    if (to === "#schedule") {
-      scrollToSchedule();
-    } else if (to === "#live") {
-      scrollToLive();
-    } else {
+  const handleQuickAction =
+    (to) => {
+      if (
+        to === "#schedule"
+      ) {
+        scrollToSchedule();
+        return;
+      }
+
+      if (to === "#live") {
+        scrollToLive();
+        return;
+      }
+
       navigate(to);
-    }
-  };
+    };
 
-  /* ---------------------------------------------
-     NOTIFICATIONS
-  --------------------------------------------- */
+  /* =======================================================
+     NOTIFICATION ACTIONS
+  ======================================================= */
 
-  const dismissNotification = async (id) => {
-    setNotifications((prev) =>
-      prev.filter((n) => n.id !== id)
-    );
-
-    try {
-      await deleteDoc(
-        doc(db, "notifications", id)
-      );
-    } catch (err) {
-      console.error(
-        "Failed to dismiss notification",
-        err
-      );
-    }
-  };
-
-  const clearAllNotifications = async () => {
-    const ids = notifications.map((n) => n.id);
-
-    setNotifications([]);
-
-    try {
-      await Promise.all(
-        ids.map((id) =>
-          deleteDoc(
-            doc(db, "notifications", id)
+  const dismissNotification =
+    async (id) => {
+      setNotifications(
+        (previous) =>
+          previous.filter(
+            (item) =>
+              item.id !== id
           )
-        )
       );
-    } catch (err) {
-      console.error(
-        "Failed to clear notifications",
-        err
+
+      try {
+        await deleteDoc(
+          doc(
+            db,
+            "notifications",
+            id
+          )
+        );
+      } catch (error) {
+        console.error(
+          "Failed to dismiss notification:",
+          error
+        );
+      }
+    };
+
+  const clearAllNotifications =
+    async () => {
+      const ids =
+        notifications.map(
+          (item) => item.id
+        );
+
+      setNotifications([]);
+
+      try {
+        await Promise.all(
+          ids.map((id) =>
+            deleteDoc(
+              doc(
+                db,
+                "notifications",
+                id
+              )
+            )
+          )
+        );
+      } catch (error) {
+        console.error(
+          "Failed to clear notifications:",
+          error
+        );
+      }
+    };
+
+  /* =======================================================
+     TASK ACTIONS
+  ======================================================= */
+
+  const toggleTask =
+    async (id) => {
+      const target =
+        tasks.find(
+          (item) =>
+            item.id === id
+        );
+
+      if (!target) {
+        return;
+      }
+
+      const nowDone =
+        target.progress !==
+        100;
+
+      const nextProgress =
+        nowDone
+          ? 100
+          : target.prevProgress;
+
+      setTasks(
+        (previous) =>
+          previous.map(
+            (item) =>
+              item.id === id
+                ? {
+                    ...item,
+
+                    progress:
+                      nextProgress,
+
+                    prevProgress:
+                      nowDone
+                        ? item.progress
+                        : item.prevProgress,
+                  }
+                : item
+          )
       );
-    }
-  };
 
-  /* ---------------------------------------------
-     TASKS
-  --------------------------------------------- */
+      try {
+        await updateDoc(
+          doc(
+            db,
+            "tasks",
+            id
+          ),
+          {
+            progress:
+              nextProgress,
 
-  const toggleTask = async (id) => {
-    const target = tasks.find(
-      (t) => t.id === id
-    );
+            prevProgress:
+              nowDone
+                ? target.progress
+                : target.prevProgress,
+          }
+        );
+      } catch (error) {
+        console.error(
+          "Failed to update task:",
+          error
+        );
+      }
+    };
 
-    if (!target) return;
-
-    const nowDone =
-      target.progress !== 100;
-
-    const nextProgress = nowDone
-      ? 100
-      : target.prevProgress;
-
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              progress: nextProgress,
-              prevProgress: nowDone
-                ? t.progress
-                : t.prevProgress,
-            }
-          : t
-      )
-    );
-
-    try {
-      await updateDoc(
-        doc(db, "tasks", id),
-        {
-          progress: nextProgress,
-          prevProgress: nowDone
-            ? target.progress
-            : target.prevProgress,
-        }
-      );
-    } catch (err) {
-      console.error(
-        "Failed to update task",
-        err
-      );
-    }
-  };
-
-  /* ---------------------------------------------
+  /* =======================================================
      LIVE CLASS STATUS
-  --------------------------------------------- */
+  ======================================================= */
 
-  const setLiveClassStatus = async (
-    status
-  ) => {
-    if (!liveClass) return;
+  const setLiveClassStatus =
+    async (status) => {
+      if (!liveClass) {
+        return;
+      }
 
-    setLiveClass((prev) =>
-      prev
-        ? {
-            ...prev,
+      setLiveClass(
+        (previous) =>
+          previous
+            ? {
+                ...previous,
+                status,
+              }
+            : previous
+      );
+
+      try {
+        await updateDoc(
+          doc(
+            db,
+            "liveClasses",
+            liveClass.id
+          ),
+          {
             status,
           }
-        : prev
-    );
+        );
+      } catch (error) {
+        console.error(
+          "Failed to update live class status:",
+          error
+        );
+      }
+    };
 
-    try {
-      await updateDoc(
-        doc(db, "liveClasses", liveClass.id),
-        {
-          status,
-        }
-      );
-    } catch (err) {
-      console.error(
-        "Failed to update live class status",
-        err
-      );
-    }
-  };
+  /* =======================================================
+     ANNOUNCEMENT DISPLAY
+  ======================================================= */
 
-  const tasksDone = tasks.filter(
-    (t) => t.progress === 100
-  ).length;
+  const visibleAnnouncements =
+    showAllAnnouncements
+      ? announcements
+      : announcements.slice(
+          0,
+          4
+        );
+
+  const tasksDone =
+    tasks.filter(
+      (task) =>
+        task.progress === 100
+    ).length;
+
+  /* =========================================================
+     RENDER
+  ========================================================= */
 
   return (
     <div
@@ -629,9 +1362,9 @@ export default function Dashboard() {
     >
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28 lg:px-8">
 
-        {/* -----------------------------------------
+        {/* =================================================
             DASHBOARD TABS
-        ----------------------------------------- */}
+        ================================================= */}
 
         <div className="mb-5">
           <div className="grid grid-cols-3 gap-1.5 sm:inline-flex sm:w-auto sm:gap-2">
@@ -649,19 +1382,26 @@ export default function Dashboard() {
                     key={key}
                     type="button"
                     onClick={() =>
-                      setActiveTab(key)
+                      setActiveTab(
+                        key
+                      )
                     }
                     className="flex min-w-0 items-center justify-center gap-1.5 rounded-full px-2 py-2.5 text-[11px] font-bold leading-tight transition-colors sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
                     style={{
-                      background: isActive
-                        ? "#1B0E3D"
-                        : "white",
-                      color: isActive
-                        ? "white"
-                        : "#8A82A6",
-                      boxShadow: isActive
-                        ? "none"
-                        : "0 1px 2px rgba(27,14,61,0.06)",
+                      background:
+                        isActive
+                          ? "#1B0E3D"
+                          : "white",
+
+                      color:
+                        isActive
+                          ? "white"
+                          : "#8A82A6",
+
+                      boxShadow:
+                        isActive
+                          ? "none"
+                          : "0 1px 2px rgba(27,14,61,0.06)",
                     }}
                   >
                     <Icon className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
@@ -676,30 +1416,36 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* -----------------------------------------
+        {/* =================================================
             CERTIFICATES
-        ----------------------------------------- */}
+        ================================================= */}
 
-        {activeTab === "certificates" ? (
+        {activeTab ===
+        "certificates" ? (
           <Certificates />
 
-        /* -----------------------------------------
+        /* =================================================
            MY COURSES
-        ----------------------------------------- */
+        ================================================= */
 
-        ) : activeTab === "courses" ? (
+        ) : activeTab ===
+          "courses" ? (
           <MyCourses />
 
-        /* -----------------------------------------
+        /* =================================================
            OVERVIEW
-        ----------------------------------------- */
+        ================================================= */
 
         ) : (
           <div>
 
-            {/* ROW 1 — GREETING + QUICK ACTIONS */}
+            {/* =================================================
+                GREETING + QUICK ACTIONS
+            ================================================= */}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+
+              {/* GREETING */}
 
               <motion.div
                 variants={fadeUp}
@@ -712,7 +1458,8 @@ export default function Dashboard() {
                   aria-hidden="true"
                   className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full opacity-[0.07] blur-2xl"
                   style={{
-                    background: ACCENT,
+                    background:
+                      ACCENT,
                   }}
                 />
 
@@ -726,14 +1473,21 @@ export default function Dashboard() {
                   <Skeleton className="mt-3 h-3 w-64" />
                 ) : (
                   <p className="mt-3 max-w-sm text-sm leading-relaxed text-[#6b5f87]">
-                    {`You've completed ${tasksDone} of ${tasks.length} tasks today. Keep the streak going — your next lesson is waiting.`}
+                    You've completed{" "}
+                    {tasksDone} of{" "}
+                    {tasks.length}{" "}
+                    tasks today. Keep the
+                    streak going — your next
+                    lesson is waiting.
                   </p>
                 )}
 
                 <button
                   type="button"
                   onClick={() =>
-                    setActiveTab("courses")
+                    setActiveTab(
+                      "courses"
+                    )
                   }
                   className="group/cta mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-white transition-transform active:scale-[0.98]"
                   style={{
@@ -746,6 +1500,8 @@ export default function Dashboard() {
                 </button>
               </motion.div>
 
+              {/* QUICK ACTIONS */}
+
               <div className="grid grid-cols-2 gap-4 lg:col-span-5">
 
                 <motion.button
@@ -755,7 +1511,9 @@ export default function Dashboard() {
                   animate="show"
                   custom={1}
                   onClick={() =>
-                    navigate(COURSES_ROUTE)
+                    navigate(
+                      COURSES_ROUTE
+                    )
                   }
                   className="flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-violet-200 bg-violet-50/50 p-5 text-center transition-colors hover:bg-violet-50"
                 >
@@ -780,7 +1538,7 @@ export default function Dashboard() {
                       icon: Icon,
                       to,
                     },
-                    i
+                    index
                   ) => (
                     <motion.button
                       key={label}
@@ -788,9 +1546,13 @@ export default function Dashboard() {
                       variants={fadeUp}
                       initial="hidden"
                       animate="show"
-                      custom={2 + i}
+                      custom={
+                        2 + index
+                      }
                       onClick={() =>
-                        handleQuickAction(to)
+                        handleQuickAction(
+                          to
+                        )
                       }
                       className={`flex flex-col items-center justify-center gap-2 rounded-3xl bg-white p-5 text-center transition-transform hover:-translate-y-0.5 ${cardShadow}`}
                     >
@@ -816,9 +1578,9 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* -----------------------------------------
+            {/* =================================================
                 ATTENDANCE
-            ----------------------------------------- */}
+            ================================================= */}
 
             <motion.div
               variants={fadeUp}
@@ -830,27 +1592,264 @@ export default function Dashboard() {
               <Attendance />
             </motion.div>
 
-            {/* ROW 2 — NOTIFICATIONS / SCHEDULE */}
+            {/* =================================================
+                ANNOUNCEMENTS
+            ================================================= */}
+
+            <motion.div
+              variants={fadeUp}
+              initial="hidden"
+              animate="show"
+              custom={4}
+              className={`mt-4 rounded-3xl bg-white p-5 ${cardShadow}`}
+            >
+              {/* HEADER */}
+
+              <div className="mb-4 flex items-center justify-between gap-3">
+
+                <div className="flex min-w-0 items-center gap-3">
+
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #059669, #0f766e)",
+                    }}
+                  >
+                    <Megaphone className="h-5 w-5" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-[#1B0E3D]">
+                      Announcements
+                    </h3>
+
+                    <p className="mt-0.5 text-[10px] text-[#8A82A6]">
+                      Important updates from
+                      Creative Adhyayan
+                    </p>
+                  </div>
+                </div>
+
+                {announcements.length >
+                  4 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowAllAnnouncements(
+                        (previous) =>
+                          !previous
+                      )
+                    }
+                    className="shrink-0 text-xs font-bold text-emerald-600 transition-colors hover:text-emerald-700"
+                  >
+                    {showAllAnnouncements
+                      ? "Show less"
+                      : "View all"}
+                  </button>
+                )}
+              </div>
+
+              {/* LOADING */}
+
+              {announcementsLoading ? (
+                <div className="space-y-2">
+                  {Array.from({
+                    length: 3,
+                  }).map(
+                    (_, index) => (
+                      <ListRowSkeleton
+                        key={index}
+                      />
+                    )
+                  )}
+                </div>
+
+              /* ERROR */
+
+              ) : announcementsError ? (
+                <div className="rounded-2xl bg-red-50 px-4 py-6 text-center">
+
+                  <Megaphone className="mx-auto h-6 w-6 text-red-400" />
+
+                  <p className="mt-2 text-xs font-bold text-red-600">
+                    Unable to load announcements.
+                  </p>
+
+                  <p className="mt-1 text-[10px] text-red-400">
+                    Please refresh the dashboard
+                    and try again.
+                  </p>
+                </div>
+
+              /* EMPTY */
+
+              ) : announcements.length ===
+                0 ? (
+                <div className="rounded-2xl bg-[#F7F5FC] px-4 py-8 text-center">
+
+                  <Megaphone className="mx-auto h-6 w-6 text-[#B4ABCB]" />
+
+                  <p className="mt-2 text-xs font-bold text-[#6B5F87]">
+                    No announcements yet.
+                  </p>
+
+                  <p className="mx-auto mt-1 max-w-sm text-[10px] leading-relaxed text-[#A79BC4]">
+                    Important updates from your
+                    institution will appear here.
+                  </p>
+                </div>
+
+              /* ANNOUNCEMENTS */
+
+              ) : (
+                <div className="space-y-2">
+
+                  {visibleAnnouncements.map(
+                    (announcement) => (
+                      <div
+                        key={
+                          announcement.id
+                        }
+                        className="group rounded-2xl bg-[#F7F5FC] p-3.5 transition-colors hover:bg-[#F3EFFC]"
+                      >
+
+                        <div className="flex items-start gap-3">
+
+                          {/* ICON */}
+
+                          <div
+                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                              announcement.pinned
+                                ? "bg-amber-100 text-amber-600"
+                                : "bg-emerald-100 text-emerald-600"
+                            }`}
+                          >
+                            {announcement.pinned ? (
+                              <Pin className="h-3.5 w-3.5" />
+                            ) : announcement.audienceType ===
+                              "global" ? (
+                              <Globe2 className="h-3.5 w-3.5" />
+                            ) : (
+                              <GraduationCap className="h-3.5 w-3.5" />
+                            )}
+                          </div>
+
+                          {/* CONTENT */}
+
+                          <div className="min-w-0 flex-1">
+
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+
+                              <div className="min-w-0">
+
+                                <h4 className="text-xs font-bold text-[#1B0E3D]">
+                                  {
+                                    announcement.title
+                                  }
+                                </h4>
+
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+
+                                  {/* AUDIENCE */}
+
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[9px] font-bold text-emerald-600">
+
+                                    {announcement.audienceType ===
+                                    "global" ? (
+                                      <>
+                                        <Globe2 className="h-2.5 w-2.5" />
+                                        Everyone
+                                      </>
+                                    ) : (
+                                      <>
+                                        <GraduationCap className="h-2.5 w-2.5" />
+                                        Course update
+                                      </>
+                                    )}
+
+                                  </span>
+
+                                  {/* PINNED */}
+
+                                  {announcement.pinned && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-600">
+                                      <Pin className="h-2.5 w-2.5" />
+                                      Pinned
+                                    </span>
+                                  )}
+
+                                </div>
+                              </div>
+
+                              {/* DATE */}
+
+                              {announcement.date && (
+                                <span className="shrink-0 text-[9px] font-medium text-[#B4ABCB]">
+                                  {formatAnnouncementDate(
+                                    announcement.date
+                                  )}
+                                </span>
+                              )}
+
+                            </div>
+
+                            {/* MESSAGE */}
+
+                            <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-[#766B91]">
+                              {
+                                announcement.message
+                              }
+                            </p>
+
+                            {/* AUTHOR */}
+
+                            {announcement.authorName && (
+                              <p className="mt-2 text-[9px] font-semibold text-[#A79BC4]">
+                                Posted by{" "}
+                                {
+                                  announcement.authorName
+                                }
+                              </p>
+                            )}
+
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  )}
+
+                </div>
+              )}
+            </motion.div>
+
+            {/* =================================================
+                NOTIFICATIONS + SCHEDULE
+            ================================================= */}
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
 
-              {/* NOTIFICATIONS */}
+              {/* =================================================
+                  NOTIFICATIONS
+              ================================================= */}
 
               <motion.div
                 variants={fadeUp}
                 initial="hidden"
                 animate="show"
-                custom={4}
+                custom={5}
                 className={`rounded-3xl bg-white p-5 ${cardShadow}`}
               >
+
                 <div className="mb-3 flex items-center justify-between">
+
                   <h3 className="flex items-center gap-2 text-sm font-bold text-[#1B0E3D]">
                     <Bell className="h-4 w-4 text-[#6D3FC0]" />
-
                     Notifications
                   </h3>
 
-                  {notifications.length > 0 && (
+                  {notifications.length >
+                    0 && (
                     <button
                       type="button"
                       onClick={
@@ -861,17 +1860,20 @@ export default function Dashboard() {
                       Clear
                     </button>
                   )}
+
                 </div>
 
                 {notifLoading ? (
                   <div className="space-y-1">
                     {Array.from({
                       length: 3,
-                    }).map((_, i) => (
-                      <ListRowSkeleton
-                        key={i}
-                      />
-                    ))}
+                    }).map(
+                      (_, index) => (
+                        <ListRowSkeleton
+                          key={index}
+                        />
+                      )
+                    )}
                   </div>
                 ) : notifications.length ===
                   0 ? (
@@ -880,64 +1882,89 @@ export default function Dashboard() {
                   </p>
                 ) : (
                   <ul className="space-y-2">
-                    {notifications.map((n) => (
-                      <li
-                        key={n.id}
-                        className="group flex items-start justify-between gap-2 rounded-2xl bg-[#F7F5FC] p-3"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-bold text-[#1B0E3D]">
-                            {n.title}
-                          </p>
 
-                          <p className="mt-0.5 line-clamp-2 text-[11px] text-[#8A82A6]">
-                            {n.body}
-                          </p>
-
-                          <p className="mt-1 text-[10px] font-medium text-[#B4ABCB]">
-                            {n.time}
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            dismissNotification(
-                              n.id
-                            )
+                    {notifications.map(
+                      (notification) => (
+                        <li
+                          key={
+                            notification.id
                           }
-                          aria-label="Dismiss"
-                          className="shrink-0 rounded-full p-1 text-[#B4ABCB] opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                          className="group flex items-start justify-between gap-2 rounded-2xl bg-[#F7F5FC] p-3"
                         >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </li>
-                    ))}
+
+                          <div className="min-w-0">
+
+                            <p className="truncate text-xs font-bold text-[#1B0E3D]">
+                              {
+                                notification.title
+                              }
+                            </p>
+
+                            <p className="mt-0.5 line-clamp-2 text-[11px] text-[#8A82A6]">
+                              {
+                                notification.body
+                              }
+                            </p>
+
+                            <p className="mt-1 text-[10px] font-medium text-[#B4ABCB]">
+                              {
+                                notification.time
+                              }
+                            </p>
+
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              dismissNotification(
+                                notification.id
+                              )
+                            }
+                            aria-label="Dismiss notification"
+                            className="shrink-0 rounded-full p-1 text-[#B4ABCB] opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+
+                        </li>
+                      )
+                    )}
+
                   </ul>
                 )}
+
               </motion.div>
 
-              {/* SCHEDULE */}
+              {/* =================================================
+                  SCHEDULE
+              ================================================= */}
 
               <motion.div
-                ref={scheduleSectionRef}
+                ref={
+                  scheduleSectionRef
+                }
                 variants={fadeUp}
                 initial="hidden"
                 animate="show"
-                custom={5}
+                custom={6}
                 className={`scroll-mt-6 rounded-3xl bg-white p-5 ${cardShadow}`}
               >
+
                 <div className="mb-3 flex items-center justify-between">
+
                   <h3 className="text-sm font-bold text-[#1B0E3D]">
                     This week
                   </h3>
 
                   <div className="flex items-center gap-1">
+
                     <button
                       type="button"
                       onClick={() =>
                         setWeekOffset(
-                          (w) => w - 1
+                          (value) =>
+                            value - 1
                         )
                       }
                       aria-label="Previous week"
@@ -950,7 +1977,8 @@ export default function Dashboard() {
                       type="button"
                       onClick={() =>
                         setWeekOffset(
-                          (w) => w + 1
+                          (value) =>
+                            value + 1
                         )
                       }
                       aria-label="Next week"
@@ -958,6 +1986,7 @@ export default function Dashboard() {
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
+
                   </div>
                 </div>
 
@@ -971,7 +2000,9 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() =>
-                        setWeekOffset(0)
+                        setWeekOffset(
+                          0
+                        )
                       }
                       className="underline underline-offset-2 hover:text-[#6D3FC0]"
                     >
@@ -981,22 +2012,28 @@ export default function Dashboard() {
                 )}
 
                 <div className="grid grid-cols-7 gap-1">
+
                   {WEEK_DAYS.map(
                     (day) => (
                       <button
                         key={day}
                         type="button"
                         onClick={() =>
-                          setActiveDay(day)
+                          setActiveDay(
+                            day
+                          )
                         }
                         className="flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-bold transition-colors"
                         style={{
                           background:
-                            activeDay === day
+                            activeDay ===
+                            day
                               ? ACCENT
                               : "transparent",
+
                           color:
-                            activeDay === day
+                            activeDay ===
+                            day
                               ? "#fff"
                               : "#8A82A6",
                         }}
@@ -1022,18 +2059,22 @@ export default function Dashboard() {
                       </button>
                     )
                   )}
+
                 </div>
 
                 <div className="mt-3 space-y-2">
+
                   {scheduleLoading ? (
                     <div className="space-y-2">
                       {Array.from({
                         length: 3,
-                      }).map((_, i) => (
-                        <ListRowSkeleton
-                          key={i}
-                        />
-                      ))}
+                      }).map(
+                        (_, index) => (
+                          <ListRowSkeleton
+                            key={index}
+                          />
+                        )
+                      )}
                     </div>
                   ) : (
                     (
@@ -1047,174 +2088,231 @@ export default function Dashboard() {
                     ) : (
                       agendaByDay[
                         activeDay
-                      ].map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center gap-2 rounded-2xl bg-[#F7F5FC] p-2.5"
-                        >
-                          <span
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white"
-                            style={{
-                              background:
-                                ACCENT,
-                            }}
+                      ].map(
+                        (item) => (
+                          <div
+                            key={
+                              item.id
+                            }
+                            className="flex items-center gap-2 rounded-2xl bg-[#F7F5FC] p-2.5"
                           >
-                            <Clock className="h-3.5 w-3.5" />
-                          </span>
 
-                          <div className="min-w-0">
-                            <p className="truncate text-[11px] font-bold text-[#1B0E3D]">
-                              {item.label}
-                            </p>
+                            <span
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white"
+                              style={{
+                                background:
+                                  ACCENT,
+                              }}
+                            >
+                              <Clock className="h-3.5 w-3.5" />
+                            </span>
 
-                            <p className="text-[10px] text-[#8A82A6]">
-                              {item.time}
-                            </p>
+                            <div className="min-w-0">
+
+                              <p className="truncate text-[11px] font-bold text-[#1B0E3D]">
+                                {
+                                  item.label
+                                }
+                              </p>
+
+                              <p className="text-[10px] text-[#8A82A6]">
+                                {
+                                  item.time
+                                }
+                              </p>
+
+                            </div>
+
                           </div>
-                        </div>
-                      ))
+                        )
+                      )
                     )
                   )}
+
                 </div>
               </motion.div>
+
             </div>
 
-            {/* ROW 3 — TASKS / UPGRADE / LIVE CLASS */}
+            {/* =================================================
+                TASKS + PREMIUM + LIVE CLASS
+            ================================================= */}
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
 
-              {/* TASKS */}
-
-              <motion.div
-                variants={fadeUp}
-                initial="hidden"
-                animate="show"
-                custom={6}
-                className={`rounded-3xl bg-white p-5 lg:col-span-6 ${cardShadow}`}
-              >
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-[#1B0E3D]">
-                    Today's tasks
-                  </h3>
-
-                  <span className="text-[11px] font-semibold text-[#8A82A6]">
-                    {tasksDone}/
-                    {tasks.length} done
-                  </span>
-                </div>
-
-                {tasksLoading ? (
-                  <div className="space-y-3">
-                    {Array.from({
-                      length: 3,
-                    }).map((_, i) => (
-                      <ListRowSkeleton
-                        key={i}
-                      />
-                    ))}
-                  </div>
-                ) : tasks.length === 0 ? (
-                  <p className="py-6 text-center text-xs text-[#A79BC4]">
-                    No tasks for today.
-                  </p>
-                ) : (
-                  <ul className="space-y-3">
-                    {tasks.map((t) => {
-                      const done =
-                        t.progress === 100;
-
-                      return (
-                        <li
-                          key={t.id}
-                          className="flex items-center gap-3"
-                        >
-                          <button
-                            type="button"
-                            onClick={() =>
-                              toggleTask(
-                                t.id
-                              )
-                            }
-                            aria-label={
-                              done
-                                ? "Mark as not done"
-                                : "Mark as done"
-                            }
-                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors"
-                            style={{
-                              borderColor:
-                                done
-                                  ? ACCENT
-                                  : "#D9D2EC",
-                              background:
-                                done
-                                  ? ACCENT
-                                  : "transparent",
-                            }}
-                          >
-                            {done && (
-                              <Check
-                                className="h-3.5 w-3.5 text-white"
-                                strokeWidth={
-                                  3
-                                }
-                              />
-                            )}
-                          </button>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <p
-                                className={`truncate text-xs font-bold ${
-                                  done
-                                    ? "text-[#B4ABCB] line-through"
-                                    : "text-[#1B0E3D]"
-                                }`}
-                              >
-                                {t.title}
-                              </p>
-
-                              <span className="shrink-0 text-[10px] font-semibold text-[#8A82A6]">
-                                {t.duration}
-                              </span>
-                            </div>
-
-                            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#EFEAFB]">
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${t.progress}%`,
-                                  background: done
-                                    ? "#22c55e"
-                                    : ACCENT,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </motion.div>
-
-              {/* PREMIUM */}
+              {/* =================================================
+                  TASKS
+              ================================================= */}
 
               <motion.div
                 variants={fadeUp}
                 initial="hidden"
                 animate="show"
                 custom={7}
+                className={`rounded-3xl bg-white p-5 lg:col-span-6 ${cardShadow}`}
+              >
+
+                <div className="mb-3 flex items-center justify-between">
+
+                  <h3 className="text-sm font-bold text-[#1B0E3D]">
+                    Today's tasks
+                  </h3>
+
+                  <span className="text-[11px] font-semibold text-[#8A82A6]">
+                    {tasksDone}/
+                    {tasks.length}{" "}
+                    done
+                  </span>
+
+                </div>
+
+                {tasksLoading ? (
+                  <div className="space-y-3">
+                    {Array.from({
+                      length: 3,
+                    }).map(
+                      (_, index) => (
+                        <ListRowSkeleton
+                          key={index}
+                        />
+                      )
+                    )}
+                  </div>
+                ) : tasks.length ===
+                  0 ? (
+                  <p className="py-6 text-center text-xs text-[#A79BC4]">
+                    No tasks for today.
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+
+                    {tasks.map(
+                      (task) => {
+                        const done =
+                          task.progress ===
+                          100;
+
+                        return (
+                          <li
+                            key={
+                              task.id
+                            }
+                            className="flex items-center gap-3"
+                          >
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleTask(
+                                  task.id
+                                )
+                              }
+                              aria-label={
+                                done
+                                  ? "Mark as not done"
+                                  : "Mark as done"
+                              }
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors"
+                              style={{
+                                borderColor:
+                                  done
+                                    ? ACCENT
+                                    : "#D9D2EC",
+
+                                background:
+                                  done
+                                    ? ACCENT
+                                    : "transparent",
+                              }}
+                            >
+                              {done && (
+                                <Check
+                                  className="h-3.5 w-3.5 text-white"
+                                  strokeWidth={
+                                    3
+                                  }
+                                />
+                              )}
+                            </button>
+
+                            <div className="min-w-0 flex-1">
+
+                              <div className="flex items-center justify-between gap-2">
+
+                                <p
+                                  className={`truncate text-xs font-bold ${
+                                    done
+                                      ? "text-[#B4ABCB] line-through"
+                                      : "text-[#1B0E3D]"
+                                  }`}
+                                >
+                                  {
+                                    task.title
+                                  }
+                                </p>
+
+                                <span className="shrink-0 text-[10px] font-semibold text-[#8A82A6]">
+                                  {
+                                    task.duration
+                                  }
+                                </span>
+
+                              </div>
+
+                              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#EFEAFB]">
+
+                                <div
+                                  className="h-full rounded-full transition-all duration-500"
+                                  style={{
+                                    width: `${Math.min(
+                                      Math.max(
+                                        task.progress,
+                                        0
+                                      ),
+                                      100
+                                    )}%`,
+
+                                    background:
+                                      done
+                                        ? "#22c55e"
+                                        : ACCENT,
+                                  }}
+                                />
+
+                              </div>
+
+                            </div>
+                          </li>
+                        );
+                      }
+                    )}
+
+                  </ul>
+                )}
+
+              </motion.div>
+
+              {/* =================================================
+                  PREMIUM
+              ================================================= */}
+
+              <motion.div
+                variants={fadeUp}
+                initial="hidden"
+                animate="show"
+                custom={8}
                 className="relative overflow-hidden rounded-3xl p-5 text-white lg:col-span-3"
                 style={{
                   background: `linear-gradient(155deg, #6D3FC0, ${VIOLET})`,
                 }}
               >
+
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute -bottom-10 -right-10 h-32 w-32 rounded-full opacity-20 blur-xl"
                   style={{
-                    background: AMBER,
+                    background:
+                      AMBER,
                   }}
                 />
 
@@ -1230,9 +2328,10 @@ export default function Dashboard() {
                 </h3>
 
                 <p className="mt-1.5 text-xs leading-relaxed text-white/70">
-                  Unlock mentor 1:1s, verified
-                  certificates, and every course
-                  in the catalog.
+                  Unlock mentor 1:1s,
+                  verified certificates,
+                  and every course in the
+                  catalog.
                 </p>
 
                 <button
@@ -1248,21 +2347,26 @@ export default function Dashboard() {
 
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </button>
+
               </motion.div>
 
-              {/* LIVE CLASS */}
+              {/* =================================================
+                  LIVE CLASS
+              ================================================= */}
 
               <motion.div
-                ref={liveClassSectionRef}
+                ref={
+                  liveClassSectionRef
+                }
                 variants={fadeUp}
                 initial="hidden"
                 animate="show"
-                custom={8}
+                custom={9}
                 className={`scroll-mt-6 rounded-3xl bg-white p-5 lg:col-span-3 ${cardShadow}`}
               >
+
                 <h3 className="flex items-center gap-2 text-sm font-bold text-[#1B0E3D]">
                   <Video className="h-4 w-4 text-[#6D3FC0]" />
-
                   Live class
                 </h3>
 
@@ -1279,20 +2383,26 @@ export default function Dashboard() {
                 ) : (
                   <>
                     <p className="mt-2 text-xs font-bold text-[#1B0E3D]">
-                      {liveClass.title}
+                      {
+                        liveClass.title
+                      }
                     </p>
 
                     <p className="mt-1 flex items-center gap-1 text-[10px] text-[#8A82A6]">
                       <Clock className="h-3 w-3" />
 
-                      {liveClass.timeLabel}
+                      {
+                        liveClass.timeLabel
+                      }
                     </p>
 
                     {liveClass.location && (
                       <p className="mt-0.5 flex items-center gap-1 text-[10px] text-[#8A82A6]">
                         <MapPin className="h-3 w-3" />
 
-                        {liveClass.location}
+                        {
+                          liveClass.location
+                        }
                       </p>
                     )}
 
@@ -1308,6 +2418,7 @@ export default function Dashboard() {
                       </p>
                     ) : (
                       <div className="mt-4 flex gap-2">
+
                         <button
                           type="button"
                           onClick={() =>
@@ -1334,15 +2445,18 @@ export default function Dashboard() {
                           }}
                         >
                           <Play className="h-3.5 w-3.5" />
-
                           Join
                         </button>
+
                       </div>
                     )}
                   </>
                 )}
+
               </motion.div>
+
             </div>
+
           </div>
         )}
       </div>

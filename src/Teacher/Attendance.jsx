@@ -15,6 +15,7 @@ import {
   RefreshCw,
   BookOpen,
   ClipboardCheck,
+  CalendarDays,
 } from "lucide-react";
 
 import { auth, db } from "../firebase/Firebase";
@@ -22,7 +23,7 @@ import { getCourseAttendance } from "../services/AttendanceService";
 
 /* ============================================================
    DATE FORMAT
-   ============================================================ */
+============================================================ */
 
 function formatDate(value) {
   if (!value) return "—";
@@ -50,7 +51,7 @@ function formatDate(value) {
 
 /* ============================================================
    STATUS CONFIG
-   ============================================================ */
+============================================================ */
 
 function statusConfig(status) {
   switch (status) {
@@ -59,6 +60,7 @@ function statusConfig(status) {
         label: "Present",
         icon: CheckCircle2,
         className: "bg-emerald-50 text-emerald-700",
+        dotClass: "bg-emerald-500",
       };
 
     case "late":
@@ -66,6 +68,7 @@ function statusConfig(status) {
         label: "Late",
         icon: Clock3,
         className: "bg-amber-50 text-amber-700",
+        dotClass: "bg-amber-500",
       };
 
     case "absent":
@@ -73,6 +76,7 @@ function statusConfig(status) {
         label: "Absent",
         icon: XCircle,
         className: "bg-red-50 text-red-700",
+        dotClass: "bg-red-500",
       };
 
     default:
@@ -80,13 +84,14 @@ function statusConfig(status) {
         label: status || "Unknown",
         icon: Clock3,
         className: "bg-slate-100 text-slate-600",
+        dotClass: "bg-slate-400",
       };
   }
 }
 
 /* ============================================================
    TEACHER ATTENDANCE
-   ============================================================ */
+============================================================ */
 
 export default function Attendance() {
   const [teacher, setTeacher] = useState(null);
@@ -104,13 +109,19 @@ export default function Attendance() {
 
   /* ==========================================================
      AUTH
-     ========================================================== */
+  ========================================================== */
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {
         setTeacher(user || null);
+
+        if (!user) {
+          setCourses([]);
+          setAttendance([]);
+          setLoading(false);
+        }
       }
     );
 
@@ -119,7 +130,7 @@ export default function Attendance() {
 
   /* ==========================================================
      LOAD TEACHER COURSES
-     ========================================================== */
+  ========================================================== */
 
   useEffect(() => {
     if (!teacher?.uid) return;
@@ -179,7 +190,7 @@ export default function Attendance() {
 
   /* ==========================================================
      LOAD ATTENDANCE
-     ========================================================== */
+  ========================================================== */
 
   useEffect(() => {
     if (!teacher?.uid) return;
@@ -189,6 +200,7 @@ export default function Attendance() {
       courses.length === 0
     ) {
       setAttendance([]);
+      setAttendanceLoading(false);
       return;
     }
 
@@ -202,11 +214,14 @@ export default function Attendance() {
         let records = [];
 
         if (selectedCourse === "all") {
-          const results = await Promise.all(
-            courses.map((course) =>
-              getCourseAttendance(course.id)
-            )
-          );
+          const results =
+            await Promise.all(
+              courses.map((course) =>
+                getCourseAttendance(
+                  course.id
+                )
+              )
+            );
 
           records = results.flat();
         } else {
@@ -225,15 +240,15 @@ export default function Attendance() {
           ])
         );
 
-        const enriched = records.map(
-          (record) => ({
+        const enriched =
+          records.map((record) => ({
             ...record,
+
             course:
               courseMap.get(
                 record.courseId
               ) || null,
-          })
-        );
+          }));
 
         setAttendance(enriched);
       } catch (err) {
@@ -267,7 +282,7 @@ export default function Attendance() {
 
   /* ==========================================================
      SEARCH
-     ========================================================== */
+  ========================================================== */
 
   const filteredAttendance =
     useMemo(() => {
@@ -294,6 +309,9 @@ export default function Attendance() {
               .includes(term) ||
             record.status
               ?.toLowerCase()
+              .includes(term) ||
+            record.sessionId
+              ?.toLowerCase()
               .includes(term)
           );
         }
@@ -302,7 +320,7 @@ export default function Attendance() {
 
   /* ==========================================================
      SUMMARY
-     ========================================================== */
+  ========================================================== */
 
   const totalRecords =
     filteredAttendance.length;
@@ -327,7 +345,7 @@ export default function Attendance() {
 
   /* ==========================================================
      REFRESH
-     ========================================================== */
+  ========================================================== */
 
   const refreshAttendance =
     async () => {
@@ -367,6 +385,7 @@ export default function Attendance() {
         setAttendance(
           records.map((record) => ({
             ...record,
+
             course:
               courseMap.get(
                 record.courseId
@@ -374,7 +393,10 @@ export default function Attendance() {
           }))
         );
       } catch (err) {
-        console.error(err);
+        console.error(
+          "Failed to refresh attendance:",
+          err
+        );
 
         setError(
           "Unable to refresh attendance."
@@ -386,12 +408,16 @@ export default function Attendance() {
 
   /* ==========================================================
      AUTH FALLBACK
-     ========================================================== */
+  ========================================================== */
 
   if (!teacher) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-        <p className="text-sm font-semibold text-slate-600">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+          <ClipboardCheck className="h-5 w-5" />
+        </div>
+
+        <p className="mt-4 text-sm font-semibold text-slate-700">
           Please log in to view attendance.
         </p>
       </div>
@@ -400,75 +426,91 @@ export default function Attendance() {
 
   /* ==========================================================
      UI
-     ========================================================== */
+  ========================================================== */
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-4 sm:space-y-6">
 
       {/* ======================================================
           HEADER
-          ====================================================== */}
+      ====================================================== */}
 
-      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-            <ClipboardCheck className="h-5 w-5" />
+          {/* TITLE */}
+
+          <div className="flex min-w-0 items-start gap-3">
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600 sm:h-11 sm:w-11">
+              <ClipboardCheck className="h-5 w-5" />
+            </div>
+
+            <div className="min-w-0">
+
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+                Attendance
+              </h1>
+
+              <p className="mt-1 text-xs leading-5 text-slate-500 sm:text-sm">
+                Monitor attendance for your courses.
+              </p>
+
+            </div>
+
           </div>
 
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">
-              Attendance
-            </h1>
+          {/* REFRESH */}
 
-            <p className="mt-1 text-sm text-slate-500">
-              Monitor attendance for your courses.
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={refreshAttendance}
+            disabled={attendanceLoading}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                attendanceLoading
+                  ? "animate-spin"
+                  : ""
+              }`}
+            />
+
+            <span>
+              {attendanceLoading
+                ? "Refreshing..."
+                : "Refresh"}
+            </span>
+          </button>
 
         </div>
-
-        <button
-          type="button"
-          onClick={refreshAttendance}
-          disabled={attendanceLoading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${
-              attendanceLoading
-                ? "animate-spin"
-                : ""
-            }`}
-          />
-
-          Refresh
-        </button>
 
       </div>
 
       {/* ======================================================
           ERROR
-          ====================================================== */}
+      ====================================================== */}
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium leading-5 text-red-700">
           {error}
         </div>
       )}
 
       {/* ======================================================
           COURSE FILTER
-          ====================================================== */}
+      ====================================================== */}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
           <div className="flex items-center gap-2">
 
-            <BookOpen className="h-4 w-4 text-violet-600" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+              <BookOpen className="h-4 w-4" />
+            </div>
 
             <span className="text-sm font-semibold text-slate-900">
               Course
@@ -483,7 +525,7 @@ export default function Attendance() {
                 e.target.value
               )
             }
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100 sm:w-auto sm:min-w-[240px]"
           >
             <option value="all">
               All my courses
@@ -507,12 +549,12 @@ export default function Attendance() {
 
       {/* ======================================================
           SUMMARY
-          ====================================================== */}
+      ====================================================== */}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
 
         <SummaryCard
-          label="Total Records"
+          label="Total"
           value={totalRecords}
           icon={Users}
         />
@@ -521,28 +563,28 @@ export default function Attendance() {
           label="Present"
           value={presentCount}
           icon={CheckCircle2}
-          iconClass="text-emerald-600 bg-emerald-50"
+          iconClass="bg-emerald-50 text-emerald-600"
         />
 
         <SummaryCard
           label="Late"
           value={lateCount}
           icon={Clock3}
-          iconClass="text-amber-600 bg-amber-50"
+          iconClass="bg-amber-50 text-amber-600"
         />
 
         <SummaryCard
           label="Absent"
           value={absentCount}
           icon={XCircle}
-          iconClass="text-red-600 bg-red-50"
+          iconClass="bg-red-50 text-red-600"
         />
 
       </div>
 
       {/* ======================================================
           SEARCH
-          ====================================================== */}
+      ====================================================== */}
 
       <div className="relative">
 
@@ -554,23 +596,51 @@ export default function Attendance() {
           onChange={(e) =>
             setSearch(e.target.value)
           }
-          placeholder="Search student ID, course or status..."
+          placeholder="Search student, course, session..."
           className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
         />
 
       </div>
 
       {/* ======================================================
-          TABLE
-          ====================================================== */}
+          MOBILE ATTENDANCE CARDS
+      ====================================================== */}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="space-y-3 lg:hidden">
+
+        {loading ||
+        attendanceLoading ? (
+          <LoadingState />
+        ) : filteredAttendance.length ===
+          0 ? (
+          <EmptyState />
+        ) : (
+          filteredAttendance.map(
+            (record) => (
+              <MobileAttendanceCard
+                key={record.id}
+                record={record}
+              />
+            )
+          )
+        )}
+
+      </div>
+
+      {/* ======================================================
+          DESKTOP TABLE
+      ====================================================== */}
+
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:block">
 
         <div className="overflow-x-auto">
 
-          <table className="w-full min-w-[720px] text-left">
+          <table className="w-full min-w-[760px] text-left">
+
+            {/* HEADER */}
 
             <thead>
+
               <tr className="border-b border-slate-200 bg-slate-50">
 
                 <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -594,7 +664,10 @@ export default function Attendance() {
                 </th>
 
               </tr>
+
             </thead>
+
+            {/* BODY */}
 
             <tbody>
 
@@ -606,13 +679,9 @@ export default function Attendance() {
                     colSpan="5"
                     className="px-5 py-14 text-center"
                   >
-                    <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-500">
-
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-
-                      Loading attendance...
-
-                    </div>
+                    <LoadingState
+                      bordered={false}
+                    />
                   </td>
                 </tr>
 
@@ -624,111 +693,21 @@ export default function Attendance() {
                     colSpan="5"
                     className="px-5 py-14 text-center"
                   >
-
-                    <div className="mx-auto flex max-w-sm flex-col items-center">
-
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                        <Users className="h-5 w-5" />
-                      </div>
-
-                      <p className="mt-4 text-sm font-semibold text-slate-900">
-                        No attendance records
-                      </p>
-
-                      <p className="mt-1 text-sm text-slate-500">
-                        Attendance marked by students
-                        will appear here.
-                      </p>
-
-                    </div>
-
+                    <EmptyState
+                      bordered={false}
+                    />
                   </td>
                 </tr>
 
               ) : (
 
                 filteredAttendance.map(
-                  (record) => {
-
-                    const config =
-                      statusConfig(
-                        record.status
-                      );
-
-                    const StatusIcon =
-                      config.icon;
-
-                    return (
-                      <tr
-                        key={record.id}
-                        className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"
-                      >
-
-                        {/* STUDENT */}
-
-                        <td className="px-5 py-4">
-
-                          <p className="text-sm font-semibold text-slate-900">
-                            {record.studentId}
-                          </p>
-
-                        </td>
-
-                        {/* COURSE */}
-
-                        <td className="px-5 py-4">
-
-                          <p className="max-w-[220px] truncate text-sm font-medium text-slate-700">
-                            {record.course
-                              ?.title ||
-                              record.course
-                                ?.name ||
-                              record.courseId}
-                          </p>
-
-                        </td>
-
-                        {/* SESSION */}
-
-                        <td className="px-5 py-4">
-
-                          <p className="text-xs font-medium text-slate-500">
-                            {record.sessionId}
-                          </p>
-
-                        </td>
-
-                        {/* STATUS */}
-
-                        <td className="px-5 py-4">
-
-                          <span
-                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold ${config.className}`}
-                          >
-
-                            <StatusIcon className="h-3.5 w-3.5" />
-
-                            {config.label}
-
-                          </span>
-
-                        </td>
-
-                        {/* DATE */}
-
-                        <td className="px-5 py-4">
-
-                          <p className="text-xs font-medium text-slate-500">
-                            {formatDate(
-                              record.markedAt
-                            )}
-                          </p>
-
-                        </td>
-
-                      </tr>
-                    );
-                  }
+                  (record) => (
+                    <DesktopAttendanceRow
+                      key={record.id}
+                      record={record}
+                    />
+                  )
                 )
 
               )}
@@ -746,8 +725,285 @@ export default function Attendance() {
 }
 
 /* ============================================================
+   MOBILE ATTENDANCE CARD
+============================================================ */
+
+function MobileAttendanceCard({
+  record,
+}) {
+  const config =
+    statusConfig(record.status);
+
+  const StatusIcon =
+    config.icon;
+
+  const courseName =
+    record.course?.title ||
+    record.course?.name ||
+    record.courseId ||
+    "Unknown course";
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+      {/* TOP */}
+
+      <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-4">
+
+        <div className="flex min-w-0 items-center gap-3">
+
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+            <Users className="h-4 w-4" />
+          </div>
+
+          <div className="min-w-0">
+
+            <p className="truncate text-sm font-bold text-slate-900">
+              {record.studentId ||
+                "Unknown student"}
+            </p>
+
+            <p className="mt-0.5 text-xs text-slate-500">
+              Student ID
+            </p>
+
+          </div>
+
+        </div>
+
+        <span
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-semibold ${config.className}`}
+        >
+          <StatusIcon className="h-3.5 w-3.5" />
+          {config.label}
+        </span>
+
+      </div>
+
+      {/* DETAILS */}
+
+      <div className="space-y-3 p-4">
+
+        {/* COURSE */}
+
+        <div className="flex items-start gap-3">
+
+          <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+
+          <div className="min-w-0">
+
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              Course
+            </p>
+
+            <p className="mt-0.5 break-words text-sm font-medium text-slate-700">
+              {courseName}
+            </p>
+
+          </div>
+
+        </div>
+
+        {/* SESSION */}
+
+        <div className="flex items-start gap-3">
+
+          <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+
+          <div className="min-w-0">
+
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              Session
+            </p>
+
+            <p className="mt-0.5 break-all text-xs font-medium text-slate-600">
+              {record.sessionId ||
+                "—"}
+            </p>
+
+          </div>
+
+        </div>
+
+        {/* DATE */}
+
+        <div className="flex items-start gap-3">
+
+          <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+
+          <div>
+
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              Marked
+            </p>
+
+            <p className="mt-0.5 text-sm font-medium text-slate-700">
+              {formatDate(
+                record.markedAt
+              )}
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+/* ============================================================
+   DESKTOP TABLE ROW
+============================================================ */
+
+function DesktopAttendanceRow({
+  record,
+}) {
+  const config =
+    statusConfig(record.status);
+
+  const StatusIcon =
+    config.icon;
+
+  return (
+    <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">
+
+      {/* STUDENT */}
+
+      <td className="px-5 py-4">
+
+        <p className="text-sm font-semibold text-slate-900">
+          {record.studentId ||
+            "Unknown student"}
+        </p>
+
+      </td>
+
+      {/* COURSE */}
+
+      <td className="px-5 py-4">
+
+        <p className="max-w-[260px] truncate text-sm font-medium text-slate-700">
+          {record.course?.title ||
+            record.course?.name ||
+            record.courseId ||
+            "Unknown course"}
+        </p>
+
+      </td>
+
+      {/* SESSION */}
+
+      <td className="px-5 py-4">
+
+        <p
+          title={record.sessionId}
+          className="max-w-[220px] truncate text-xs font-medium text-slate-500"
+        >
+          {record.sessionId || "—"}
+        </p>
+
+      </td>
+
+      {/* STATUS */}
+
+      <td className="px-5 py-4">
+
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold ${config.className}`}
+        >
+
+          <StatusIcon className="h-3.5 w-3.5" />
+
+          {config.label}
+
+        </span>
+
+      </td>
+
+      {/* DATE */}
+
+      <td className="px-5 py-4">
+
+        <p className="text-xs font-medium text-slate-500">
+          {formatDate(
+            record.markedAt
+          )}
+        </p>
+
+      </td>
+
+    </tr>
+  );
+}
+
+/* ============================================================
+   LOADING STATE
+============================================================ */
+
+function LoadingState({
+  bordered = true,
+}) {
+  return (
+    <div
+      className={`rounded-2xl bg-white p-10 text-center ${
+        bordered
+          ? "border border-slate-200 shadow-sm"
+          : ""
+      }`}
+    >
+
+      <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-500">
+
+        <RefreshCw className="h-4 w-4 animate-spin" />
+
+        <span>
+          Loading attendance...
+        </span>
+
+      </div>
+
+    </div>
+  );
+}
+
+/* ============================================================
+   EMPTY STATE
+============================================================ */
+
+function EmptyState({
+  bordered = true,
+}) {
+  return (
+    <div
+      className={`rounded-2xl bg-white p-10 text-center ${
+        bordered
+          ? "border border-slate-200 shadow-sm"
+          : ""
+      }`}
+    >
+
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+        <Users className="h-5 w-5" />
+      </div>
+
+      <p className="mt-4 text-sm font-semibold text-slate-900">
+        No attendance records
+      </p>
+
+      <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500 sm:text-sm">
+        Attendance marked by students
+        will appear here.
+      </p>
+
+    </div>
+  );
+}
+
+/* ============================================================
    SUMMARY CARD
-   ============================================================ */
+============================================================ */
 
 function SummaryCard({
   label,
@@ -756,26 +1012,26 @@ function SummaryCard({
   iconClass = "bg-violet-50 text-violet-600",
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
 
-        <div>
+        <div className="min-w-0">
 
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs">
             {label}
           </p>
 
-          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+          <p className="mt-1.5 text-xl font-bold tracking-tight text-slate-900 sm:mt-2 sm:text-2xl">
             {value}
           </p>
 
         </div>
 
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 ${iconClass}`}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
 
       </div>

@@ -22,6 +22,10 @@ import {
 
 import { auth, db, storage } from "../firebase/Firebase";
 
+import {
+  createNotification,
+  NOTIFICATION_TYPES,
+} from "./CommunicationService";
 
 // ============================================================
 // CONSTANTS
@@ -75,6 +79,73 @@ function sortCourses(a, b) {
   return (a.title || "").localeCompare(
     b.title || ""
   );
+}
+
+
+// ============================================================
+// NOTIFICATION HELPER
+// ============================================================
+
+/**
+ * Sends a notification to the teacher who owns a course.
+ *
+ * Notification failure must NOT break the main admin action.
+ *
+ * Example:
+ *
+ * Admin approves course
+ *        ↓
+ * Course becomes published
+ *        ↓
+ * Teacher gets notification
+ */
+async function notifyCourseTeacher({
+  course,
+  type,
+  title,
+  message,
+}) {
+  if (!course?.instructorId) {
+    console.warn(
+      "Cannot send course notification: instructorId missing.",
+      course?.id
+    );
+
+    return;
+  }
+
+  try {
+    await createNotification({
+      recipientId: course.instructorId,
+
+      type,
+
+      title,
+
+      message,
+
+      link: "/teacher/courses",
+
+      courseId: course.id,
+
+      actorId: auth.currentUser?.uid || null,
+    });
+
+    console.log(
+      `Notification sent to teacher for course: ${course.id}`
+    );
+  } catch (error) {
+    /**
+     * Important:
+     *
+     * If notification creation fails,
+     * the course action should still succeed.
+     */
+    console.error(
+      "Course notification failed:",
+      error
+    );
+  }
 }
 
 
@@ -137,10 +208,6 @@ export async function getPendingCourses() {
 
 /**
  * Real-time listener for the Admin Course table.
- *
- * Whenever a teacher creates, edits, submits,
- * or an admin approves/rejects a course,
- * the Admin panel updates automatically.
  */
 export function subscribeToAllCourses(
   callback,
@@ -194,11 +261,15 @@ export function subscribeToAllCourses(
  * pending
  *    ↓
  * published
+ *
+ * Teacher receives:
+ *
+ * "Course approved"
  */
 export async function approveCourse(
   courseId
 ) {
-  requireAuthenticatedAdmin();
+  const admin = requireAuthenticatedAdmin();
 
   if (!courseId) {
     throw new Error(
@@ -242,9 +313,31 @@ export async function approveCourse(
     rejectionReason: null,
   });
 
+  // ----------------------------------------------------------
+  // Notify teacher
+  // ----------------------------------------------------------
+
+  await notifyCourseTeacher({
+    course: {
+      id: courseId,
+      ...course,
+    },
+
+    type:
+      NOTIFICATION_TYPES.SYSTEM,
+
+    title:
+      "Course approved",
+
+    message:
+      `Your course "${course.title || "Untitled Course"}" has been approved and published.`,
+
+  });
+
   return {
     id: courseId,
     status: "published",
+    approvedBy: admin.uid,
   };
 }
 
@@ -260,8 +353,9 @@ export async function approveCourse(
  *    ↓
  * rejected
  *
- * A rejection reason is saved so the teacher
- * can see what needs to be fixed.
+ * Teacher receives:
+ *
+ * "Course rejected"
  */
 export async function rejectCourse(
   courseId,
@@ -318,10 +412,34 @@ export async function rejectCourse(
       serverTimestamp(),
   });
 
+  // ----------------------------------------------------------
+  // Notify teacher
+  // ----------------------------------------------------------
+
+  await notifyCourseTeacher({
+    course: {
+      id: courseId,
+      ...course,
+    },
+
+    type:
+      NOTIFICATION_TYPES.SYSTEM,
+
+    title:
+      "Course needs changes",
+
+    message:
+      `Your course "${course.title || "Untitled Course"}" was not approved. Reason: ${cleanReason}`,
+
+  });
+
   return {
     id: courseId,
+
     status: "rejected",
-    rejectionReason: cleanReason,
+
+    rejectionReason:
+      cleanReason,
   };
 }
 
@@ -337,8 +455,7 @@ export async function rejectCourse(
  *    ↓
  * archived
  *
- * This immediately removes the course
- * from the public LMS.
+ * Teacher receives notification.
  */
 export async function adminUnpublishCourse(
   courseId
@@ -367,11 +484,34 @@ export async function adminUnpublishCourse(
     );
   }
 
+  const course = snapshot.data();
+
   await updateDoc(courseRef, {
     status: "archived",
 
     updatedAt:
       serverTimestamp(),
+  });
+
+  // ----------------------------------------------------------
+  // Notify teacher
+  // ----------------------------------------------------------
+
+  await notifyCourseTeacher({
+    course: {
+      id: courseId,
+      ...course,
+    },
+
+    type:
+      NOTIFICATION_TYPES.SYSTEM,
+
+    title:
+      "Course unpublished",
+
+    message:
+      `Your course "${course.title || "Untitled Course"}" has been unpublished by an administrator.`,
+
   });
 
   return {
@@ -386,15 +526,11 @@ export async function adminUnpublishCourse(
 // ============================================================
 
 /**
- * Allows an admin to move an archived course
- * back into the approval process.
- *
  * archived
  *    ↓
  * pending
  *
- * This is useful when an admin wants a previously
- * archived course to go through approval again.
+ * Teacher receives notification.
  */
 export async function sendArchivedCourseForApproval(
   courseId
@@ -423,6 +559,8 @@ export async function sendArchivedCourseForApproval(
     );
   }
 
+  const course = snapshot.data();
+
   await updateDoc(courseRef, {
     status: "pending",
 
@@ -430,6 +568,27 @@ export async function sendArchivedCourseForApproval(
       serverTimestamp(),
 
     rejectionReason: null,
+  });
+
+  // ----------------------------------------------------------
+  // Notify teacher
+  // ----------------------------------------------------------
+
+  await notifyCourseTeacher({
+    course: {
+      id: courseId,
+      ...course,
+    },
+
+    type:
+      NOTIFICATION_TYPES.SYSTEM,
+
+    title:
+      "Course sent for approval",
+
+    message:
+      `Your course "${course.title || "Untitled Course"}" has been sent back for approval.`,
+
   });
 
   return {
@@ -485,7 +644,9 @@ export async function setFeatured(
 
   return {
     id: courseId,
-    featured: Boolean(featured),
+
+    featured:
+      Boolean(featured),
   };
 }
 
@@ -495,21 +656,7 @@ export async function setFeatured(
 // ============================================================
 
 /**
- * Admin controls the homepage order.
- *
- * Example:
- *
- * [
- *   "courseA",
- *   "courseB",
- *   "courseC"
- * ]
- *
- * becomes:
- *
- * courseA → order 0
- * courseB → order 1
- * courseC → order 2
+ * Admin controls homepage order.
  */
 export async function reorderFeaturedCourses(
   courseIds = []
@@ -549,16 +696,13 @@ export async function reorderFeaturedCourses(
 
     batch.update(courseRef, {
       order: index,
+
       updatedAt:
         serverTimestamp(),
     });
 
     operations++;
 
-    /**
-     * Keep a safe margin below Firestore's
-     * batch operation limit.
-     */
     if (operations >= 450) {
       await batch.commit();
 
@@ -579,10 +723,6 @@ export async function reorderFeaturedCourses(
 // SET COURSE ORDER
 // ============================================================
 
-/**
- * Simple version for moving one course
- * to a specific position.
- */
 export async function setCourseOrder(
   courseId,
   order
@@ -595,7 +735,11 @@ export async function setCourseOrder(
     );
   }
 
-  if (!Number.isFinite(Number(order))) {
+  if (
+    !Number.isFinite(
+      Number(order)
+    )
+  ) {
     throw new Error(
       "Order must be a number."
     );
@@ -608,7 +752,9 @@ export async function setCourseOrder(
       courseId
     ),
     {
-      order: Number(order),
+      order:
+        Number(order),
+
       updatedAt:
         serverTimestamp(),
     }
@@ -625,17 +771,14 @@ export async function setCourseOrder(
 /**
  * Emergency course deletion.
  *
- * This removes:
+ * Removes:
  *
  * 1. Lessons
  * 2. Modules
  * 3. Course document
  * 4. Course Storage files
  *
- * Unlike teacher deleteCourse(),
- * this function does NOT check instructorId.
- *
- * Admin can delete any course.
+ * Teacher is notified BEFORE deletion.
  */
 export async function adminDeleteCourse(
   courseId
@@ -663,6 +806,30 @@ export async function adminDeleteCourse(
     );
   }
 
+  const course =
+    courseSnapshot.data();
+
+  // ----------------------------------------------------------
+  // Notify teacher BEFORE deleting course
+  // ----------------------------------------------------------
+
+  await notifyCourseTeacher({
+    course: {
+      id: courseId,
+      ...course,
+    },
+
+    type:
+      NOTIFICATION_TYPES.SYSTEM,
+
+    title:
+      "Course removed",
+
+    message:
+      `Your course "${course.title || "Untitled Course"}" has been removed by an administrator.`,
+
+  });
+
 
   // ----------------------------------------------------------
   // Find all modules
@@ -683,11 +850,14 @@ export async function adminDeleteCourse(
   // Delete modules + lessons
   // ----------------------------------------------------------
 
-  let batch = writeBatch(db);
+  let batch =
+    writeBatch(db);
+
   let operations = 0;
 
   for (
-    const moduleDoc of modulesSnapshot.docs
+    const moduleDoc
+    of modulesSnapshot.docs
   ) {
     const lessonsSnapshot =
       await getDocs(
@@ -702,7 +872,8 @@ export async function adminDeleteCourse(
       );
 
     for (
-      const lessonDoc of lessonsSnapshot.docs
+      const lessonDoc
+      of lessonsSnapshot.docs
     ) {
       batch.delete(
         lessonDoc.ref
@@ -713,7 +884,9 @@ export async function adminDeleteCourse(
       if (operations >= 450) {
         await batch.commit();
 
-        batch = writeBatch(db);
+        batch =
+          writeBatch(db);
+
         operations = 0;
       }
     }
@@ -727,7 +900,9 @@ export async function adminDeleteCourse(
     if (operations >= 450) {
       await batch.commit();
 
-      batch = writeBatch(db);
+      batch =
+        writeBatch(db);
+
       operations = 0;
     }
   }
@@ -737,7 +912,10 @@ export async function adminDeleteCourse(
   // Delete course
   // ----------------------------------------------------------
 
-  batch.delete(courseRef);
+  batch.delete(
+    courseRef
+  );
+
   operations++;
 
 
@@ -808,7 +986,6 @@ async function deleteStorageFolder(
     const result =
       await listAll(folderRef);
 
-
     // Delete files
     await Promise.all(
       result.items.map(
@@ -818,7 +995,6 @@ async function deleteStorageFolder(
           ).catch(() => null)
       )
     );
-
 
     // Delete nested folders
     for (
@@ -839,22 +1015,6 @@ async function deleteStorageFolder(
 // ADMIN — GET COURSE COUNTS
 // ============================================================
 
-/**
- * Calculates Admin dashboard statistics
- * from the courses collection.
- *
- * Returns:
- *
- * total
- * short
- * long
- * published
- * pending
- * draft
- * rejected
- * archived
- * featured
- */
 export async function getCourseStats() {
   requireAuthenticatedAdmin();
 
@@ -923,10 +1083,6 @@ export async function getCourseStats() {
 // FIND COURSES BY INSTRUCTOR
 // ============================================================
 
-/**
- * Useful for Admin → Teacher profile
- * or "courses by instructor" filtering.
- */
 export async function getCoursesByInstructor(
   instructorId
 ) {
