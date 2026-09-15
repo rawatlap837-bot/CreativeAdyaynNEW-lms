@@ -673,7 +673,7 @@ export default function Attendance() {
   ============================================================ */
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 md:py-8 lg:px-8">
+    <div className="min-h-[70vh] bg-gray-50 px-4 py-6 sm:px-6 md:py-8 lg:px-8">
 
       <div className="mx-auto max-w-6xl">
 

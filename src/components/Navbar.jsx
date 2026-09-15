@@ -305,7 +305,7 @@ export default function Navbar() {
                 onClick={() => navigate("/login")}
                 onMouseEnter={(e) => Object.assign(e.currentTarget.style, pressed(9999))}
                 onMouseLeave={(e) => Object.assign(e.currentTarget.style, { boxShadow: "none" })}
-                className="rounded-full px-6 py-3 text-base font-medium text-[#1B0E3D] transition-colors"
+                className="rounded-full px-6 py-3 text-base font-bold text-[#1B0E3D] transition-colors"
               >
                 Log in
               </button>
@@ -495,7 +495,7 @@ export default function Navbar() {
                       setMobileOpen(false);
                       navigate("/login");
                     }}
-                    className="px-4 py-3 text-sm font-medium text-[#1B0E3D]"
+                    className="px-4 py-3 text-sm font-bold text-[#1B0E3D]"
                     style={pressed(9999)}
                   >
                     Log in

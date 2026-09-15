@@ -12,6 +12,12 @@ import {
   GraduationCap,
   RefreshCw,
   Lock,
+  Receipt,
+  ChevronDown,
+  CreditCard,
+  CalendarDays,
+  Hash,
+  CheckCircle2,
 } from "lucide-react";
 
 import { onAuthStateChanged } from "firebase/auth";
@@ -24,6 +30,60 @@ import {
 } from "firebase/firestore";
 
 import { getMyEnrollments } from "../services/EnrollmentService";
+
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+/**
+ * Normalizes a Firestore Timestamp, ISO string, or millis value
+ * into a readable date string. Returns null if nothing usable.
+ */
+function formatPaymentDate(value) {
+  if (!value) return null;
+
+  try {
+    const date =
+      typeof value?.toDate === "function"
+        ? value.toDate()
+        : new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return null;
+  }
+}
+
+function formatAmount(amount, currency) {
+  if (amount === undefined || amount === null || amount === "") {
+    return null;
+  }
+
+  const numeric = Number(amount);
+
+  if (Number.isNaN(numeric)) {
+    return String(amount);
+  }
+
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency || "INR",
+      maximumFractionDigits: 2,
+    }).format(numeric);
+  } catch {
+    return `${currency || ""} ${numeric}`.trim();
+  }
+}
 
 
 /* =========================================================
@@ -359,11 +419,11 @@ export default function MyCourses() {
     loading
   ) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex min-h-[60vh] items-center justify-center px-4">
         <div className="flex items-center gap-3 text-gray-600">
           <Loader2 className="h-5 w-5 animate-spin" />
 
-          <span>
+          <span className="text-sm sm:text-base">
             Loading your courses...
           </span>
         </div>
@@ -395,7 +455,7 @@ export default function MyCourses() {
           <button
             type="button"
             onClick={handleRefresh}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 sm:w-auto"
           >
             <RefreshCw className="h-4 w-4" />
             Try Again
@@ -412,16 +472,16 @@ export default function MyCourses() {
 
   if (courses.length === 0) {
     return (
-      <div className="min-h-[60vh] px-5 py-10">
+      <div className="min-h-[60vh] px-4 py-10 sm:px-5">
         <div className="mx-auto max-w-6xl">
 
-          <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center">
+          <div className="rounded-2xl border border-gray-200 bg-white px-6 py-14 text-center sm:py-16">
 
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100">
               <GraduationCap className="h-8 w-8 text-gray-500" />
             </div>
 
-            <h1 className="mt-5 text-2xl font-bold text-gray-900">
+            <h1 className="mt-5 text-xl font-bold text-gray-900 sm:text-2xl">
               You haven't enrolled in any courses yet
             </h1>
 
@@ -432,7 +492,7 @@ export default function MyCourses() {
 
             <Link
               to="/courses"
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 sm:w-auto"
             >
               Explore Courses
               <ArrowRight className="h-4 w-4" />
@@ -450,7 +510,7 @@ export default function MyCourses() {
   ========================================================= */
 
   return (
-    <div className="min-h-screen bg-gray-50 px-5 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
 
       <div className="mx-auto max-w-7xl">
 
@@ -458,15 +518,15 @@ export default function MyCourses() {
             HEADER
         ================================================= */}
 
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 sm:gap-5 lg:flex-row lg:items-end lg:justify-between">
 
           <div>
 
-            <p className="text-sm font-semibold text-violet-600">
+            <p className="text-xs font-semibold text-violet-600 sm:text-sm">
               MY LEARNING
             </p>
 
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
               My Courses
             </h1>
 
@@ -479,7 +539,7 @@ export default function MyCourses() {
 
           <Link
             to="/courses"
-            className="inline-flex w-fit items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-100"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-100 sm:w-fit"
           >
             Browse Courses
             <ArrowRight className="h-4 w-4" />
@@ -492,7 +552,7 @@ export default function MyCourses() {
             STATS
         ================================================= */}
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-4 lg:grid-cols-4">
 
           <StatCard
             label="Total Courses"
@@ -533,7 +593,7 @@ export default function MyCourses() {
             SEARCH + FILTER
         ================================================= */}
 
-        <div className="mt-8 flex flex-col gap-3 md:flex-row">
+        <div className="mt-6 flex flex-col gap-3 sm:mt-8 md:flex-row">
 
           <div className="relative flex-1">
 
@@ -561,7 +621,7 @@ export default function MyCourses() {
                 event.target.value
               )
             }
-            className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-violet-400"
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-violet-400 md:w-auto"
           >
 
             <option value="all">
@@ -589,7 +649,7 @@ export default function MyCourses() {
             COURSE GRID
         ================================================= */}
 
-        <div className="mt-8">
+        <div className="mt-6 sm:mt-8">
 
           {filteredCourses.length === 0 ? (
 
@@ -609,7 +669,7 @@ export default function MyCourses() {
 
           ) : (
 
-            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
 
               {filteredCourses.map(
                 (course) => (
@@ -645,25 +705,121 @@ function StatCard({
   icon,
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 transition hover:shadow-sm">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 transition hover:shadow-sm sm:p-5">
 
       <div className="flex items-center justify-between">
 
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-700">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-700 sm:h-10 sm:w-10">
           {icon}
         </div>
 
-        <span className="text-2xl font-bold text-gray-900">
+        <span className="text-xl font-bold text-gray-900 sm:text-2xl">
           {value}
         </span>
 
       </div>
 
-      <p className="mt-4 text-sm text-gray-500">
+      <p className="mt-3 text-xs text-gray-500 sm:mt-4 sm:text-sm">
         {label}
       </p>
 
     </div>
+  );
+}
+
+
+/* =========================================================
+   PAYMENT DETAILS
+
+   Renders the receipt for a paid enrollment. Reads from
+   whichever payment fields exist on the enrollment doc, so
+   it degrades gracefully if some fields weren't recorded.
+========================================================= */
+
+function PaymentDetails({ enrollment }) {
+  const amount = formatAmount(
+    enrollment?.amount ?? enrollment?.amountPaid,
+    enrollment?.currency
+  );
+
+  const paymentDate = formatPaymentDate(
+    enrollment?.paymentDate ?? enrollment?.paidAt ?? enrollment?.createdAt
+  );
+
+  const paymentId =
+    enrollment?.paymentId ||
+    enrollment?.transactionId ||
+    enrollment?.orderId ||
+    null;
+
+  const paymentMethod =
+    enrollment?.paymentMethod ||
+    enrollment?.method ||
+    null;
+
+  const hasAnyDetail =
+    amount || paymentDate || paymentId || paymentMethod;
+
+  if (!hasAnyDetail) {
+    return (
+      <p className="text-sm text-gray-500">
+        No payment record found for this enrollment yet.
+      </p>
+    );
+  }
+
+  return (
+    <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+      {amount && (
+        <div className="flex items-start gap-2.5">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+          <div>
+            <dt className="text-xs text-gray-500">Amount Paid</dt>
+            <dd className="text-sm font-semibold text-gray-900">
+              {amount}
+            </dd>
+          </div>
+        </div>
+      )}
+
+      {paymentDate && (
+        <div className="flex items-start gap-2.5">
+          <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+          <div>
+            <dt className="text-xs text-gray-500">Payment Date</dt>
+            <dd className="text-sm font-semibold text-gray-900">
+              {paymentDate}
+            </dd>
+          </div>
+        </div>
+      )}
+
+      {paymentMethod && (
+        <div className="flex items-start gap-2.5">
+          <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+          <div>
+            <dt className="text-xs text-gray-500">Payment Method</dt>
+            <dd className="text-sm font-semibold capitalize text-gray-900">
+              {paymentMethod}
+            </dd>
+          </div>
+        </div>
+      )}
+
+      {paymentId && (
+        <div className="flex items-start gap-2.5">
+          <Hash className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+          <div>
+            <dt className="text-xs text-gray-500">Transaction ID</dt>
+            <dd className="break-all text-sm font-semibold text-gray-900">
+              {paymentId}
+            </dd>
+          </div>
+        </div>
+      )}
+
+    </dl>
   );
 }
 
@@ -675,6 +831,9 @@ function StatCard({
 function StudentCourseCard({
   course,
 }) {
+  const [showPayment, setShowPayment] =
+    useState(false);
+
   const enrollment =
     course.enrollment || {};
 
@@ -704,6 +863,13 @@ function StudentCourseCard({
   const isPending =
     enrollment.status === "pending";
 
+  /* A student "purchased" the course if it wasn't a free
+     enrollment and it's not sitting in a pending/unpaid
+     state — active or completed enrollments count. */
+  const hasPurchased =
+    (isActive || isCompleted) &&
+    enrollment.isFree !== true;
+
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
 
@@ -718,6 +884,7 @@ function StudentCourseCard({
           <img
             src={course.thumbnailUrl}
             alt={course.title}
+            loading="lazy"
             className="h-full w-full object-cover transition duration-300 hover:scale-[1.02]"
           />
 
@@ -752,7 +919,7 @@ function StudentCourseCard({
           CONTENT
       ================================================= */}
 
-      <div className="p-5">
+      <div className="p-4 sm:p-5">
 
         {/* CATEGORY */}
 
@@ -765,7 +932,7 @@ function StudentCourseCard({
 
         {/* TITLE */}
 
-        <h2 className="mt-1 line-clamp-2 text-lg font-bold text-gray-900">
+        <h2 className="mt-1 line-clamp-2 text-base font-bold text-gray-900 sm:text-lg">
           {course.title}
         </h2>
 
@@ -815,7 +982,7 @@ function StudentCourseCard({
             META
         ================================================= */}
 
-        <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-gray-500">
 
           <span>
             {completedLessons}{" "}
@@ -833,6 +1000,47 @@ function StudentCourseCard({
           )}
 
         </div>
+
+
+        {/* =================================================
+            PAYMENT DETAILS (purchased courses only)
+        ================================================= */}
+
+        {hasPurchased && (
+
+          <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50">
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowPayment((prev) => !prev)
+              }
+              aria-expanded={showPayment}
+              className="flex w-full items-center justify-between gap-2 px-3.5 py-2.5 text-left"
+            >
+
+              <span className="flex items-center gap-2 text-xs font-semibold text-gray-700 sm:text-sm">
+                <Receipt className="h-4 w-4 text-violet-600" />
+                Payment Details
+              </span>
+
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${
+                  showPayment ? "rotate-180" : ""
+                }`}
+              />
+
+            </button>
+
+            {showPayment && (
+              <div className="border-t border-gray-100 px-3.5 py-3.5">
+                <PaymentDetails enrollment={enrollment} />
+              </div>
+            )}
+
+          </div>
+
+        )}
 
 
         {/* =================================================

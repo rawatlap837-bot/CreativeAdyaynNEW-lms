@@ -1,13 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  AlertCircle,
   ArrowRight,
   BookOpen,
+  CheckCircle2,
   Clock3,
-  Loader2,
+  Filter,
+  GraduationCap,
+  RefreshCw,
   Search,
   SlidersHorizontal,
   Users,
+  X,
+  Zap,
 } from "lucide-react";
 
 import {
@@ -15,545 +21,1354 @@ import {
   usePublishedCourses,
 } from "../services/CourseService";
 
+/* ================================================================
+   BRAND
+================================================================ */
+
+const BRAND = {
+  violet: "#5b21b6",
+  violetDark: "#4c1d95",
+  orange: "#f97316",
+};
+
+/* ================================================================
+   LAYOUT
+================================================================ */
+
+const HEADER_CLEARANCE = "pt-24 sm:pt-28";
+const FILTER_BAR_TOP = "top-16";
+
+/* ================================================================
+   FORMATTERS
+================================================================ */
+
+const inr = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
+
+const compactNumber = new Intl.NumberFormat("en-IN", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+/* ================================================================
+   SORT OPTIONS
+================================================================ */
+
+const SORT_OPTIONS = [
+  {
+    value: "featured",
+    label: "Featured",
+  },
+  {
+    value: "popular",
+    label: "Most popular",
+  },
+  {
+    value: "price-asc",
+    label: "Price: Low to high",
+  },
+  {
+    value: "price-desc",
+    label: "Price: High to low",
+  },
+  {
+    value: "title",
+    label: "A–Z",
+  },
+];
+
+/* ================================================================
+   HELPERS
+================================================================ */
+
+function getPricing(course) {
+  const price = Number(course.price) || 0;
+  const discountPrice = Number(course.discountPrice) || 0;
+
+  const hasDiscount =
+    discountPrice > 0 &&
+    price > 0 &&
+    discountPrice < price;
+
+  const effectivePrice = hasDiscount
+    ? discountPrice
+    : price;
+
+  const percentOff = hasDiscount
+    ? Math.round(((price - discountPrice) / price) * 100)
+    : 0;
+
+  return {
+    price,
+    discountPrice,
+    effective: effectivePrice,
+    original: hasDiscount ? price : null,
+    percentOff,
+    isFree: effectivePrice <= 0,
+  };
+}
+
+function getCourseTitle(course) {
+  return (
+    course.title ||
+    course.name ||
+    "Untitled course"
+  );
+}
+
+function getDescription(course) {
+  return (
+    course.shortDescription ||
+    course.description ||
+    "Build practical skills through a focused learning experience."
+  );
+}
+
+function getLevel(course) {
+  return (
+    course.level ||
+    course.difficulty ||
+    "All levels"
+  );
+}
+
+function getMode(course) {
+  return (
+    course.mode ||
+    "Online"
+  );
+}
+
+function useDebounced(value, delay = 200) {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDebounced(value);
+    }, delay);
+
+    return () => clearTimeout(id);
+  }, [value, delay]);
+
+  return debounced;
+}
+
+/* ================================================================
+   MAIN PAGE
+================================================================ */
+
 export default function ShortCourses() {
   const {
     courses,
     loading,
     error,
-  } = usePublishedCourses(
-    COURSE_TYPES.SHORT
-  );
+  } = usePublishedCourses(COURSE_TYPES.SHORT);
 
-  const [search, setSearch] =
-    useState("");
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [sort, setSort] = useState("featured");
 
-  const [category, setCategory] =
-    useState("all");
+  const query = useDebounced(search)
+    .trim()
+    .toLowerCase();
 
-  /* ============================================================
+  const hasFilters =
+    Boolean(search.trim()) ||
+    category !== "all";
+
+  /* --------------------------------------------------------------
      CATEGORIES
-     ============================================================ */
+  -------------------------------------------------------------- */
 
   const categories = useMemo(() => {
-    const unique =
-      new Set();
+    const unique = new Set();
 
-    courses.forEach(
-      (course) => {
-        if (
-          course.category?.trim()
-        ) {
-          unique.add(
-            course.category.trim()
-          );
-        }
+    courses.forEach((course) => {
+      const value = course.category?.trim();
+
+      if (value) {
+        unique.add(value);
       }
-    );
+    });
 
     return [
       "all",
-      ...Array.from(unique).sort(
-        (a, b) =>
-          a.localeCompare(b)
+      ...Array.from(unique).sort((a, b) =>
+        a.localeCompare(b)
       ),
     ];
   }, [courses]);
 
-  /* ============================================================
-     FILTER COURSES
-     ============================================================ */
+  /* --------------------------------------------------------------
+     FILTER + SORT
+  -------------------------------------------------------------- */
 
-  const filteredCourses =
-    useMemo(() => {
-      const searchValue =
-        search
-          .trim()
-          .toLowerCase();
+  const visibleCourses = useMemo(() => {
+    const filtered = courses.filter((course) => {
+      if (
+        category !== "all" &&
+        course.category !== category
+      ) {
+        return false;
+      }
 
-      return courses.filter(
-        (course) => {
-          const matchesSearch =
-            !searchValue ||
-            course.title
-              ?.toLowerCase()
-              .includes(
-                searchValue
-              ) ||
-            course.shortDescription
-              ?.toLowerCase()
-              .includes(
-                searchValue
-              ) ||
-            course.description
-              ?.toLowerCase()
-              .includes(
-                searchValue
-              ) ||
-            course.category
-              ?.toLowerCase()
-              .includes(
-                searchValue
-              );
+      if (!query) {
+        return true;
+      }
 
-          const matchesCategory =
-            category ===
-              "all" ||
-            course.category ===
-              category;
+      const searchableText = [
+        getCourseTitle(course),
+        course.shortDescription,
+        course.description,
+        course.category,
+        course.instructor,
+        getLevel(course),
+        getMode(course),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
+      return searchableText.includes(query);
+    });
+
+    const sorted = [...filtered];
+
+    sorted.sort((a, b) => {
+      switch (sort) {
+        case "popular":
           return (
-            matchesSearch &&
-            matchesCategory
+            (Number(b.studentCount) || 0) -
+            (Number(a.studentCount) || 0)
           );
-        }
-      );
-    }, [
-      courses,
-      search,
-      category,
-    ]);
 
-  /* ============================================================
-     PRICE
-     ============================================================ */
+        case "price-asc":
+          return (
+            getPricing(a).effective -
+            getPricing(b).effective
+          );
 
-  function renderPrice(
-    course
-  ) {
-    const price =
-      Number(course.price) ||
-      0;
+        case "price-desc":
+          return (
+            getPricing(b).effective -
+            getPricing(a).effective
+          );
 
-    const discountPrice =
-      Number(
-        course.discountPrice
-      ) || 0;
+        case "title":
+          return getCourseTitle(a).localeCompare(
+            getCourseTitle(b)
+          );
 
-    if (
-      discountPrice > 0 &&
-      discountPrice < price
-    ) {
-      return (
-        <div className="flex items-center gap-2">
-          <span className="text-lg font-bold text-slate-950">
-            ₹
-            {discountPrice.toLocaleString(
-              "en-IN"
-            )}
-          </span>
+        case "featured":
+        default:
+          return (
+            Number(Boolean(b.featured)) -
+            Number(Boolean(a.featured))
+          );
+      }
+    });
 
-          <span className="text-sm text-slate-400 line-through">
-            ₹
-            {price.toLocaleString(
-              "en-IN"
-            )}
-          </span>
-        </div>
-      );
-    }
+    return sorted;
+  }, [
+    courses,
+    query,
+    category,
+    sort,
+  ]);
 
-    if (price > 0) {
-      return (
-        <span className="text-lg font-bold text-slate-950">
-          ₹
-          {price.toLocaleString(
-            "en-IN"
-          )}
-        </span>
-      );
-    }
+  const showFilters =
+    !error &&
+    (loading || courses.length > 0);
 
-    return (
-      <span className="text-lg font-bold text-emerald-600">
-        Free
-      </span>
-    );
+  function clearFilters() {
+    setSearch("");
+    setCategory("all");
+    setSort("featured");
   }
-
-  /* ============================================================
-     LOADING
-     ============================================================ */
-
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] bg-white">
-        <div className="mx-auto flex min-h-[60vh] max-w-7xl items-center justify-center px-6">
-          <div className="text-center">
-            <Loader2
-              size={32}
-              className="mx-auto animate-spin text-slate-700"
-            />
-
-            <p className="mt-4 text-sm text-slate-500">
-              Loading courses...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /* ============================================================
-     ERROR
-     ============================================================ */
-
-  if (error) {
-    return (
-      <div className="min-h-[60vh] bg-white">
-        <div className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center px-6">
-          <div className="w-full rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
-            <h2 className="text-lg font-semibold text-red-800">
-              Unable to load courses
-            </h2>
-
-            <p className="mt-2 text-sm text-red-600">
-              {error}
-            </p>
-
-            <button
-              type="button"
-              onClick={() =>
-                window.location.reload()
-              }
-              className="mt-5 rounded-xl bg-red-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-800"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /* ============================================================
-     PAGE
-     ============================================================ */
 
   return (
     <div className="min-h-screen bg-white">
-      {/* ======================================================
-         HERO
-         ====================================================== */}
 
-      <section className="border-b border-slate-200 bg-slate-50">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
-          <div className="max-w-3xl">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
-              <BookOpen
-                size={14}
-              />
+      <PageHeader courseCount={courses.length} />
 
-              Short Courses
-            </div>
+      {showFilters && (
+        <FilterBar
+          search={search}
+          onSearchChange={setSearch}
+          categories={categories}
+          category={category}
+          onCategoryChange={setCategory}
+          sort={sort}
+          onSortChange={setSort}
+          disabled={loading}
+        />
+      )}
 
-            <h1 className="text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              Learn skills.
-              <br />
-              Build your future.
-            </h1>
+      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
 
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-              Practical short courses
-              designed to help you learn
-              useful digital skills and
-              move faster in your career.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================
-         FILTER BAR
-         ====================================================== */}
-
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            {/* SEARCH */}
-
-            <div className="relative w-full lg:max-w-md">
-              <Search
-                size={18}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-
-              <input
-                type="search"
-                value={search}
-                onChange={(event) =>
-                  setSearch(
-                    event.target.value
-                  )
-                }
-                placeholder="Search short courses..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950 focus:bg-white focus:ring-2 focus:ring-slate-950/10"
-              />
-            </div>
-
-            {/* CATEGORY */}
-
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-              <SlidersHorizontal
-                size={17}
-                className="hidden shrink-0 text-slate-400 sm:block"
-              />
-
-              {categories.map(
-                (item) => {
-                  const selected =
-                    category ===
-                    item;
-
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() =>
-                        setCategory(
-                          item
-                        )
-                      }
-                      className={[
-                        "shrink-0 rounded-full px-4 py-2 text-sm font-medium transition",
-                        selected
-                          ? "bg-slate-950 text-white"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                      ].join(" ")}
-                    >
-                      {item ===
-                      "all"
-                        ? "All Courses"
-                        : item}
-                    </button>
-                  );
-                }
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================
-         COURSES
-         ====================================================== */}
-
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        {/* RESULTS */}
-
-        <div className="mb-7 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-slate-950 sm:text-2xl">
-              Short Courses
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              {filteredCourses.length}{" "}
-              {filteredCourses.length ===
-              1
-                ? "course"
-                : "courses"}{" "}
-              available
-            </p>
-          </div>
-        </div>
-
-        {/* EMPTY */}
-
-        {filteredCourses.length ===
-        0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm">
-              <Search
-                size={24}
-              />
-            </div>
-
-            <h3 className="mt-5 text-lg font-semibold text-slate-950">
-              No courses found
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Try a different search
-              term or select another
-              category.
-            </p>
-
-            {(search ||
-              category !==
-                "all") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  setCategory(
-                    "all"
-                  );
-                }}
-                className="mt-5 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-              >
-                Clear Filters
-              </button>
-            )}
-          </div>
+        {error ? (
+          <ErrorState message={error} />
+        ) : loading ? (
+          <CourseGridSkeleton />
         ) : (
-          /* ====================================================
-             GRID
-             ==================================================== */
-
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredCourses.map(
-              (course) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                  renderPrice={
-                    renderPrice
-                  }
-                />
-              )
+          <>
+            {courses.length > 0 && (
+              <CourseResultsHeader
+                category={category}
+                visibleCount={visibleCourses.length}
+                totalCount={courses.length}
+                hasFilters={hasFilters}
+              />
             )}
-          </div>
+
+            {visibleCourses.length === 0 ? (
+              <EmptyState
+                hasFilters={hasFilters}
+                onClearFilters={clearFilters}
+              />
+            ) : (
+              <ul
+                className="
+                  grid
+                  gap-6
+                  sm:grid-cols-2
+                  xl:grid-cols-3
+                "
+              >
+                {visibleCourses.map((course) => (
+                  <li
+                    key={course.id}
+                    className="flex"
+                  >
+                    <CourseCard course={course} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </main>
     </div>
   );
 }
 
-/* ==============================================================
-   COURSE CARD
-   ============================================================== */
+/* ================================================================
+   PAGE HEADER
+================================================================ */
 
-function CourseCard({
-  course,
-  renderPrice,
+function PageHeader({ courseCount }) {
+  return (
+    <section className="relative overflow-hidden border-b border-violet-100 bg-gradient-to-br from-violet-50 via-white to-orange-50">
+
+      {/* Decorative background */}
+      <div className="pointer-events-none absolute -right-32 -top-32 h-80 w-80 rounded-full bg-violet-200/30 blur-3xl" />
+
+      <div className="pointer-events-none absolute -bottom-40 -left-20 h-80 w-80 rounded-full bg-orange-200/20 blur-3xl" />
+
+      <div
+        className={`
+          relative mx-auto max-w-7xl
+          px-4 pb-12
+          sm:px-6 sm:pb-16
+          lg:px-8 lg:pb-20
+          ${HEADER_CLEARANCE}
+        `}
+      >
+
+        <div className="max-w-4xl">
+
+          {/* Eyebrow */}
+          <div
+            className="
+              mb-5 inline-flex items-center gap-2
+              rounded-full
+              border border-violet-200
+              bg-white/80
+              px-3.5 py-2
+              text-xs font-bold
+              text-violet-700
+              shadow-sm
+              backdrop-blur
+            "
+          >
+            <GraduationCap size={15} />
+
+            Practical digital skills
+
+            {courseCount > 0 && (
+              <>
+                <span className="text-slate-300">
+                  •
+                </span>
+
+                <span className="text-slate-500">
+                  {courseCount} courses
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Heading */}
+          <h1
+            className="
+              max-w-4xl
+              text-[2.35rem]
+              font-extrabold
+              leading-[1.06]
+              tracking-tight
+              text-slate-950
+              sm:text-5xl
+              lg:text-6xl
+          "
+          >
+            Learn a skill.
+            <br />
+
+            <span className="text-violet-700">
+              Build something real.
+            </span>
+          </h1>
+
+          {/* Description */}
+          <p
+            className="
+              mt-5
+              max-w-2xl
+              text-base
+              leading-7
+              text-slate-600
+              sm:text-lg
+          "
+          >
+            Short, practical courses designed to help you
+            learn valuable digital skills, complete real
+            projects, and move closer to your career goals.
+          </p>
+
+          {/* Trust points */}
+          <div
+            className="
+              mt-7
+              flex flex-wrap
+              gap-x-5 gap-y-3
+              text-sm
+              font-medium
+              text-slate-600
+          "
+          >
+            <TrustPoint text="Practical learning" />
+            <TrustPoint text="Project-focused" />
+            <TrustPoint text="Learn at your pace" />
+          </div>
+
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ================================================================
+   TRUST POINT
+================================================================ */
+
+function TrustPoint({ text }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+        <CheckCircle2 size={14} />
+      </span>
+
+      {text}
+    </span>
+  );
+}
+
+/* ================================================================
+   FILTER BAR
+================================================================ */
+
+function FilterBar({
+  search,
+  onSearchChange,
+  categories,
+  category,
+  onCategoryChange,
+  sort,
+  onSortChange,
+  disabled,
 }) {
-  const thumbnail =
-    course.thumbnailUrl;
+  const showCategories =
+    categories.length > 2;
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl">
-      {/* ======================================================
-         IMAGE
-         ====================================================== */}
-
-      <Link
-        to={`/courses/${course.id}`}
-        className="block"
+    <section
+      className={`
+        sticky ${FILTER_BAR_TOP}
+        z-30
+        border-b border-slate-200
+        bg-white/90
+        backdrop-blur-xl
+      `}
+    >
+      <div
+        className="
+          mx-auto max-w-7xl
+          px-4 py-3
+          sm:px-6 sm:py-4
+          lg:px-8
+        "
       >
-        <div className="relative aspect-video overflow-hidden bg-slate-100">
-          {thumbnail ? (
-            <img
-              src={thumbnail}
-              alt={
-                course.title ||
-                "Course"
-              }
-              loading="lazy"
-              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+        <div
+          className="
+            flex flex-col gap-3
+            lg:flex-row
+            lg:items-center
+            lg:justify-between
+            lg:gap-6
+          "
+        >
+
+          {/* Search */}
+          <div className="relative w-full lg:max-w-md">
+
+            <Search
+              size={18}
+              className="
+                pointer-events-none
+                absolute left-4 top-1/2
+                -translate-y-1/2
+                text-slate-400
+              "
             />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
-              <BookOpen
-                size={42}
+
+            <label
+              htmlFor="course-search"
+              className="sr-only"
+            >
+              Search short courses
+            </label>
+
+            <input
+              id="course-search"
+              type="search"
+              value={search}
+              disabled={disabled}
+              onChange={(event) =>
+                onSearchChange(event.target.value)
+              }
+              placeholder="Search courses, skills or categories..."
+              className="
+                w-full
+                rounded-xl
+                border border-slate-200
+                bg-slate-50
+                py-3
+                pl-11 pr-11
+                text-sm
+                text-slate-950
+                outline-none
+                transition
+                placeholder:text-slate-400
+                focus:border-violet-500
+                focus:bg-white
+                focus:ring-4
+                focus:ring-violet-500/10
+                disabled:opacity-60
+              "
+            />
+
+            {search && (
+              <button
+                type="button"
+                onClick={() => onSearchChange("")}
+                aria-label="Clear search"
+                className="
+                  absolute right-3 top-1/2
+                  -translate-y-1/2
+                  rounded-full
+                  p-1.5
+                  text-slate-400
+                  transition
+                  hover:bg-slate-100
+                  hover:text-slate-700
+                "
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Right controls */}
+          <div className="flex min-w-0 items-center gap-2">
+
+            {showCategories && (
+              <div
+                role="group"
+                aria-label="Course categories"
+                className="
+                  -mx-1
+                  flex min-w-0 flex-1
+                  items-center gap-2
+                  overflow-x-auto
+                  px-1 py-1
+                  [scrollbar-width:none]
+                  [&::-webkit-scrollbar]:hidden
+                "
+              >
+                {categories.map((item) => {
+                  const selected =
+                    category === item;
+
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      disabled={disabled}
+                      aria-pressed={selected}
+                      onClick={() =>
+                        onCategoryChange(item)
+                      }
+                      className={`
+                        shrink-0
+                        rounded-full
+                        px-4 py-2
+                        text-sm
+                        font-semibold
+                        transition
+                        disabled:opacity-60
+                        ${
+                          selected
+                            ? "bg-violet-700 text-white shadow-sm"
+                            : "bg-slate-100 text-slate-600 hover:bg-violet-50 hover:text-violet-700"
+                        }
+                      `}
+                    >
+                      {item === "all"
+                        ? "All"
+                        : item}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Sort */}
+            <div className="relative shrink-0">
+              <SlidersHorizontal
+                size={15}
+                className="
+                  pointer-events-none
+                  absolute left-3 top-1/2
+                  -translate-y-1/2
+                  text-slate-400
+                "
               />
-            </div>
-          )}
 
-          {/* FEATURED */}
+              <label
+                htmlFor="course-sort"
+                className="sr-only"
+              >
+                Sort courses
+              </label>
 
-          {course.featured && (
-            <div className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-slate-950 shadow-sm backdrop-blur">
-              Featured
+              <select
+                id="course-sort"
+                value={sort}
+                disabled={disabled}
+                onChange={(event) =>
+                  onSortChange(event.target.value)
+                }
+                className="
+                  rounded-xl
+                  border border-slate-200
+                  bg-slate-50
+                  py-2.5
+                  pl-9 pr-8
+                  text-sm
+                  font-semibold
+                  text-slate-700
+                  outline-none
+                  transition
+                  focus:border-violet-500
+                  focus:bg-white
+                  focus:ring-4
+                  focus:ring-violet-500/10
+                "
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option
+                    key={option.value}
+                    value={option.value}
+                  >
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+
+          </div>
         </div>
-      </Link>
+      </div>
+    </section>
+  );
+}
 
-      {/* ======================================================
-         CONTENT
-         ====================================================== */}
+/* ================================================================
+   RESULTS HEADER
+================================================================ */
 
-      <div className="p-5">
-        {/* CATEGORY */}
+function CourseResultsHeader({
+  category,
+  visibleCount,
+  totalCount,
+  hasFilters,
+}) {
+  return (
+    <div
+      className="
+        mb-6
+        flex flex-wrap
+        items-center
+        justify-between
+        gap-3
+      "
+    >
+      <div>
+        <h2 className="text-xl font-bold text-slate-950 sm:text-2xl">
+          {category === "all"
+            ? "Explore short courses"
+            : category}
+        </h2>
 
-        {course.category && (
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {course.category}
+        <p className="mt-1 text-sm text-slate-500">
+          {hasFilters
+            ? `${visibleCount} of ${totalCount} courses`
+            : `${totalCount} courses available`}
+        </p>
+      </div>
+
+      <div
+        className="
+          hidden
+          items-center gap-2
+          rounded-full
+          bg-violet-50
+          px-3 py-1.5
+          text-xs
+          font-semibold
+          text-violet-700
+          sm:flex
+        "
+      >
+        <BookOpen size={14} />
+
+        Learn. Practice. Grow.
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
+   COURSE CARD
+================================================================ */
+
+function CourseCard({ course }) {
+  const [imageFailed, setImageFailed] =
+    useState(false);
+
+  const pricing = getPricing(course);
+
+  const title = getCourseTitle(course);
+  const description = getDescription(course);
+
+  const students =
+    Number(course.studentCount) || 0;
+
+  const thumbnail =
+    course.thumbnailUrl ||
+    course.imageUrl ||
+    course.thumbnail;
+
+  const showImage =
+    Boolean(thumbnail) &&
+    !imageFailed;
+
+  const href =
+    `/courses/${course.id}`;
+
+  return (
+    <article
+      className="
+        group
+        relative
+        flex w-full
+        flex-col
+        overflow-hidden
+        rounded-2xl
+        border border-slate-200
+        bg-white
+        transition-all
+        duration-300
+        hover:-translate-y-1
+        hover:border-violet-200
+        hover:shadow-xl
+        hover:shadow-violet-900/[0.07]
+      "
+    >
+
+      {/* ----------------------------------------------------------
+          IMAGE
+      ---------------------------------------------------------- */}
+
+      <div
+        className="
+          relative
+          aspect-[16/9]
+          overflow-hidden
+          bg-gradient-to-br
+          from-violet-100
+          to-slate-100
+        "
+      >
+        {showImage ? (
+          <img
+            src={thumbnail}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={() =>
+              setImageFailed(true)
+            }
+            className="
+              h-full w-full
+              object-cover
+              transition duration-500
+              group-hover:scale-105
+            "
+          />
+        ) : (
+          <div
+            className="
+              flex h-full w-full
+              items-center justify-center
+              bg-gradient-to-br
+              from-violet-100
+              via-violet-50
+              to-orange-50
+              text-violet-300
+            "
+          >
+            <BookOpen size={44} />
           </div>
         )}
 
-        {/* TITLE */}
+        {/* Image overlay */}
+        <div
+          className="
+            pointer-events-none
+            absolute inset-0
+            bg-gradient-to-t
+            from-black/25
+            via-transparent
+            to-transparent
+          "
+        />
 
-        <Link
-          to={`/courses/${course.id}`}
-          className="block"
+        {/* Top badges */}
+        <div
+          className="
+            absolute inset-x-3 top-3
+            flex items-start
+            justify-between
+            gap-2
+          "
         >
-          <h3 className="line-clamp-2 text-lg font-bold leading-7 text-slate-950 transition group-hover:text-slate-700">
-            {course.title}
-          </h3>
-        </Link>
+          <div className="flex flex-wrap gap-2">
 
-        {/* DESCRIPTION */}
+            {course.featured && (
+              <span
+                className="
+                  inline-flex items-center gap-1.5
+                  rounded-full
+                  bg-white/95
+                  px-3 py-1.5
+                  text-xs
+                  font-bold
+                  text-violet-700
+                  shadow-sm
+                  backdrop-blur
+                "
+              >
+                <Zap size={12} />
 
-        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
-          {course.shortDescription ||
-            course.description ||
-            "Explore this course and start learning."}
+                Featured
+              </span>
+            )}
+
+            {course.popular && (
+              <span
+                className="
+                  rounded-full
+                  bg-orange-500
+                  px-3 py-1.5
+                  text-xs
+                  font-bold
+                  text-white
+                  shadow-sm
+                "
+              >
+                Popular
+              </span>
+            )}
+          </div>
+
+          {pricing.percentOff > 0 && (
+            <span
+              className="
+                shrink-0
+                rounded-full
+                bg-emerald-600
+                px-3 py-1.5
+                text-xs
+                font-bold
+                text-white
+                shadow-sm
+              "
+            >
+              {pricing.percentOff}% OFF
+            </span>
+          )}
+        </div>
+
+        {/* Category */}
+        {course.category && (
+          <span
+            className="
+              absolute
+              bottom-3 left-3
+              rounded-full
+              bg-black/60
+              px-3 py-1.5
+              text-[11px]
+              font-semibold
+              text-white
+              backdrop-blur
+            "
+          >
+            {course.category}
+          </span>
+        )}
+      </div>
+
+      {/* ----------------------------------------------------------
+          CONTENT
+      ---------------------------------------------------------- */}
+
+      <div className="flex flex-1 flex-col p-5">
+
+        {/* Title */}
+        <h3
+          className="
+            text-lg
+            font-bold
+            leading-7
+            text-slate-950
+          "
+        >
+          <Link
+            to={href}
+            className="
+              transition
+              group-hover:text-violet-700
+              focus-visible:outline-none
+            "
+          >
+            {title}
+          </Link>
+        </h3>
+
+        {/* Description */}
+        <p
+          className="
+            mt-2
+            line-clamp-2
+            text-sm
+            leading-6
+            text-slate-500
+          "
+        >
+          {description}
         </p>
 
-        {/* META */}
+        {/* --------------------------------------------------------
+            COURSE META
+        -------------------------------------------------------- */}
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
+        <div
+          className="
+            mt-4
+            flex flex-wrap
+            gap-x-4 gap-y-2
+            text-xs
+            text-slate-500
+          "
+        >
           {course.duration && (
             <span className="inline-flex items-center gap-1.5">
-              <Clock3
-                size={14}
-              />
+              <Clock3 size={14} />
 
               {course.duration}
             </span>
           )}
 
-          {course.studentCount >
-            0 && (
+          {course.level && (
             <span className="inline-flex items-center gap-1.5">
-              <Users
-                size={14}
-              />
+              <GraduationCap size={14} />
 
-              {course.studentCount.toLocaleString(
-                "en-IN"
-              )}{" "}
-              students
+              {getLevel(course)}
+            </span>
+          )}
+
+          {students > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <Users size={14} />
+
+              {compactNumber.format(students)}
             </span>
           )}
         </div>
 
-        {/* DIVIDER */}
-
-        <div className="my-5 h-px bg-slate-100" />
-
-        {/* FOOTER */}
-
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            {renderPrice(
-              course
-            )}
-          </div>
-
-          <Link
-            to={`/courses/${course.id}`}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+        {/* Mode */}
+        <div className="mt-3">
+          <span
+            className="
+              inline-flex
+              rounded-md
+              bg-slate-50
+              px-2.5 py-1
+              text-xs
+              font-medium
+              text-slate-600
+            "
           >
-            View Course
+            {getMode(course)}
+          </span>
+        </div>
 
-            <ArrowRight
-              size={16}
-            />
-          </Link>
+        {/* --------------------------------------------------------
+            FOOTER
+        -------------------------------------------------------- */}
+
+        <div className="mt-auto pt-5">
+
+          <div className="mb-5 h-px bg-slate-100" />
+
+          <div
+            className="
+              flex
+              items-end
+              justify-between
+              gap-4
+            "
+          >
+
+            {/* Price */}
+            <Price pricing={pricing} />
+
+            {/* CTA */}
+            <Link
+              to={href}
+              className="
+                relative
+                z-10
+                inline-flex
+                shrink-0
+                items-center
+                gap-2
+                rounded-xl
+                bg-violet-700
+                px-4 py-2.5
+                text-sm
+                font-semibold
+                text-white
+                transition
+                hover:bg-violet-800
+                focus-visible:outline
+                focus-visible:outline-2
+                focus-visible:outline-offset-2
+                focus-visible:outline-violet-700
+              "
+            >
+              View course
+
+              <ArrowRight
+                size={16}
+                className="
+                  transition-transform
+                  group-hover:translate-x-0.5
+                "
+              />
+            </Link>
+
+          </div>
         </div>
       </div>
     </article>
+  );
+}
+
+/* ================================================================
+   PRICE
+================================================================ */
+
+function Price({ pricing }) {
+  if (pricing.isFree) {
+    return (
+      <div>
+        <p className="text-lg font-bold text-emerald-600">
+          Free
+        </p>
+
+        <p className="text-[11px] text-slate-400">
+          Start learning
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+
+      <div className="flex items-baseline gap-2">
+
+        <span className="text-lg font-bold text-slate-950">
+          {inr.format(pricing.effective)}
+        </span>
+
+        {pricing.original && (
+          <span className="text-xs text-slate-400 line-through">
+            {inr.format(pricing.original)}
+          </span>
+        )}
+      </div>
+
+      {pricing.percentOff > 0 && (
+        <p className="mt-0.5 text-[11px] font-medium text-emerald-600">
+          Save {pricing.percentOff}%
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================
+   SKELETON
+================================================================ */
+
+function CourseGridSkeleton({ count = 6 }) {
+  return (
+    <div
+      className="
+        grid gap-6
+        sm:grid-cols-2
+        xl:grid-cols-3
+      "
+      role="status"
+      aria-label="Loading courses"
+    >
+      {Array.from({ length: count }).map(
+        (_, index) => (
+          <div
+            key={index}
+            className="
+              overflow-hidden
+              rounded-2xl
+              border border-slate-200
+              bg-white
+            "
+          >
+            <div className="aspect-[16/9] animate-pulse bg-slate-100" />
+
+            <div className="space-y-4 p-5">
+
+              <div className="h-5 w-4/5 animate-pulse rounded bg-slate-100" />
+
+              <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
+
+              <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+
+              <div className="flex gap-3 pt-2">
+                <div className="h-4 w-20 animate-pulse rounded bg-slate-100" />
+                <div className="h-4 w-16 animate-pulse rounded bg-slate-100" />
+              </div>
+
+              <div className="flex items-center justify-between pt-4">
+                <div className="h-6 w-20 animate-pulse rounded bg-slate-100" />
+
+                <div className="h-10 w-28 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+
+            </div>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+/* ================================================================
+   EMPTY STATE
+================================================================ */
+
+function EmptyState({
+  hasFilters,
+  onClearFilters,
+}) {
+  return (
+    <div
+      className="
+        rounded-3xl
+        border border-dashed
+        border-slate-300
+        bg-slate-50
+        px-6 py-16
+        text-center
+      "
+    >
+      <div
+        className="
+          mx-auto
+          flex h-16 w-16
+          items-center justify-center
+          rounded-2xl
+          bg-white
+          text-violet-400
+          shadow-sm
+        "
+      >
+        {hasFilters ? (
+          <Search size={26} />
+        ) : (
+          <BookOpen size={26} />
+        )}
+      </div>
+
+      <h3 className="mt-5 text-xl font-bold text-slate-950">
+        {hasFilters
+          ? "No courses found"
+          : "Short courses coming soon"}
+      </h3>
+
+      <p
+        className="
+          mx-auto mt-2
+          max-w-md
+          text-sm
+          leading-6
+          text-slate-500
+        "
+      >
+        {hasFilters
+          ? "Try another search term or explore all available categories."
+          : "Courses will appear here once they are published by the institute."}
+      </p>
+
+      {hasFilters && (
+        <button
+          type="button"
+          onClick={onClearFilters}
+          className="
+            mt-6
+            inline-flex
+            items-center
+            gap-2
+            rounded-xl
+            bg-violet-700
+            px-5 py-2.5
+            text-sm
+            font-semibold
+            text-white
+            transition
+            hover:bg-violet-800
+          "
+        >
+          <Filter size={16} />
+
+          Clear filters
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================
+   ERROR
+================================================================ */
+
+function ErrorState({ message }) {
+  return (
+    <div
+      role="alert"
+      className="
+        mx-auto
+        max-w-xl
+        rounded-3xl
+        border border-red-200
+        bg-red-50
+        px-6 py-12
+        text-center
+      "
+    >
+      <div
+        className="
+          mx-auto
+          flex h-14 w-14
+          items-center justify-center
+          rounded-2xl
+          bg-white
+          text-red-600
+          shadow-sm
+        "
+      >
+        <AlertCircle size={25} />
+      </div>
+
+      <h2 className="mt-5 text-lg font-bold text-red-900">
+        Courses couldn't load
+      </h2>
+
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-red-700">
+        {message ||
+          "Something went wrong while fetching the course list."}
+      </p>
+
+      <button
+        type="button"
+        onClick={() =>
+          window.location.reload()
+        }
+        className="
+          mt-6
+          inline-flex
+          items-center
+          gap-2
+          rounded-xl
+          bg-red-700
+          px-5 py-2.5
+          text-sm
+          font-semibold
+          text-white
+          transition
+          hover:bg-red-800
+        "
+      >
+        <RefreshCw size={16} />
+
+        Try again
+      </button>
+    </div>
   );
 }

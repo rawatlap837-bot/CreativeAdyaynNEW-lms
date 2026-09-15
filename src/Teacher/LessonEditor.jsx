@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   FileText,
   Image as ImageIcon,
+  Link as LinkIcon,
   Loader2,
   Save,
   Upload,
@@ -32,6 +33,77 @@ import {
   uploadLessonResource,
   deleteStorageFile,
 } from "../services/StorageService";
+
+/* --------------------------------------------------
+   VIDEO LINK HELPERS
+
+   Converts a pasted YouTube / Vimeo URL into an
+   embeddable iframe URL. Any other link (e.g. a
+   direct .mp4 URL) falls back to a plain <video> tag.
+-------------------------------------------------- */
+
+const getYouTubeEmbedUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+    let videoId = "";
+
+    if (parsed.hostname.includes("youtu.be")) {
+      videoId = parsed.pathname.slice(1);
+    } else if (parsed.hostname.includes("youtube.com")) {
+      if (parsed.pathname.startsWith("/embed/")) {
+        return url;
+      }
+
+      if (parsed.pathname.startsWith("/shorts/")) {
+        videoId = parsed.pathname.split("/")[2] || "";
+      } else {
+        videoId = parsed.searchParams.get("v") || "";
+      }
+    } else {
+      return null;
+    }
+
+    return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+  } catch {
+    return null;
+  }
+};
+
+const getVimeoEmbedUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+
+    if (!parsed.hostname.includes("vimeo.com")) {
+      return null;
+    }
+
+    const id = parsed.pathname.split("/").filter(Boolean).pop();
+
+    return id ? `https://player.vimeo.com/video/${id}` : null;
+  } catch {
+    return null;
+  }
+};
+
+const getEmbedUrl = (url) => {
+  if (!url) return null;
+  return getYouTubeEmbedUrl(url) || getVimeoEmbedUrl(url);
+};
+
+const isLikelyVideoPlatformLink = (url) => {
+  if (!url) return false;
+
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.hostname.includes("youtube.com") ||
+      parsed.hostname.includes("youtu.be") ||
+      parsed.hostname.includes("vimeo.com")
+    );
+  } catch {
+    return false;
+  }
+};
 
 const LessonEditor = () => {
   const navigate = useNavigate();
@@ -75,6 +147,11 @@ const LessonEditor = () => {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // "upload" = file uploaded to storage, "link" = pasted YouTube / Vimeo / direct URL
+  const [videoMode, setVideoMode] = useState("upload");
+  const [videoLinkInput, setVideoLinkInput] = useState("");
+  const [savingVideoLink, setSavingVideoLink] = useState(false);
 
   /* --------------------------------------------------
      AUTH
@@ -177,6 +254,14 @@ const LessonEditor = () => {
           duration: lessonData.duration || "",
           published: Boolean(lessonData.published),
         });
+
+        // Decide which video mode to show based on existing data.
+        if (!lessonData.videoPath && lessonData.videoUrl) {
+          setVideoMode("link");
+          setVideoLinkInput(lessonData.videoUrl);
+        } else {
+          setVideoMode("upload");
+        }
       } catch (err) {
         console.error("Lesson loading error:", err);
         setError(err.message || "Failed to load lesson.");
@@ -204,7 +289,22 @@ const LessonEditor = () => {
   };
 
   /* --------------------------------------------------
-     VIDEO UPLOAD
+     VIDEO MODE SWITCH
+  -------------------------------------------------- */
+
+  const handleVideoModeChange = (mode) => {
+    setVideoMode(mode);
+    setError("");
+    setSuccess("");
+
+    if (mode === "link") {
+      setVideoFile(null);
+      setVideoLinkInput(form.videoPath ? "" : form.videoUrl);
+    }
+  };
+
+  /* --------------------------------------------------
+     VIDEO UPLOAD (FILE)
   -------------------------------------------------- */
 
   const handleVideoUpload = async () => {
@@ -255,6 +355,60 @@ const LessonEditor = () => {
       setError(err.message || "Video upload failed.");
     } finally {
       setUploadingVideo(false);
+    }
+  };
+
+  /* --------------------------------------------------
+     VIDEO LINK SAVE (YOUTUBE / VIMEO / DIRECT URL)
+  -------------------------------------------------- */
+
+  const handleSaveVideoLink = async () => {
+    const trimmedLink = videoLinkInput.trim();
+
+    if (!trimmedLink) {
+      setError("Please paste a video link first.");
+      return;
+    }
+
+    try {
+      new URL(trimmedLink);
+    } catch {
+      setError("That doesn't look like a valid URL.");
+      return;
+    }
+
+    try {
+      setSavingVideoLink(true);
+      setError("");
+      setSuccess("");
+
+      // If a file was previously uploaded to storage, remove it
+      // since we're replacing it with an external link.
+      if (form.videoPath) {
+        try {
+          await deleteStorageFile(form.videoPath);
+        } catch (err) {
+          console.error("Failed to remove previous video file:", err);
+        }
+      }
+
+      await updateLesson(courseId, moduleId, lessonId, {
+        videoUrl: trimmedLink,
+        videoPath: "",
+      });
+
+      setForm((previous) => ({
+        ...previous,
+        videoUrl: trimmedLink,
+        videoPath: "",
+      }));
+
+      setSuccess("Video link saved successfully.");
+    } catch (err) {
+      console.error("Video link save error:", err);
+      setError(err.message || "Failed to save video link.");
+    } finally {
+      setSavingVideoLink(false);
     }
   };
 
@@ -355,7 +509,7 @@ const LessonEditor = () => {
   -------------------------------------------------- */
 
   const handleDeleteVideo = async () => {
-    if (!form.videoPath) return;
+    if (!form.videoUrl && !form.videoPath) return;
 
     const confirmed = window.confirm(
       "Are you sure you want to remove this video?"
@@ -367,7 +521,9 @@ const LessonEditor = () => {
       setSaving(true);
       setError("");
 
-      await deleteStorageFile(form.videoPath);
+      if (form.videoPath) {
+        await deleteStorageFile(form.videoPath);
+      }
 
       await updateLesson(courseId, moduleId, lessonId, {
         videoUrl: "",
@@ -380,6 +536,7 @@ const LessonEditor = () => {
         videoPath: "",
       }));
 
+      setVideoLinkInput("");
       setSuccess("Video removed.");
     } catch (err) {
       console.error("Video deletion error:", err);
@@ -563,6 +720,9 @@ const LessonEditor = () => {
     );
   }
 
+  const videoEmbedUrl = getEmbedUrl(form.videoUrl);
+  const isPlatformLink = isLikelyVideoPlatformLink(form.videoUrl);
+
   return (
     <div className="mx-auto w-full max-w-5xl p-4 sm:p-6 lg:p-8">
 
@@ -737,7 +897,8 @@ const LessonEditor = () => {
                 </h2>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  Upload the video students will watch.
+                  Upload a video file, or paste a YouTube / Vimeo / direct
+                  video link.
                 </p>
               </div>
             </div>
@@ -745,32 +906,46 @@ const LessonEditor = () => {
 
           <div className="p-5 sm:p-6">
 
-            {/* CURRENT VIDEO */}
+            {/* CURRENT VIDEO PREVIEW */}
 
             {form.videoUrl && (
               <div className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
 
-                <video
-                  src={form.videoUrl}
-                  controls
-                  className="max-h-[420px] w-full"
-                />
+                {videoEmbedUrl ? (
+                  <div className="aspect-video w-full">
+                    <iframe
+                      src={videoEmbedUrl}
+                      title="Lesson video"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="h-full w-full"
+                    />
+                  </div>
+                ) : (
+                  <video
+                    src={form.videoUrl}
+                    controls
+                    className="max-h-[420px] w-full"
+                  />
+                )}
 
                 <div className="flex flex-col gap-3 border-t border-slate-800 bg-slate-900 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-white">
-                      Current video
+                      {form.videoPath
+                        ? "Current video (uploaded)"
+                        : "Current video (external link)"}
                     </p>
 
                     <p className="mt-1 truncate text-[11px] text-slate-400">
-                      {form.videoPath}
+                      {form.videoPath || form.videoUrl}
                     </p>
                   </div>
 
                   <button
                     type="button"
                     onClick={handleDeleteVideo}
-                    disabled={saving || uploadingVideo}
+                    disabled={saving || uploadingVideo || savingVideoLink}
                     className="w-full shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50 sm:w-auto"
                   >
                     Remove
@@ -779,101 +954,189 @@ const LessonEditor = () => {
               </div>
             )}
 
-            {/* FILE PICKER */}
+            {/* MODE SWITCH */}
 
-            <div className="rounded-xl border-2 border-dashed border-slate-200 p-5 transition hover:border-violet-300">
+            <div className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => handleVideoModeChange("upload")}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition ${
+                  videoMode === "upload"
+                    ? "bg-white text-violet-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Upload size={14} />
+                Upload File
+              </button>
 
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                onClick={() => handleVideoModeChange("link")}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition ${
+                  videoMode === "link"
+                    ? "bg-white text-violet-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <LinkIcon size={14} />
+                Paste Link
+              </button>
+            </div>
 
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    Upload a new video
-                  </p>
+            {/* UPLOAD MODE */}
 
-                  <p className="mt-1 text-xs text-slate-400">
-                    MP4, WebM, MOV or MKV • Maximum 2 GB
-                  </p>
+            {videoMode === "upload" && (
+              <div className="rounded-xl border-2 border-dashed border-slate-200 p-5 transition hover:border-violet-300">
+
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      Upload a new video
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-400">
+                      MP4, WebM, MOV or MKV • Maximum 2 GB
+                    </p>
+                  </div>
+
+                  <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-300 hover:text-violet-600">
+                    <Upload size={16} />
+
+                    Choose Video
+
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
+                      className="hidden"
+                      onChange={(event) => {
+                        setVideoFile(event.target.files?.[0] || null);
+                        setError("");
+                      }}
+                    />
+                  </label>
+
                 </div>
 
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-300 hover:text-violet-600">
-                  <Upload size={16} />
+                {videoFile && (
+                  <div className="mt-4 rounded-xl bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-700">
+                          {videoFile.name}
+                        </p>
 
-                  Choose Video
+                        <p className="mt-1 text-xs text-slate-400">
+                          {(videoFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
 
-                  <input
-                    type="file"
-                    accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
-                    className="hidden"
-                    onChange={(event) => {
-                      setVideoFile(event.target.files?.[0] || null);
-                      setError("");
-                    }}
-                  />
-                </label>
-
-              </div>
-
-              {videoFile && (
-                <div className="mt-4 rounded-xl bg-slate-50 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-700">
-                        {videoFile.name}
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-400">
-                        {(videoFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setVideoFile(null)}
+                        className="text-slate-400 hover:text-red-500"
+                      >
+                        <X size={17} />
+                      </button>
                     </div>
+
+                    {uploadingVideo && (
+                      <div className="mt-3">
+                        <div className="mb-1 flex justify-between text-[11px] text-slate-400">
+                          <span>Uploading...</span>
+                          <span>{videoProgress}%</span>
+                        </div>
+
+                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className="h-full rounded-full bg-violet-600 transition-all"
+                            style={{
+                              width: `${videoProgress}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     <button
                       type="button"
-                      onClick={() => setVideoFile(null)}
-                      className="text-slate-400 hover:text-red-500"
+                      onClick={handleVideoUpload}
+                      disabled={uploadingVideo}
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <X size={17} />
+                      {uploadingVideo ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={16} />
+                          Upload Video
+                        </>
+                      )}
                     </button>
                   </div>
+                )}
+              </div>
+            )}
 
-                  {uploadingVideo && (
-                    <div className="mt-3">
-                      <div className="mb-1 flex justify-between text-[11px] text-slate-400">
-                        <span>Uploading...</span>
-                        <span>{videoProgress}%</span>
-                      </div>
+            {/* LINK MODE */}
 
-                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
-                        <div
-                          className="h-full rounded-full bg-violet-600 transition-all"
-                          style={{
-                            width: `${videoProgress}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
+            {videoMode === "link" && (
+              <div className="rounded-xl border-2 border-dashed border-slate-200 p-5 transition hover:border-violet-300">
+
+                <p className="text-sm font-semibold text-slate-800">
+                  Paste a video link
+                </p>
+
+                <p className="mt-1 text-xs text-slate-400">
+                  YouTube, Vimeo, or a direct link to an .mp4 file. The video
+                  will be embedded automatically when possible.
+                </p>
+
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <input
+                    type="url"
+                    value={videoLinkInput}
+                    onChange={(event) => {
+                      setVideoLinkInput(event.target.value);
+                      setError("");
+                    }}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                  />
 
                   <button
                     type="button"
-                    onClick={handleVideoUpload}
-                    disabled={uploadingVideo}
-                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={handleSaveVideoLink}
+                    disabled={savingVideoLink}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {uploadingVideo ? (
+                    {savingVideoLink ? (
                       <>
                         <Loader2 size={16} className="animate-spin" />
-                        Uploading...
+                        Saving...
                       </>
                     ) : (
                       <>
-                        <Upload size={16} />
-                        Upload Video
+                        <LinkIcon size={16} />
+                        Save Link
                       </>
                     )}
                   </button>
                 </div>
-              )}
-            </div>
+
+                {videoLinkInput && !getEmbedUrl(videoLinkInput) && !isPlatformLink && (
+                  <p className="mt-2 text-xs text-slate-400">
+                    This doesn't look like a YouTube or Vimeo link — it will
+                    be played as a direct video file instead.
+                  </p>
+                )}
+              </div>
+            )}
+
           </div>
         </section>
 
@@ -1228,7 +1491,7 @@ const LessonEditor = () => {
 
           <button
             type="submit"
-            disabled={saving || uploadingVideo || uploadingThumbnail || uploadingResource}
+            disabled={saving || uploadingVideo || uploadingThumbnail || uploadingResource || savingVideoLink}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? (

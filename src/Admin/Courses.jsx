@@ -38,6 +38,7 @@ import {
   approveCourse,
   rejectCourse,
   adminUnpublishCourse,
+  adminPublishCourse,
   adminDeleteCourse,
   setFeatured,
   subscribeToAllCourses,
@@ -256,7 +257,7 @@ export default function Courses() {
 
           setError(
             firebaseError?.message ||
-              "Unable to load courses."
+            "Unable to load courses."
           );
 
           setLoading(false);
@@ -381,7 +382,7 @@ export default function Courses() {
       const matchesInstructor =
         instructorFilter === "all" ||
         course.instructorId ===
-          instructorFilter;
+        instructorFilter;
 
       return (
         matchesSearch &&
@@ -469,7 +470,7 @@ export default function Courses() {
 
       setActionError(
         firebaseError?.message ||
-          "Something went wrong."
+        "Something went wrong."
       );
     } finally {
       setBusyAction("");
@@ -487,6 +488,29 @@ export default function Courses() {
 
       async () => {
         await approveCourse(course.id);
+
+        setSelectedCourse(null);
+      }
+    );
+  }
+
+
+  // ==========================================================
+  // PUBLISH (from draft)
+  // ==========================================================
+
+  async function handlePublish(course) {
+    const confirmed = window.confirm(
+      `Publish "${course.title}" directly?\n\nThis skips the pending-review step and makes it visible to students immediately.`
+    );
+
+    if (!confirmed) return;
+
+    await runAction(
+      `publish-${course.id}`,
+
+      async () => {
+        await adminPublishCourse(course.id);
 
         setSelectedCourse(null);
       }
@@ -690,9 +714,15 @@ export default function Courses() {
 
         {/* ==================================================
             STATS
+            NOTE: widened from xl:grid-cols-8 to xl:grid-cols-4
+            (grid-cols-2 on mobile, grid-cols-4 from sm up) so
+            each card has enough width for its full label. If
+            labels still show truncated ("T...", "S..."), the
+            `truncate` class lives inside the StatCard component
+            itself (AdminUI.jsx) and needs to change there too.
         ================================================== */}
 
-        <div className="mb-5 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4 xl:grid-cols-8">
+        <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
           <StatCard
             label="Total Courses"
             value={stats.total}
@@ -911,16 +941,16 @@ export default function Courses() {
                 statusFilter !== "all" ||
                 typeFilter !== "all" ||
                 instructorFilter !== "all") && (
-                <button
-                  onClick={resetFilters}
-                  className="self-start text-xs font-medium sm:self-auto"
-                  style={{
-                    color: AT.accentDeep,
-                  }}
-                >
-                  Clear filters
-                </button>
-              )}
+                  <button
+                    onClick={resetFilters}
+                    className="self-start text-xs font-medium sm:self-auto"
+                    style={{
+                      color: AT.accentDeep,
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                )}
             </div>
           </div>
         </Card>
@@ -968,7 +998,7 @@ export default function Courses() {
                   {filteredCourses.map((course) => {
                     const instructor =
                       instructors[
-                        course.instructorId
+                      course.instructorId
                       ];
 
                     const studentCount =
@@ -989,6 +1019,11 @@ export default function Courses() {
                         }
                         onView={() =>
                           setSelectedCourse(
+                            course
+                          )
+                        }
+                        onPublish={() =>
+                          handlePublish(
                             course
                           )
                         }
@@ -1080,7 +1115,7 @@ export default function Courses() {
                         (course) => {
                           const instructor =
                             instructors[
-                              course.instructorId
+                            course.instructorId
                             ];
 
                           const studentCount =
@@ -1176,7 +1211,7 @@ export default function Courses() {
                                 >
                                   {formatDate(
                                     course.updatedAt ||
-                                      course.createdAt
+                                    course.createdAt
                                   )}
                                 </span>
                               </td>
@@ -1192,6 +1227,11 @@ export default function Courses() {
                                   }
                                   onView={() =>
                                     setSelectedCourse(
+                                      course
+                                    )
+                                  }
+                                  onPublish={() =>
+                                    handlePublish(
                                       course
                                     )
                                   }
@@ -1484,55 +1524,73 @@ export default function Courses() {
               </GhostButton>
 
               {selectedCourse.status ===
-                "pending" && (
-                <>
-                  <GhostButton
-                    onClick={() => {
-                      setRejectingCourse(
-                        selectedCourse
-                      );
-
-                      setRejectReason("");
-
-                      setSelectedCourse(
-                        null
-                      );
-                    }}
-                  >
-                    <X size={15} />
-                    Reject
-                  </GhostButton>
-
+                "draft" && (
                   <PrimaryButton
                     disabled={
                       busyAction ===
-                      `approve-${selectedCourse.id}`
+                      `publish-${selectedCourse.id}`
                     }
                     onClick={() =>
-                      handleApprove(
+                      handlePublish(
                         selectedCourse
                       )
                     }
                   >
                     <Check size={15} />
-                    Approve
+                    Publish
                   </PrimaryButton>
-                </>
-              )}
+                )}
+
+              {selectedCourse.status ===
+                "pending" && (
+                  <>
+                    <GhostButton
+                      onClick={() => {
+                        setRejectingCourse(
+                          selectedCourse
+                        );
+
+                        setRejectReason("");
+
+                        setSelectedCourse(
+                          null
+                        );
+                      }}
+                    >
+                      <X size={15} />
+                      Reject
+                    </GhostButton>
+
+                    <PrimaryButton
+                      disabled={
+                        busyAction ===
+                        `approve-${selectedCourse.id}`
+                      }
+                      onClick={() =>
+                        handleApprove(
+                          selectedCourse
+                        )
+                      }
+                    >
+                      <Check size={15} />
+                      Approve
+                    </PrimaryButton>
+                  </>
+                )}
 
               {selectedCourse.status ===
                 "published" && (
-                <GhostButton
-                  onClick={() =>
-                    handleUnpublish(
-                      selectedCourse
-                    )
-                  }
-                >
-                  <Archive size={15} />
-                  Unpublish
-                </GhostButton>
-              )}
+                  <GhostButton
+                    onClick={() =>
+                      handleUnpublish(
+                        selectedCourse
+                      )
+                    }
+                  >
+                    <Archive size={15} />
+                    Unpublish
+                  </GhostButton>
+                )}
             </div>
           </div>
         </Modal>
@@ -1608,7 +1666,7 @@ export default function Courses() {
               <X size={15} />
 
               {busyAction ===
-              `reject-${rejectingCourse.id}`
+                `reject-${rejectingCourse.id}`
                 ? "Rejecting..."
                 : "Reject Course"}
             </button>
@@ -1757,6 +1815,7 @@ function CourseActions({
   course,
   busyAction,
   onView,
+  onPublish,
   onApprove,
   onReject,
   onFeatured,
@@ -1778,6 +1837,28 @@ function CourseActions({
       >
         <Eye size={16} />
       </button>
+
+
+      {/* Publish (draft courses only) */}
+
+      {course.status === "draft" && (
+        <button
+          title="Publish"
+          disabled={
+            busyAction ===
+            `publish-${course.id}`
+          }
+          onClick={onPublish}
+          className="flex h-8 w-8 items-center justify-center rounded-lg disabled:opacity-50"
+          style={{
+            color: AT.success,
+            background:
+              AT.successSoft,
+          }}
+        >
+          <Check size={16} />
+        </button>
+      )}
 
 
       {/* Approve */}
@@ -1904,6 +1985,7 @@ function MobileCourseCard({
   studentCount,
   busyAction,
   onView,
+  onPublish,
   onApprove,
   onReject,
   onFeatured,
@@ -2021,7 +2103,7 @@ function MobileCourseCard({
           label="Updated"
           value={formatDate(
             course.updatedAt ||
-              course.createdAt
+            course.createdAt
           )}
         />
       </div>
@@ -2045,6 +2127,26 @@ function MobileCourseCard({
 
 
         <div className="flex items-center gap-1.5">
+
+          {course.status === "draft" && (
+            <button
+              onClick={onPublish}
+              disabled={
+                busyAction ===
+                `publish-${course.id}`
+              }
+              title="Publish"
+              className="flex h-9 w-9 items-center justify-center rounded-lg disabled:opacity-50"
+              style={{
+                color: AT.success,
+                background:
+                  AT.successSoft,
+              }}
+            >
+              <Check size={16} />
+            </button>
+          )}
+
 
           {course.status === "pending" && (
             <>

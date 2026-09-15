@@ -224,7 +224,7 @@ export function subscribeToAllCourses(
       onError(error);
     }
 
-    return () => {};
+    return () => { };
   }
 
   const coursesQuery = query(
@@ -338,6 +338,98 @@ export async function approveCourse(
     id: courseId,
     status: "published",
     approvedBy: admin.uid,
+  };
+}
+
+
+// ============================================================
+// ADMIN PUBLISH (from draft)
+// ============================================================
+
+/**
+ * Admin publishes a draft course directly, skipping
+ * the pending-review step.
+ *
+ * draft
+ *    ↓
+ * published
+ *
+ * Teacher receives:
+ *
+ * "Course published"
+ */
+export async function adminPublishCourse(
+  courseId
+) {
+  const admin = requireAuthenticatedAdmin();
+
+  if (!courseId) {
+    throw new Error(
+      "Course ID is required."
+    );
+  }
+
+  const courseRef = doc(
+    db,
+    COURSES_COLLECTION,
+    courseId
+  );
+
+  const snapshot = await getDoc(
+    courseRef
+  );
+
+  if (!snapshot.exists()) {
+    throw new Error(
+      "Course not found."
+    );
+  }
+
+  const course = snapshot.data();
+
+  if (course.status !== "draft") {
+    throw new Error(
+      "Only draft courses can be published this way."
+    );
+  }
+
+  await updateDoc(courseRef, {
+    status: "published",
+
+    publishedAt:
+      serverTimestamp(),
+
+    updatedAt:
+      serverTimestamp(),
+
+    rejectionReason: null,
+  });
+
+  // ----------------------------------------------------------
+  // Notify teacher
+  // ----------------------------------------------------------
+
+  await notifyCourseTeacher({
+    course: {
+      id: courseId,
+      ...course,
+    },
+
+    type:
+      NOTIFICATION_TYPES.SYSTEM,
+
+    title:
+      "Course published",
+
+    message:
+      `Your course "${course.title || "Untitled Course"}" has been published by an administrator.`,
+
+  });
+
+  return {
+    id: courseId,
+    status: "published",
+    publishedBy: admin.uid,
   };
 }
 
@@ -1059,7 +1151,7 @@ export async function getCourseStats() {
 
       if (
         stats[
-          course.status
+        course.status
         ] !== undefined
       ) {
         stats[

@@ -198,6 +198,19 @@ service cloud.firestore {
 
     // ============================================================
     // ENROLLMENTS
+    //
+    // Document ID MUST be `{uid}_{courseId}` — isEnrolled()
+    // above depends on this exact ID scheme everywhere it's used
+    // (modules, lessons, discussions, attendance, announcements,
+    // schedule, tasks, liveClasses).
+    //
+    // Students can self-enroll ONLY as a direct result of a
+    // matching, just-created payment doc for the same uid+course
+    // — this is what stands in for server-side verification now
+    // that there is no backend. It stops a student from writing
+    // an enrollment out of thin air, but NOT from writing a fake
+    // "paid" payment doc first (see payments section below for
+    // that caveat).
     // ============================================================
 
     match /enrollments/{enrollmentId} {
@@ -214,10 +227,46 @@ service cloud.firestore {
           && isCourseOwner(resource.data.courseId)
         );
 
-      // Trusted backend/admin creates enrollments
-      allow create: if isAdmin();
+      allow create: if
+        isAdmin()
+        || (
+          isStudent()
+          && enrollmentId == request.auth.uid + "_" + request.resource.data.courseId
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.courseId is string
+          && request.resource.data.status == "active"
+          && request.resource.data.paymentId is string
+          && exists(
+            /databases/$(database)/documents/payments/$(request.resource.data.paymentId)
+          )
+          && get(
+            /databases/$(database)/documents/payments/$(request.resource.data.paymentId)
+          ).data.userId == request.auth.uid
+          && get(
+            /databases/$(database)/documents/payments/$(request.resource.data.paymentId)
+          ).data.courseId == request.resource.data.courseId
+        );
 
-      allow update: if isAdmin();
+      allow update: if
+        isAdmin()
+        || (
+          isStudent()
+          && enrollmentId == request.auth.uid + "_" + resource.data.courseId
+          && resource.data.uid == request.auth.uid
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.courseId == resource.data.courseId
+          && request.resource.data.status == "active"
+          && request.resource.data.lastPaymentId is string
+          && exists(
+            /databases/$(database)/documents/payments/$(request.resource.data.lastPaymentId)
+          )
+          && get(
+            /databases/$(database)/documents/payments/$(request.resource.data.lastPaymentId)
+          ).data.userId == request.auth.uid
+          && get(
+            /databases/$(database)/documents/payments/$(request.resource.data.lastPaymentId)
+          ).data.courseId == resource.data.courseId
+        );
 
       allow delete: if isAdmin();
     }
@@ -225,41 +274,17 @@ service cloud.firestore {
 
     // ============================================================
     // ATTENDANCE SESSIONS
-    //
-    // Structure:
-    //
-    // attendanceSessions/{sessionId}
-    //
-    // {
-    //   courseId,
-    //   teacherId,
-    //   title,
-    //   date,
-    //   status: "open" | "closed",
-    //   createdAt,
-    //   updatedAt
-    // }
     // ============================================================
 
     match /attendanceSessions/{sessionId} {
 
-      // ----------------------------------------------------------
-      // READ
-      // ----------------------------------------------------------
-
       allow read: if
-        // Admin can see every session
         isAdmin()
-
-        // Teacher can see sessions for their own courses
         || (
           isTeacher()
           && resource.data.courseId is string
           && isCourseOwner(resource.data.courseId)
         )
-
-        // Student can only see OPEN sessions
-        // for courses they are actively enrolled in
         || (
           isStudent()
           && resource.data.courseId is string
@@ -267,16 +292,8 @@ service cloud.firestore {
           && isEnrolled(resource.data.courseId)
         );
 
-
-      // ----------------------------------------------------------
-      // CREATE
-      // ----------------------------------------------------------
-
       allow create: if
-        // Admin can create any session
         isAdmin()
-
-        // Teacher can create only for their own course
         || (
           isTeacher()
           && request.resource.data.courseId is string
@@ -285,16 +302,8 @@ service cloud.firestore {
           && request.resource.data.status == "open"
         );
 
-
-      // ----------------------------------------------------------
-      // UPDATE
-      // ----------------------------------------------------------
-
       allow update: if
-        // Admin can update anything
         isAdmin()
-
-        // Teacher can update their own course session
         || (
           isTeacher()
           && resource.data.courseId is string
@@ -304,14 +313,8 @@ service cloud.firestore {
           && request.resource.data.teacherId == resource.data.teacherId
         );
 
-
-      // ----------------------------------------------------------
-      // DELETE
-      // ----------------------------------------------------------
-
       allow delete: if
         isAdmin()
-
         || (
           isTeacher()
           && resource.data.courseId is string
@@ -323,112 +326,234 @@ service cloud.firestore {
 
     // ============================================================
     // ATTENDANCE RECORDS
-    //
-    // Structure:
-    //
-    // attendance/{sessionId_studentId}
-    //
-    // {
-    //   sessionId,
-    //   courseId,
-    //   studentId,
-    //   status,
-    //   markedAt,
-    //   markedBy
-    // }
     // ============================================================
 
     match /attendance/{attendanceId} {
 
-      // ----------------------------------------------------------
-      // READ
-      // ----------------------------------------------------------
-
       allow read: if
-        // Admin sees everything
         isAdmin()
-
-        // Student sees ONLY their own attendance
         || (
           isStudent()
           && resource.data.studentId == request.auth.uid
         )
-
-        // Teacher sees attendance for their own course
         || (
           isTeacher()
           && resource.data.courseId is string
           && isCourseOwner(resource.data.courseId)
         );
 
-
-      // ----------------------------------------------------------
-      // CREATE
-      //
-      // Students can only create:
-      //
-      // - their own record
-      // - for an enrolled course
-      // - while the session is OPEN
-      // - status = present
-      // ----------------------------------------------------------
-
       allow create: if
         isStudent()
-
         && request.resource.data.studentId == request.auth.uid
-
         && request.resource.data.markedBy == request.auth.uid
-
         && request.resource.data.courseId is string
-
         && request.resource.data.sessionId is string
-
         && request.resource.data.status == "present"
-
         && isEnrolled(request.resource.data.courseId)
-
         && exists(
           /databases/$(database)/documents/attendanceSessions/$(request.resource.data.sessionId)
         )
-
         && get(
           /databases/$(database)/documents/attendanceSessions/$(request.resource.data.sessionId)
         ).data.courseId == request.resource.data.courseId
-
         && get(
           /databases/$(database)/documents/attendanceSessions/$(request.resource.data.sessionId)
         ).data.status == "open";
 
-
-      // ----------------------------------------------------------
-      // UPDATE
-      //
-      // Teacher/Admin can correct attendance.
-      // Students cannot modify their attendance.
-      // ----------------------------------------------------------
-
       allow update: if
         isAdmin()
-
         || (
           isTeacher()
           && resource.data.courseId is string
           && isCourseOwner(resource.data.courseId)
-
-          // Do not allow teacher to move the record
-          // to another student/session/course.
           && request.resource.data.studentId == resource.data.studentId
           && request.resource.data.sessionId == resource.data.sessionId
           && request.resource.data.courseId == resource.data.courseId
         );
 
-
-      // ----------------------------------------------------------
-      // DELETE
-      // ----------------------------------------------------------
-
       allow delete: if isAdmin();
+    }
+
+
+    // ============================================================
+    // SCHEDULE
+    //
+    // ASSUMPTION — confirm real collection/field names against
+    // Dashboard.jsx before relying on this:
+    //
+    // schedule/{scheduleId}
+    // {
+    //   courseId,
+    //   teacherId,
+    //   title,
+    //   startTime,
+    //   endTime,
+    //   dayOfWeek / date
+    // }
+    // ============================================================
+
+    match /schedule/{scheduleId} {
+
+      allow read: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        )
+        || (
+          isStudent()
+          && resource.data.courseId is string
+          && isEnrolled(resource.data.courseId)
+        );
+
+      allow create: if
+        isAdmin()
+        || (
+          isTeacher()
+          && request.resource.data.courseId is string
+          && isCourseOwner(request.resource.data.courseId)
+          && request.resource.data.teacherId == request.auth.uid
+        );
+
+      allow update: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+          && resource.data.teacherId == request.auth.uid
+          && request.resource.data.courseId == resource.data.courseId
+        );
+
+      allow delete: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+          && resource.data.teacherId == request.auth.uid
+        );
+    }
+
+
+    // ============================================================
+    // TASKS (assignments / to-dos)
+    //
+    // ASSUMPTION — confirm real collection/field names:
+    //
+    // tasks/{taskId}
+    // {
+    //   courseId,
+    //   teacherId,
+    //   title,
+    //   dueDate,
+    //   status
+    // }
+    // ============================================================
+
+    match /tasks/{taskId} {
+
+      allow read: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        )
+        || (
+          isStudent()
+          && resource.data.courseId is string
+          && isEnrolled(resource.data.courseId)
+        );
+
+      allow create: if
+        isAdmin()
+        || (
+          isTeacher()
+          && request.resource.data.courseId is string
+          && isCourseOwner(request.resource.data.courseId)
+          && request.resource.data.teacherId == request.auth.uid
+        );
+
+      allow update: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+          && resource.data.teacherId == request.auth.uid
+          && request.resource.data.courseId == resource.data.courseId
+        );
+
+      allow delete: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+          && resource.data.teacherId == request.auth.uid
+        );
+    }
+
+
+    // ============================================================
+    // LIVE CLASSES
+    //
+    // ASSUMPTION — confirm real collection/field names:
+    //
+    // liveClasses/{liveClassId}
+    // {
+    //   courseId,
+    //   teacherId,
+    //   status: "scheduled" | "live" | "ended",
+    //   meetingLink,
+    //   startTime
+    // }
+    // ============================================================
+
+    match /liveClasses/{liveClassId} {
+
+      allow read: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        )
+        || (
+          isStudent()
+          && resource.data.courseId is string
+          && isEnrolled(resource.data.courseId)
+        );
+
+      allow create: if
+        isAdmin()
+        || (
+          isTeacher()
+          && request.resource.data.courseId is string
+          && isCourseOwner(request.resource.data.courseId)
+          && request.resource.data.teacherId == request.auth.uid
+        );
+
+      allow update: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+          && resource.data.teacherId == request.auth.uid
+          && request.resource.data.courseId == resource.data.courseId
+        );
+
+      allow delete: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+          && resource.data.teacherId == request.auth.uid
+        );
     }
 
 
@@ -450,7 +575,14 @@ service cloud.firestore {
           && isCourseOwner(resource.data.courseId)
         );
 
-      allow create: if isAdmin();
+      allow create: if
+        isAdmin()
+        || (
+          isStudent()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.courseId is string
+          && request.resource.data.status == "paid"
+        );
 
       allow update: if isAdmin();
 
@@ -517,51 +649,25 @@ service cloud.firestore {
 
     match /announcements/{announcementId} {
 
-      // ----------------------------------------------------------
-      // READ
-      // ----------------------------------------------------------
-
       allow read: if
-
-        // ADMIN
         isAdmin()
-
-        // --------------------------------------------------------
-        // TEACHER - GLOBAL ANNOUNCEMENTS
-        // --------------------------------------------------------
-        ||
-        (
+        || (
           isTeacher()
           && resource.data.audienceType == "global"
           && resource.data.status == "published"
         )
-
-        // --------------------------------------------------------
-        // TEACHER - THEIR OWN COURSE ANNOUNCEMENTS
-        // --------------------------------------------------------
-        ||
-        (
+        || (
           isTeacher()
           && resource.data.audienceType == "course"
           && resource.data.courseId is string
           && isCourseOwner(resource.data.courseId)
         )
-
-        // --------------------------------------------------------
-        // STUDENT - GLOBAL
-        // --------------------------------------------------------
-        ||
-        (
+        || (
           isStudent()
           && resource.data.audienceType == "global"
           && resource.data.status == "published"
         )
-
-        // --------------------------------------------------------
-        // STUDENT - ENROLLED COURSE
-        // --------------------------------------------------------
-        ||
-        (
+        || (
           isStudent()
           && resource.data.audienceType == "course"
           && resource.data.status == "published"
@@ -569,19 +675,9 @@ service cloud.firestore {
           && isEnrolled(resource.data.courseId)
         );
 
-
-      // ----------------------------------------------------------
-      // CREATE
-      // ----------------------------------------------------------
-
       allow create: if
-
-        // ADMIN CAN CREATE ANY TYPE
         isAdmin()
-
-        // TEACHER CAN ONLY CREATE COURSE ANNOUNCEMENTS
-        ||
-        (
+        || (
           isTeacher()
           && request.resource.data.audienceType == "course"
           && request.resource.data.courseId is string
@@ -593,44 +689,22 @@ service cloud.firestore {
           )
         );
 
-
-      // ----------------------------------------------------------
-      // UPDATE
-      // ----------------------------------------------------------
-
       allow update: if
-
-        // ADMIN
         isAdmin()
-
-        // TEACHER - OWN COURSE ANNOUNCEMENT
-        ||
-        (
+        || (
           isTeacher()
           && resource.data.audienceType == "course"
           && resource.data.courseId is string
           && resource.data.authorId == request.auth.uid
           && isCourseOwner(resource.data.courseId)
-
-          // Keep ownership fields unchanged
           && request.resource.data.authorId == resource.data.authorId
           && request.resource.data.courseId == resource.data.courseId
           && request.resource.data.audienceType == resource.data.audienceType
         );
 
-
-      // ----------------------------------------------------------
-      // DELETE
-      // ----------------------------------------------------------
-
       allow delete: if
-
-        // ADMIN
         isAdmin()
-
-        // TEACHER - OWN COURSE ANNOUNCEMENT
-        ||
-        (
+        || (
           isTeacher()
           && resource.data.audienceType == "course"
           && resource.data.courseId is string
@@ -661,14 +735,12 @@ service cloud.firestore {
 
       allow create: if
         isAdmin()
-
         || (
           isTeacher()
           && request.resource.data.courseId is string
           && isCourseOwner(request.resource.data.courseId)
           && request.resource.data.authorId == request.auth.uid
         )
-
         || (
           isStudent()
           && request.resource.data.courseId is string
@@ -678,13 +750,11 @@ service cloud.firestore {
 
       allow update: if
         isAdmin()
-
         || (
           isTeacher()
           && resource.data.courseId is string
           && isCourseOwner(resource.data.courseId)
         )
-
         || (
           isStudent()
           && resource.data.authorId == request.auth.uid
@@ -692,13 +762,11 @@ service cloud.firestore {
 
       allow delete: if
         isAdmin()
-
         || (
           isTeacher()
           && resource.data.courseId is string
           && isCourseOwner(resource.data.courseId)
         )
-
         || (
           isStudent()
           && resource.data.authorId == request.auth.uid
@@ -713,7 +781,6 @@ service cloud.firestore {
 
         allow read: if
           isAdmin()
-
           || (
             isTeacher()
             && get(
@@ -725,7 +792,6 @@ service cloud.firestore {
               ).data.courseId
             )
           )
-
           || (
             isStudent()
             && get(
@@ -737,11 +803,9 @@ service cloud.firestore {
               ).data.courseId
             )
           );
-
 
         allow create: if
           isAdmin()
-
           || (
             isTeacher()
             && get(
@@ -754,7 +818,6 @@ service cloud.firestore {
             )
             && request.resource.data.authorId == request.auth.uid
           )
-
           || (
             isStudent()
             && get(
@@ -767,7 +830,6 @@ service cloud.firestore {
             )
             && request.resource.data.authorId == request.auth.uid
           );
-
 
         allow update: if
           isAdmin()
@@ -775,7 +837,6 @@ service cloud.firestore {
             isSignedIn()
             && resource.data.authorId == request.auth.uid
           );
-
 
         allow delete: if
           isAdmin()
@@ -800,7 +861,6 @@ service cloud.firestore {
           && resource.data.recipientId == request.auth.uid
         );
 
-      // Notifications should be created by admin/backend
       allow create: if isAdmin();
 
       allow update: if

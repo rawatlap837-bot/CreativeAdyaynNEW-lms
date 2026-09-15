@@ -1030,23 +1030,12 @@ const AdminLayout = () => {
             className="w-20 h-10 rounded-md object-contain shrink-0"
           />
 
-          <div>
-            <p
-              className="text-[15px]"
-              style={{
-                color: "#8593A8",
-              }}
-            >
-              Admin Console
-            </p>
-          </div>
-
           <button
             className="ml-auto md:hidden text-white/70"
             onClick={() =>
               setMobileNavOpen(false)
             }
-          >
+          > 
             <X size={18} />
           </button>
         </div>

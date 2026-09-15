@@ -72,8 +72,47 @@ const calculateDiscount = (price, discountPrice) => {
 
 
 /* =========================================================
+   RAZORPAY
+========================================================= */
+
+const RAZORPAY_SCRIPT_URL =
+  "https://checkout.razorpay.com/v1/checkout.js";
+
+const PAYMENT_API_URL = "http://localhost:5000";
+
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+
+    const existingScript = document.querySelector(
+      `script[src="${RAZORPAY_SCRIPT_URL}"]`
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(true));
+      existingScript.addEventListener("error", () => resolve(false));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = RAZORPAY_SCRIPT_URL;
+    script.async = true;
+
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+
+    document.body.appendChild(script);
+  });
+};
+
+
+/* =========================================================
    COURSE DETAILS
 ========================================================= */
+
 
 export default function CourseDetails() {
   const { courseId } = useParams();
@@ -503,25 +542,236 @@ export default function CourseDetails() {
 
 
     /* -------------------------------------------------------
-       PAID COURSE
+       PAID COURSE — RAZORPAY
     ------------------------------------------------------- */
 
-    /*
-      IMPORTANT:
-
-      Payment gateway is not connected yet.
-
-      Do NOT create a pending enrollment here and do NOT
-      send the student into the learning area.
-
-      Once Razorpay / Stripe / another payment system is
-      connected, this section will start the payment flow.
-    */
-
     if (!isFree) {
-      setEnrollmentError(
-        "Online payment is not available yet. Please contact the institute to complete enrollment."
-      );
+      try {
+        setEnrolling(true);
+
+        const razorpayLoaded =
+          await loadRazorpayScript();
+
+        if (!razorpayLoaded) {
+          throw new Error(
+            "Razorpay Checkout could not be loaded. Please check your internet connection and try again."
+          );
+        }
+
+        /*
+          Use the final selling price shown on the page.
+          Example:
+          discountPrice = 2467
+          price = 3500
+          => Razorpay order = ₹2467
+        */
+        const payableAmount = Number(
+          course.discountPrice ?? course.price ?? 0
+        );
+
+        if (!Number.isFinite(payableAmount) || payableAmount <= 0) {
+          throw new Error(
+            "Invalid course price. Please contact the institute."
+          );
+        }
+
+        /* -----------------------------------------------
+           CREATE RAZORPAY ORDER
+        ------------------------------------------------ */
+
+        const orderResponse = await fetch(
+          `${PAYMENT_API_URL}/api/create-order`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              amount: payableAmount,
+              courseId: course.id,
+              courseName: course.title,
+              uid: user.uid,
+            }),
+          }
+        );
+
+        const orderData = await orderResponse.json();
+
+        if (!orderResponse.ok || !orderData?.success) {
+          throw new Error(
+            orderData?.message ||
+            "Unable to create Razorpay order."
+          );
+        }
+
+        /* -----------------------------------------------
+           OPEN RAZORPAY CHECKOUT
+        ------------------------------------------------ */
+
+        const options = {
+          key: orderData.keyId,
+          amount: orderData.amount,
+          currency: orderData.currency || "INR",
+          name: "Creative Adhyayan",
+          description: course.title,
+          order_id: orderData.orderId,
+
+          prefill: {
+            name:
+              user.displayName ||
+              "",
+            email:
+              user.email ||
+              "",
+            contact:
+              user.phoneNumber ||
+              "",
+          },
+
+          notes: {
+            courseId: course.id,
+            courseName: course.title,
+            uid: user.uid,
+          },
+
+          theme: {
+            color: "#000000",
+          },
+
+          modal: {
+            ondismiss: () => {
+              setEnrolling(false);
+              setEnrollmentMessage(
+                "Payment window closed. No payment was completed."
+              );
+            },
+          },
+
+          handler: async (response) => {
+            try {
+              setEnrollmentMessage(
+                "Payment received. Verifying your payment..."
+              );
+
+              /* -------------------------------------------
+                 VERIFY PAYMENT ON OUR SERVER
+              -------------------------------------------- */
+
+              const verifyResponse = await fetch(
+                `${PAYMENT_API_URL}/api/verify-payment`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    razorpay_order_id:
+                      response.razorpay_order_id,
+                    razorpay_payment_id:
+                      response.razorpay_payment_id,
+                    razorpay_signature:
+                      response.razorpay_signature,
+                    courseId: course.id,
+                    courseName: course.title,
+                    uid: user.uid,
+                  }),
+                }
+              );
+
+              const verifyData =
+                await verifyResponse.json();
+
+              if (
+                !verifyResponse.ok ||
+                !verifyData?.success
+              ) {
+                throw new Error(
+                  verifyData?.message ||
+                  "Payment verification failed."
+                );
+              }
+
+              /* -------------------------------------------
+                 PAYMENT + ENROLLMENT SUCCESS
+              -------------------------------------------- */
+
+              setEnrollment({
+                id: verifyData.enrollmentId,
+                uid: user.uid,
+                courseId: course.id,
+                courseName: course.title,
+                status: "active",
+                paymentStatus: "paid",
+                paymentId:
+                  verifyData.paymentId ||
+                  response.razorpay_payment_id,
+              });
+
+              setEnrollmentMessage(
+                "Payment successful! Your course is now unlocked."
+              );
+
+              /*
+                Give the success message a moment to appear,
+                then take the student directly to the course.
+              */
+              setTimeout(() => {
+                navigate(
+                  `/student/courses/${course.id}`
+                );
+              }, 800);
+            } catch (err) {
+              console.error(
+                "Payment verification failed:",
+                err
+              );
+
+              setEnrollmentError(
+                err?.message ||
+                "Payment was completed, but verification failed. Please contact the institute with your Razorpay payment ID."
+              );
+
+              setEnrolling(false);
+            }
+          },
+        };
+
+        const razorpay = new window.Razorpay(
+          options
+        );
+
+        razorpay.on(
+          "payment.failed",
+          (response) => {
+            console.error(
+              "Razorpay payment failed:",
+              response?.error
+            );
+
+            setEnrollmentError(
+              response?.error?.description ||
+              "Payment failed. Please try again."
+            );
+
+            setEnrollmentMessage("");
+            setEnrolling(false);
+          }
+        );
+
+        razorpay.open();
+      } catch (err) {
+        console.error(
+          "Razorpay checkout failed:",
+          err
+        );
+
+        setEnrollmentError(
+          err?.message ||
+          "Unable to start online payment. Please try again."
+        );
+
+        setEnrolling(false);
+      }
 
       return;
     }
@@ -953,7 +1203,7 @@ export default function CourseDetails() {
                           ? "Your enrollment is waiting for payment verification."
                           : isFree
                             ? "Create your account and start learning immediately."
-                            : "Online payment is currently unavailable."}
+                            : "Secure payment powered by Razorpay."}
 
                     </p>
 
@@ -964,45 +1214,45 @@ export default function CourseDetails() {
                       totalModules > 0 ||
                       course.duration) && (
 
-                      <div className="mt-7 border-t border-gray-200 pt-6">
+                        <div className="mt-7 border-t border-gray-200 pt-6">
 
-                        <h3 className="font-semibold text-gray-900">
-                          This course includes
-                        </h3>
+                          <h3 className="font-semibold text-gray-900">
+                            This course includes
+                          </h3>
 
-                        <div className="mt-4 space-y-3">
+                          <div className="mt-4 space-y-3">
 
-                          {totalLessons > 0 && (
-                            <div className="flex items-center gap-3 text-sm text-gray-600">
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            {totalLessons > 0 && (
+                              <div className="flex items-center gap-3 text-sm text-gray-600">
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
 
-                              {totalLessons} lessons
-                            </div>
-                          )}
-
-
-                          {totalModules > 0 && (
-                            <div className="flex items-center gap-3 text-sm text-gray-600">
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-
-                              {totalModules} structured modules
-                            </div>
-                          )}
+                                {totalLessons} lessons
+                              </div>
+                            )}
 
 
-                          {course.duration && (
-                            <div className="flex items-center gap-3 text-sm text-gray-600">
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            {totalModules > 0 && (
+                              <div className="flex items-center gap-3 text-sm text-gray-600">
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
 
-                              {course.duration} learning duration
-                            </div>
-                          )}
+                                {totalModules} structured modules
+                              </div>
+                            )}
+
+
+                            {course.duration && (
+                              <div className="flex items-center gap-3 text-sm text-gray-600">
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+
+                                {course.duration} learning duration
+                              </div>
+                            )}
+
+                          </div>
 
                         </div>
 
-                      </div>
-
-                    )}
+                      )}
 
                   </div>
 
@@ -1061,18 +1311,16 @@ export default function CourseDetails() {
               <p className="mt-2 text-sm text-gray-600">
 
                 {totalModules > 0
-                  ? `${totalModules} ${
-                      totalModules === 1
-                        ? "module"
-                        : "modules"
-                    }`
+                  ? `${totalModules} ${totalModules === 1
+                    ? "module"
+                    : "modules"
+                  }`
                   : "Curriculum"}
 
                 {totalLessons > 0 &&
-                  ` · ${totalLessons} ${
-                    totalLessons === 1
-                      ? "lesson"
-                      : "lessons"
+                  ` · ${totalLessons} ${totalLessons === 1
+                    ? "lesson"
+                    : "lessons"
                   }`}
 
               </p>
@@ -1176,8 +1424,7 @@ export default function CourseDetails() {
 
                                 <h3 className="font-semibold text-gray-900">
                                   {module.title ||
-                                    `Module ${
-                                      moduleIndex + 1
+                                    `Module ${moduleIndex + 1
                                     }`}
                                 </h3>
 
@@ -1232,7 +1479,7 @@ export default function CourseDetails() {
                                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100">
 
                                             {lesson.type ===
-                                            "video" ? (
+                                              "video" ? (
                                               <Video className="h-4 w-4 text-gray-600" />
                                             ) : (
                                               <BookOpen className="h-4 w-4 text-gray-600" />
@@ -1270,14 +1517,14 @@ export default function CourseDetails() {
 
                                               {lesson.type ===
                                                 "video" && (
-                                                <span className="flex items-center gap-1">
+                                                  <span className="flex items-center gap-1">
 
-                                                  <PlayCircle className="h-3.5 w-3.5" />
+                                                    <PlayCircle className="h-3.5 w-3.5" />
 
-                                                  Video
+                                                    Video
 
-                                                </span>
-                                              )}
+                                                  </span>
+                                                )}
 
                                               {lesson.duration && (
                                                 <span>

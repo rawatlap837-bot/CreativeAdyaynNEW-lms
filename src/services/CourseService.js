@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   collection,
@@ -77,22 +77,16 @@ function courseFromDoc(snapshot) {
 
 function sortCourses(a, b) {
   const orderA =
-    typeof a.order === "number"
-      ? a.order
-      : 999999;
+    typeof a.order === "number" ? a.order : 999999;
 
   const orderB =
-    typeof b.order === "number"
-      ? b.order
-      : 999999;
+    typeof b.order === "number" ? b.order : 999999;
 
   if (orderA !== orderB) {
     return orderA - orderB;
   }
 
-  return (a.title || "").localeCompare(
-    b.title || ""
-  );
+  return (a.title || "").localeCompare(b.title || "");
 }
 
 function requireAuthUser() {
@@ -107,6 +101,25 @@ function requireAuthUser() {
   return user;
 }
 
+/*
+  Turns raw Firebase errors into something safe to show
+  in the UI, without leaking internal error codes/messages
+  to end users. Permission errors are the most common case
+  when a listener is attached for a user/role that the
+  Firestore rules don't allow to read that data.
+*/
+function friendlyFirestoreError(error, fallbackMessage) {
+  if (error?.code === "permission-denied") {
+    return "You don't have permission to view this data.";
+  }
+
+  if (error?.code === "unavailable") {
+    return "Connection issue — please check your internet and try again.";
+  }
+
+  return error?.message || fallbackMessage;
+}
+
 /* ============================================================
    VERIFY COURSE OWNER
 ============================================================ */
@@ -118,14 +131,9 @@ async function requireCourseOwner(courseId) {
     throw new Error("Course ID is required.");
   }
 
-  const courseRef = doc(
-    db,
-    COURSES_COLLECTION,
-    courseId
-  );
+  const courseRef = doc(db, COURSES_COLLECTION, courseId);
 
-  const courseSnapshot =
-    await getDoc(courseRef);
+  const courseSnapshot = await getDoc(courseRef);
 
   if (!courseSnapshot.exists()) {
     throw new Error("Course not found.");
@@ -155,9 +163,7 @@ export function groupByCategory(courses = []) {
   const coursesByCategory = {};
 
   for (const course of courses) {
-    const category =
-      course.category?.trim() ||
-      "Uncategorized";
+    const category = course.category?.trim() || "Uncategorized";
 
     if (!coursesByCategory[category]) {
       coursesByCategory[category] = [];
@@ -174,7 +180,7 @@ export function groupByCategory(courses = []) {
 }
 
 /* ============================================================
-   TEACHER — GET MY COURSES
+   TEACHER — GET MY COURSES (one-off fetch)
 ============================================================ */
 
 export async function getMyCourses(
@@ -188,26 +194,29 @@ export async function getMyCourses(
 
   const q = query(
     collection(db, COURSES_COLLECTION),
-    where(
-      "instructorId",
-      "==",
-      teacherId
-    )
+    where("instructorId", "==", teacherId)
   );
 
   const snapshot = await getDocs(q);
 
-  return snapshot.docs
-    .map(courseFromDoc)
-    .sort(sortCourses);
+  return snapshot.docs.map(courseFromDoc).sort(sortCourses);
 }
 
 /* ============================================================
-   TEACHER — LIVE COURSES
+   TEACHER — LIVE COURSES (realtime)
+
+   IMPORTANT: pass `enabled: false` for any session that is
+   not actually an instructor session (e.g. a student viewing
+   their own dashboard). Firing this listener for a user whose
+   Firestore rules don't grant them instructor-level reads will
+   always resolve to a permission-denied error — that is a
+   rules/role mismatch, not something this hook can work around,
+   so the caller should simply not attach the listener at all.
 ============================================================ */
 
 export function useMyCourses(
-  teacherId = auth.currentUser?.uid
+  teacherId = auth.currentUser?.uid,
+  { enabled = true } = {}
 ) {
   const [state, setState] = useState({
     courses: [],
@@ -215,7 +224,26 @@ export function useMyCourses(
     error: null,
   });
 
+  const isMountedRef = useRef(true);
+
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) {
+      setState({
+        courses: [],
+        loading: false,
+        error: null,
+      });
+
+      return;
+    }
+
     if (!teacherId) {
       setState({
         courses: [],
@@ -234,16 +262,14 @@ export function useMyCourses(
 
     const q = query(
       collection(db, COURSES_COLLECTION),
-      where(
-        "instructorId",
-        "==",
-        teacherId
-      )
+      where("instructorId", "==", teacherId)
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        if (!isMountedRef.current) return;
+
         const courses = snapshot.docs
           .map(courseFromDoc)
           .sort(sortCourses);
@@ -255,23 +281,23 @@ export function useMyCourses(
         });
       },
       (error) => {
-        console.error(
-          "Teacher courses listener error:",
-          error
-        );
+        if (!isMountedRef.current) return;
+
+        console.error("Teacher courses listener error:", error);
 
         setState({
           courses: [],
           loading: false,
-          error:
-            error?.message ||
-            "Unable to load teacher courses.",
+          error: friendlyFirestoreError(
+            error,
+            "Unable to load teacher courses."
+          ),
         });
       }
     );
 
     return () => unsubscribe();
-  }, [teacherId]);
+  }, [teacherId, enabled]);
 
   return state;
 }
@@ -285,14 +311,9 @@ export async function getCourseById(courseId) {
     throw new Error("Course ID is required.");
   }
 
-  const courseRef = doc(
-    db,
-    COURSES_COLLECTION,
-    courseId
-  );
+  const courseRef = doc(db, COURSES_COLLECTION, courseId);
 
-  const snapshot =
-    await getDoc(courseRef);
+  const snapshot = await getDoc(courseRef);
 
   if (!snapshot.exists()) {
     return null;
@@ -303,9 +324,7 @@ export async function getCourseById(courseId) {
 
 /* ============================================================
    CREATE COURSE
-============================================================ */
 
-/*
   IMPORTANT:
 
   Teacher creates:
@@ -321,47 +340,33 @@ export async function getCourseById(courseId) {
       admin approves
         ↓
       published
-*/
+============================================================ */
 
-export async function createCourse(
-  courseData = {}
-) {
+export async function createCourse(courseData = {}) {
   const user = requireAuthUser();
 
   /* ----------------------------------------------------------
      VALIDATION
   ---------------------------------------------------------- */
 
-  const title =
-    courseData.title?.trim();
+  const title = courseData.title?.trim();
 
   if (!title) {
-    throw new Error(
-      "Course title is required."
-    );
+    throw new Error("Course title is required.");
   }
 
   if (
-    courseData.type !==
-      COURSE_TYPES.SHORT &&
-    courseData.type !==
-      COURSE_TYPES.LONG
+    courseData.type !== COURSE_TYPES.SHORT &&
+    courseData.type !== COURSE_TYPES.LONG
   ) {
-    throw new Error(
-      "Course type must be short or long."
-    );
+    throw new Error("Course type must be short or long.");
   }
 
   /* ----------------------------------------------------------
      CREATE NEW FIRESTORE DOCUMENT
   ---------------------------------------------------------- */
 
-  const courseRef = doc(
-    collection(
-      db,
-      COURSES_COLLECTION
-    )
-  );
+  const courseRef = doc(collection(db, COURSES_COLLECTION));
 
   /* ----------------------------------------------------------
      COURSE DATA
@@ -372,29 +377,17 @@ export async function createCourse(
 
     title,
 
-    slug:
-      courseData.slug?.trim() ||
-      slugify(title),
+    slug: courseData.slug?.trim() || slugify(title),
 
-    description:
-      courseData.description?.trim() ||
-      "",
+    description: courseData.description?.trim() || "",
 
-    shortDescription:
-      courseData.shortDescription?.trim() ||
-      "",
+    shortDescription: courseData.shortDescription?.trim() || "",
 
-    category:
-      courseData.category?.trim() ||
-      "",
+    category: courseData.category?.trim() || "",
 
-    level:
-      courseData.level?.trim() ||
-      "",
+    level: courseData.level?.trim() || "",
 
-    duration:
-      courseData.duration?.trim() ||
-      "",
+    duration: courseData.duration?.trim() || "",
 
     /* COURSE TYPE */
 
@@ -405,54 +398,33 @@ export async function createCourse(
     instructorId: user.uid,
 
     instructorName:
-      courseData.instructorName?.trim() ||
-      user.displayName ||
-      "",
+      courseData.instructorName?.trim() || user.displayName || "",
 
     /* MEDIA */
 
-    thumbnailUrl:
-      courseData.thumbnailUrl ||
-      "",
+    thumbnailUrl: courseData.thumbnailUrl || "",
 
-    thumbnailPath:
-      courseData.thumbnailPath ||
-      "",
+    thumbnailPath: courseData.thumbnailPath || "",
 
-    bannerUrl:
-      courseData.bannerUrl ||
-      "",
+    bannerUrl: courseData.bannerUrl || "",
 
-    bannerPath:
-      courseData.bannerPath ||
-      "",
+    bannerPath: courseData.bannerPath || "",
 
-    previewVideoUrl:
-      courseData.previewVideoUrl ||
-      "",
+    previewVideoUrl: courseData.previewVideoUrl || "",
 
-    previewVideoPath:
-      courseData.previewVideoPath ||
-      "",
+    previewVideoPath: courseData.previewVideoPath || "",
 
     /* PRICING */
 
-    price:
-      Number(courseData.price) || 0,
+    price: Number(courseData.price) || 0,
 
-    discountPrice:
-      Number(
-        courseData.discountPrice
-      ) || 0,
+    discountPrice: Number(courseData.discountPrice) || 0,
 
-    currency:
-      courseData.currency ||
-      "INR",
+    currency: courseData.currency || "INR",
 
     /* STATUS */
 
-    status:
-      COURSE_STATUS.DRAFT,
+    status: COURSE_STATUS.DRAFT,
 
     /* ADMIN CONTROLLED */
 
@@ -462,11 +434,9 @@ export async function createCourse(
 
     /* TIMESTAMPS */
 
-    createdAt:
-      serverTimestamp(),
+    createdAt: serverTimestamp(),
 
-    updatedAt:
-      serverTimestamp(),
+    updatedAt: serverTimestamp(),
 
     publishedAt: null,
 
@@ -481,47 +451,24 @@ export async function createCourse(
     enrollmentCount: 0,
   };
 
-  /* ----------------------------------------------------------
-     THIS IS THE IMPORTANT FIX
-  ---------------------------------------------------------- */
+  await setDoc(courseRef, course);
 
-  await setDoc(
-    courseRef,
-    course
-  );
-
-  /* ----------------------------------------------------------
-     RETURN CREATED COURSE
-  ---------------------------------------------------------- */
-
-  return getCourseById(
-    courseRef.id
-  );
+  return getCourseById(courseRef.id);
 }
 
 /* ============================================================
    UPDATE COURSE
 ============================================================ */
 
-export async function updateCourse(
-  courseId,
-  courseData = {}
-) {
-  const {
-    courseRef,
-    course: existingCourse,
-  } = await requireCourseOwner(
-    courseId
-  );
+export async function updateCourse(courseId, courseData = {}) {
+  const { courseRef, course: existingCourse } =
+    await requireCourseOwner(courseId);
 
   /* ----------------------------------------------------------
      LOCK PENDING
   ---------------------------------------------------------- */
 
-  if (
-    existingCourse.status ===
-    COURSE_STATUS.PENDING
-  ) {
+  if (existingCourse.status === COURSE_STATUS.PENDING) {
     throw new Error(
       "This course is waiting for admin approval and cannot be edited right now."
     );
@@ -531,13 +478,8 @@ export async function updateCourse(
      LOCK ARCHIVED
   ---------------------------------------------------------- */
 
-  if (
-    existingCourse.status ===
-    COURSE_STATUS.ARCHIVED
-  ) {
-    throw new Error(
-      "Archived courses cannot be edited."
-    );
+  if (existingCourse.status === COURSE_STATUS.ARCHIVED) {
+    throw new Error("Archived courses cannot be edited.");
   }
 
   const updates = {};
@@ -546,24 +488,16 @@ export async function updateCourse(
      TITLE
   ---------------------------------------------------------- */
 
-  if (
-    courseData.title !==
-    undefined
-  ) {
-    const title =
-      courseData.title.trim();
+  if (courseData.title !== undefined) {
+    const title = courseData.title.trim();
 
     if (!title) {
-      throw new Error(
-        "Course title cannot be empty."
-      );
+      throw new Error("Course title cannot be empty.");
     }
 
     updates.title = title;
 
-    updates.slug =
-      courseData.slug?.trim() ||
-      slugify(title);
+    updates.slug = courseData.slug?.trim() || slugify(title);
   }
 
   /* ----------------------------------------------------------
@@ -585,15 +519,9 @@ export async function updateCourse(
     "currency",
   ];
 
-  for (
-    const field of editableFields
-  ) {
-    if (
-      courseData[field] !==
-      undefined
-    ) {
-      updates[field] =
-        courseData[field];
+  for (const field of editableFields) {
+    if (courseData[field] !== undefined) {
+      updates[field] = courseData[field];
     }
   }
 
@@ -601,45 +529,27 @@ export async function updateCourse(
      PRICING
   ---------------------------------------------------------- */
 
-  if (
-    courseData.price !==
-    undefined
-  ) {
-    updates.price =
-      Number(courseData.price) || 0;
+  if (courseData.price !== undefined) {
+    updates.price = Number(courseData.price) || 0;
   }
 
-  if (
-    courseData.discountPrice !==
-    undefined
-  ) {
-    updates.discountPrice =
-      Number(
-        courseData.discountPrice
-      ) || 0;
+  if (courseData.discountPrice !== undefined) {
+    updates.discountPrice = Number(courseData.discountPrice) || 0;
   }
 
   /* ----------------------------------------------------------
      COURSE TYPE
   ---------------------------------------------------------- */
 
-  if (
-    courseData.type !==
-    undefined
-  ) {
+  if (courseData.type !== undefined) {
     if (
-      courseData.type !==
-        COURSE_TYPES.SHORT &&
-      courseData.type !==
-        COURSE_TYPES.LONG
+      courseData.type !== COURSE_TYPES.SHORT &&
+      courseData.type !== COURSE_TYPES.LONG
     ) {
-      throw new Error(
-        "Invalid course type."
-      );
+      throw new Error("Invalid course type.");
     }
 
-    updates.type =
-      courseData.type;
+    updates.type = courseData.type;
   }
 
   /* ----------------------------------------------------------
@@ -658,53 +568,31 @@ export async function updateCourse(
   ---------------------------------------------------------- */
 
   const titleChanged =
-    courseData.title !==
-      undefined &&
-    courseData.title.trim() !==
-      existingCourse.title;
+    courseData.title !== undefined &&
+    courseData.title.trim() !== existingCourse.title;
 
   const priceChanged =
-    courseData.price !==
-      undefined &&
-    Number(courseData.price) !==
-      Number(
-        existingCourse.price || 0
-      );
+    courseData.price !== undefined &&
+    Number(courseData.price) !== Number(existingCourse.price || 0);
 
   const discountChanged =
-    courseData.discountPrice !==
-      undefined &&
-    Number(
-      courseData.discountPrice
-    ) !==
-      Number(
-        existingCourse.discountPrice ||
-          0
-      );
+    courseData.discountPrice !== undefined &&
+    Number(courseData.discountPrice) !==
+      Number(existingCourse.discountPrice || 0);
 
   const typeChanged =
-    courseData.type !==
-      undefined &&
-    courseData.type !==
-      existingCourse.type;
+    courseData.type !== undefined &&
+    courseData.type !== existingCourse.type;
 
   const majorChange =
-    titleChanged ||
-    priceChanged ||
-    discountChanged ||
-    typeChanged;
+    titleChanged || priceChanged || discountChanged || typeChanged;
 
   /* ----------------------------------------------------------
      PUBLISHED → PENDING
   ---------------------------------------------------------- */
 
-  if (
-    existingCourse.status ===
-      COURSE_STATUS.PUBLISHED &&
-    majorChange
-  ) {
-    updates.status =
-      COURSE_STATUS.PENDING;
+  if (existingCourse.status === COURSE_STATUS.PUBLISHED && majorChange) {
+    updates.status = COURSE_STATUS.PENDING;
 
     updates.publishedAt = null;
 
@@ -715,12 +603,8 @@ export async function updateCourse(
      REJECTED → DRAFT
   ---------------------------------------------------------- */
 
-  if (
-    existingCourse.status ===
-    COURSE_STATUS.REJECTED
-  ) {
-    updates.status =
-      COURSE_STATUS.DRAFT;
+  if (existingCourse.status === COURSE_STATUS.REJECTED) {
+    updates.status = COURSE_STATUS.DRAFT;
 
     updates.rejectionReason = "";
   }
@@ -729,36 +613,19 @@ export async function updateCourse(
      UPDATED TIMESTAMP
   ---------------------------------------------------------- */
 
-  updates.updatedAt =
-    serverTimestamp();
+  updates.updatedAt = serverTimestamp();
 
-  /* ----------------------------------------------------------
-     IMPORTANT FIX
-  ---------------------------------------------------------- */
+  await updateDoc(courseRef, updates);
 
-  await updateDoc(
-    courseRef,
-    updates
-  );
-
-  return getCourseById(
-    courseId
-  );
+  return getCourseById(courseId);
 }
 
 /* ============================================================
    DELETE COURSE
 ============================================================ */
 
-export async function deleteCourse(
-  courseId
-) {
-  const {
-    courseRef,
-    course,
-  } = await requireCourseOwner(
-    courseId
-  );
+export async function deleteCourse(courseId) {
+  const { courseRef, course } = await requireCourseOwner(courseId);
 
   /* ----------------------------------------------------------
      DELETE DIRECT STORAGE FILES
@@ -770,104 +637,69 @@ export async function deleteCourse(
     course.previewVideoPath,
   ].filter(Boolean);
 
-  for (
-    const path of directStoragePaths
-  ) {
-    await safeDeleteStorageFile(
-      path
-    );
+  for (const path of directStoragePaths) {
+    await safeDeleteStorageFile(path);
   }
 
   /* ----------------------------------------------------------
      GET MODULES
   ---------------------------------------------------------- */
 
-  const modulesRef =
-    collection(
-      db,
-      COURSES_COLLECTION,
-      courseId,
-      "modules"
-    );
+  const modulesRef = collection(
+    db,
+    COURSES_COLLECTION,
+    courseId,
+    "modules"
+  );
 
-  const modulesSnapshot =
-    await getDocs(modulesRef);
+  const modulesSnapshot = await getDocs(modulesRef);
 
   /* ----------------------------------------------------------
      DELETE MODULES + LESSONS
   ---------------------------------------------------------- */
 
-  for (
-    const moduleSnapshot of
-      modulesSnapshot.docs
-  ) {
-    const moduleId =
-      moduleSnapshot.id;
+  for (const moduleSnapshot of modulesSnapshot.docs) {
+    const moduleId = moduleSnapshot.id;
 
-    const lessonsRef =
-      collection(
-        db,
-        COURSES_COLLECTION,
-        courseId,
-        "modules",
-        moduleId,
-        "lessons"
-      );
+    const lessonsRef = collection(
+      db,
+      COURSES_COLLECTION,
+      courseId,
+      "modules",
+      moduleId,
+      "lessons"
+    );
 
-    const lessonsSnapshot =
-      await getDocs(
-        lessonsRef
-      );
+    const lessonsSnapshot = await getDocs(lessonsRef);
 
-    if (
-      !lessonsSnapshot.empty
-    ) {
-      const batch =
-        writeBatch(db);
+    if (!lessonsSnapshot.empty) {
+      const batch = writeBatch(db);
 
-      for (
-        const lessonSnapshot of
-          lessonsSnapshot.docs
-      ) {
-        const lesson =
-          lessonSnapshot.data();
+      for (const lessonSnapshot of lessonsSnapshot.docs) {
+        const lesson = lessonSnapshot.data();
 
-        if (
-          lesson.videoPath
-        ) {
-          await safeDeleteStorageFile(
-            lesson.videoPath
-          );
+        if (lesson.videoPath) {
+          await safeDeleteStorageFile(lesson.videoPath);
         }
 
-        if (
-          lesson.resourcePath
-        ) {
-          await safeDeleteStorageFile(
-            lesson.resourcePath
-          );
+        if (lesson.resourcePath) {
+          await safeDeleteStorageFile(lesson.resourcePath);
         }
 
-        batch.delete(
-          lessonSnapshot.ref
-        );
+        batch.delete(lessonSnapshot.ref);
       }
 
       await batch.commit();
     }
 
-    await deleteDoc(
-      moduleSnapshot.ref
-    );
+    await deleteDoc(moduleSnapshot.ref);
   }
 
   /* ----------------------------------------------------------
      DELETE COURSE
   ---------------------------------------------------------- */
 
-  await deleteDoc(
-    courseRef
-  );
+  await deleteDoc(courseRef);
 
   return true;
 }
@@ -876,198 +708,133 @@ export async function deleteCourse(
    SUBMIT FOR APPROVAL
 ============================================================ */
 
-export async function submitForApproval(
-  courseId
-) {
-  const {
-    courseRef,
-    course,
-  } = await requireCourseOwner(
-    courseId
-  );
+export async function submitForApproval(courseId) {
+  const { courseRef, course } = await requireCourseOwner(courseId);
 
-  if (
-    course.status ===
-    COURSE_STATUS.PENDING
-  ) {
-    throw new Error(
-      "This course is already waiting for approval."
-    );
+  if (course.status === COURSE_STATUS.PENDING) {
+    throw new Error("This course is already waiting for approval.");
   }
 
-  if (
-    course.status ===
-    COURSE_STATUS.PUBLISHED
-  ) {
-    throw new Error(
-      "This course is already published."
-    );
+  if (course.status === COURSE_STATUS.PUBLISHED) {
+    throw new Error("This course is already published.");
   }
 
-  if (
-    course.status ===
-    COURSE_STATUS.ARCHIVED
-  ) {
-    throw new Error(
-      "Archived courses cannot be submitted."
-    );
+  if (course.status === COURSE_STATUS.ARCHIVED) {
+    throw new Error("Archived courses cannot be submitted.");
   }
 
   if (!course.title?.trim()) {
-    throw new Error(
-      "Course title is required."
-    );
+    throw new Error("Course title is required.");
   }
 
   if (!course.type) {
-    throw new Error(
-      "Course type is required."
-    );
+    throw new Error("Course type is required.");
   }
 
-  await updateDoc(
-    courseRef,
-    {
-      status:
-        COURSE_STATUS.PENDING,
+  await updateDoc(courseRef, {
+    status: COURSE_STATUS.PENDING,
+    rejectionReason: "",
+    updatedAt: serverTimestamp(),
+  });
 
-      rejectionReason: "",
-
-      updatedAt:
-        serverTimestamp(),
-    }
-  );
-
-  return getCourseById(
-    courseId
-  );
+  return getCourseById(courseId);
 }
 
 /* ============================================================
    UNPUBLISH
 ============================================================ */
 
-export async function unpublishCourse(
-  courseId
-) {
-  const {
-    courseRef,
-    course,
-  } = await requireCourseOwner(
-    courseId
-  );
+export async function unpublishCourse(courseId) {
+  const { courseRef, course } = await requireCourseOwner(courseId);
 
-  if (
-    course.status !==
-    COURSE_STATUS.PUBLISHED
-  ) {
-    throw new Error(
-      "Only published courses can be unpublished."
-    );
+  if (course.status !== COURSE_STATUS.PUBLISHED) {
+    throw new Error("Only published courses can be unpublished.");
   }
 
-  await updateDoc(
-    courseRef,
-    {
-      status:
-        COURSE_STATUS.DRAFT,
+  await updateDoc(courseRef, {
+    status: COURSE_STATUS.DRAFT,
+    publishedAt: null,
+    updatedAt: serverTimestamp(),
+  });
 
-      publishedAt: null,
-
-      updatedAt:
-        serverTimestamp(),
-    }
-  );
-
-  return getCourseById(
-    courseId
-  );
+  return getCourseById(courseId);
 }
 
 /* ============================================================
-   PUBLIC — PUBLISHED COURSES
+   PUBLIC — PUBLISHED COURSES (realtime)
 ============================================================ */
 
-export function usePublishedCourses(
-  type
-) {
-  const [state, setState] =
-    useState({
-      courses: [],
-      loading: true,
-      error: null,
-    });
+export function usePublishedCourses(type) {
+  const [state, setState] = useState({
+    courses: [],
+    loading: true,
+    error: null,
+  });
+
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!type) {
       setState({
         courses: [],
         loading: false,
-        error:
-          "Course type is required.",
+        error: "Course type is required.",
       });
 
       return;
     }
 
-    setState(
-      (previous) => ({
-        ...previous,
-        loading: true,
-        error: null,
-      })
-    );
+    setState((previous) => ({
+      ...previous,
+      loading: true,
+      error: null,
+    }));
 
     const q = query(
-      collection(
-        db,
-        COURSES_COLLECTION
-      ),
-      where(
-        "type",
-        "==",
-        type
-      ),
-      where(
-        "status",
-        "==",
-        COURSE_STATUS.PUBLISHED
-      )
+      collection(db, COURSES_COLLECTION),
+      where("type", "==", type),
+      where("status", "==", COURSE_STATUS.PUBLISHED)
     );
 
-    const unsubscribe =
-      onSnapshot(
-        q,
-        (snapshot) => {
-          const courses =
-            snapshot.docs
-              .map(courseFromDoc)
-              .sort(sortCourses);
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!isMountedRef.current) return;
 
-          setState({
-            courses,
-            loading: false,
-            error: null,
-          });
-        },
-        (error) => {
-          console.error(
-            "Published courses error:",
-            error
-          );
+        const courses = snapshot.docs
+          .map(courseFromDoc)
+          .sort(sortCourses);
 
-          setState({
-            courses: [],
-            loading: false,
-            error:
-              error?.message ||
-              "Unable to load courses.",
-          });
-        }
-      );
+        setState({
+          courses,
+          loading: false,
+          error: null,
+        });
+      },
+      (error) => {
+        if (!isMountedRef.current) return;
 
-    return () =>
-      unsubscribe();
+        console.error("Published courses error:", error);
+
+        setState({
+          courses: [],
+          loading: false,
+          error: friendlyFirestoreError(
+            error,
+            "Unable to load courses."
+          ),
+        });
+      }
+    );
+
+    return () => unsubscribe();
   }, [type]);
 
   return state;
@@ -1077,20 +844,10 @@ export function usePublishedCourses(
    PUBLIC — CATEGORY COURSES
 ============================================================ */
 
-export function usePublishedCoursesByCategory(
-  type
-) {
-  const {
-    courses,
-    loading,
-    error,
-  } = usePublishedCourses(type);
+export function usePublishedCoursesByCategory(type) {
+  const { courses, loading, error } = usePublishedCourses(type);
 
-  const {
-    categories,
-    coursesByCategory,
-  } =
-    groupByCategory(courses);
+  const { categories, coursesByCategory } = groupByCategory(courses);
 
   return {
     categories,
@@ -1105,9 +862,7 @@ export function usePublishedCoursesByCategory(
    PUBLIC — COURSE DETAIL
 ============================================================ */
 
-export async function getPublishedCourseByIdOrSlug(
-  idOrSlug
-) {
+export async function getPublishedCourseByIdOrSlug(idOrSlug) {
   if (!idOrSlug) {
     return null;
   }
@@ -1116,28 +871,15 @@ export async function getPublishedCourseByIdOrSlug(
      TRY DOCUMENT ID
   ---------------------------------------------------------- */
 
-  const directRef = doc(
-    db,
-    COURSES_COLLECTION,
-    idOrSlug
-  );
+  const directRef = doc(db, COURSES_COLLECTION, idOrSlug);
 
-  const directSnapshot =
-    await getDoc(directRef);
+  const directSnapshot = await getDoc(directRef);
 
-  if (
-    directSnapshot.exists()
-  ) {
-    const course =
-      directSnapshot.data();
+  if (directSnapshot.exists()) {
+    const course = directSnapshot.data();
 
-    if (
-      course.status ===
-      COURSE_STATUS.PUBLISHED
-    ) {
-      return courseFromDoc(
-        directSnapshot
-      );
+    if (course.status === COURSE_STATUS.PUBLISHED) {
+      return courseFromDoc(directSnapshot);
     }
 
     return null;
@@ -1148,211 +890,126 @@ export async function getPublishedCourseByIdOrSlug(
   ---------------------------------------------------------- */
 
   const q = query(
-    collection(
-      db,
-      COURSES_COLLECTION
-    ),
-    where(
-      "slug",
-      "==",
-      idOrSlug
-    ),
-    where(
-      "status",
-      "==",
-      COURSE_STATUS.PUBLISHED
-    )
+    collection(db, COURSES_COLLECTION),
+    where("slug", "==", idOrSlug),
+    where("status", "==", COURSE_STATUS.PUBLISHED)
   );
 
-  const snapshot =
-    await getDocs(q);
+  const snapshot = await getDocs(q);
 
-  if (
-    snapshot.empty
-  ) {
+  if (snapshot.empty) {
     return null;
   }
 
-  return courseFromDoc(
-    snapshot.docs[0]
-  );
+  return courseFromDoc(snapshot.docs[0]);
 }
 
 /* ============================================================
    THUMBNAIL UPLOAD
 ============================================================ */
 
-export function uploadCourseThumbnail(
-  courseId,
-  file,
-  onProgress
-) {
+export function uploadCourseThumbnail(courseId, file, onProgress) {
   if (!courseId) {
-    return Promise.reject(
-      new Error(
-        "Course ID is required."
-      )
-    );
+    return Promise.reject(new Error("Course ID is required."));
   }
 
   if (!file) {
+    return Promise.reject(new Error("Thumbnail file is required."));
+  }
+
+  if (!file.type?.startsWith("image/")) {
     return Promise.reject(
-      new Error(
-        "Thumbnail file is required."
-      )
+      new Error("Please upload a valid image file.")
     );
   }
 
-  if (
-    !file.type?.startsWith(
-      "image/"
-    )
-  ) {
+  const MAX_SIZE = 5 * 1024 * 1024;
+
+  if (file.size > MAX_SIZE) {
     return Promise.reject(
-      new Error(
-        "Please upload a valid image file."
-      )
+      new Error("Thumbnail must be smaller than 5MB.")
     );
   }
 
-  const MAX_SIZE =
-    5 * 1024 * 1024;
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
 
-  if (
-    file.size > MAX_SIZE
-  ) {
-    return Promise.reject(
-      new Error(
-        "Thumbnail must be smaller than 5MB."
-      )
-    );
-  }
+  const storagePath = `courseThumbnails/${courseId}/thumbnail-${Date.now()}.${extension}`;
 
-  const extension =
-    file.name
-      .split(".")
-      .pop()
-      ?.toLowerCase() ||
-    "jpg";
+  const storageRef = ref(storage, storagePath);
 
-  const storagePath =
-    `courseThumbnails/${courseId}/thumbnail-${Date.now()}.${extension}`;
+  return new Promise((resolve, reject) => {
+    const uploadTask = uploadBytesResumable(storageRef, file, {
+      contentType: file.type,
+    });
 
-  const storageRef =
-    ref(
-      storage,
-      storagePath
-    );
+    uploadTask.on(
+      "state_changed",
 
-  return new Promise(
-    (resolve, reject) => {
-      const uploadTask =
-        uploadBytesResumable(
-          storageRef,
-          file,
-          {
-            contentType:
-              file.type,
-          }
+      (snapshot) => {
+        const progress = Math.round(
+          (snapshot.bytesTransferred / snapshot.totalBytes) * 100
         );
 
-      uploadTask.on(
-        "state_changed",
-
-        (snapshot) => {
-          const progress =
-            Math.round(
-              (snapshot.bytesTransferred /
-                snapshot.totalBytes) *
-                100
-            );
-
-          if (
-            typeof onProgress ===
-            "function"
-          ) {
-            onProgress(progress);
-          }
-        },
-
-        (error) => {
-          console.error(
-            "Thumbnail upload error:",
-            error
-          );
-
-          reject(error);
-        },
-
-        async () => {
-          try {
-            const url =
-              await getDownloadURL(
-                uploadTask.snapshot.ref
-              );
-
-            resolve({
-              url,
-              path: storagePath,
-            });
-          } catch (error) {
-            reject(error);
-          }
+        if (typeof onProgress === "function") {
+          onProgress(progress);
         }
-      );
-    }
-  );
+      },
+
+      (error) => {
+        console.error("Thumbnail upload error:", error);
+
+        reject(error);
+      },
+
+      async () => {
+        try {
+          const url = await getDownloadURL(uploadTask.snapshot.ref);
+
+          resolve({
+            url,
+            path: storagePath,
+          });
+        } catch (error) {
+          reject(error);
+        }
+      }
+    );
+  });
 }
 
 /* ============================================================
    DELETE THUMBNAIL
 ============================================================ */
 
-export async function deleteCourseThumbnail(
-  path
-) {
+export async function deleteCourseThumbnail(path) {
   if (!path) {
     return;
   }
 
-  await safeDeleteStorageFile(
-    path
-  );
+  await safeDeleteStorageFile(path);
 }
 
 /* ============================================================
    SAFE STORAGE DELETE
 ============================================================ */
 
-async function safeDeleteStorageFile(
-  path
-) {
+async function safeDeleteStorageFile(path) {
   if (!path) {
     return;
   }
 
   try {
-    const storageRef =
-      ref(storage, path);
+    const storageRef = ref(storage, path);
 
-    await deleteObject(
-      storageRef
-    );
+    await deleteObject(storageRef);
   } catch (error) {
     /*
       File may already be deleted.
       Do not stop course deletion.
     */
 
-    if (
-      error?.code !==
-      "storage/object-not-found"
-    ) {
-      console.warn(
-        "Storage cleanup failed:",
-        path,
-        error
-      );
+    if (error?.code !== "storage/object-not-found") {
+      console.warn("Storage cleanup failed:", path, error);
     }
   }
 }
