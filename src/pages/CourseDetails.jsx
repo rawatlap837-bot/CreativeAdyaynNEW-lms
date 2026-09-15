@@ -78,7 +78,8 @@ const calculateDiscount = (price, discountPrice) => {
 const RAZORPAY_SCRIPT_URL =
   "https://checkout.razorpay.com/v1/checkout.js";
 
-const PAYMENT_API_URL = "http://localhost:5000";
+/* Public Razorpay key only. Never put your Razorpay key secret in this file. */
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -542,15 +543,18 @@ export default function CourseDetails() {
 
 
     /* -------------------------------------------------------
-       PAID COURSE — RAZORPAY
+       PAID COURSE — FIREBASE-ONLY CLIENT FLOW
+
+       This has no localhost/Express/Firebase Functions call.
+       Razorpay returns the payment ID to the browser, then the
+       existing Firestore enrollment service records the enrollment.
     ------------------------------------------------------- */
 
     if (!isFree) {
       try {
         setEnrolling(true);
 
-        const razorpayLoaded =
-          await loadRazorpayScript();
+        const razorpayLoaded = await loadRazorpayScript();
 
         if (!razorpayLoaded) {
           throw new Error(
@@ -558,13 +562,12 @@ export default function CourseDetails() {
           );
         }
 
-        /*
-          Use the final selling price shown on the page.
-          Example:
-          discountPrice = 2467
-          price = 3500
-          => Razorpay order = ₹2467
-        */
+        if (!RAZORPAY_KEY_ID) {
+          throw new Error(
+            "Razorpay key is missing. Add VITE_RAZORPAY_KEY_ID to your .env file."
+          );
+        }
+
         const payableAmount = Number(
           course.discountPrice ?? course.price ?? 0
         );
@@ -575,57 +578,17 @@ export default function CourseDetails() {
           );
         }
 
-        /* -----------------------------------------------
-           CREATE RAZORPAY ORDER
-        ------------------------------------------------ */
-
-        const orderResponse = await fetch(
-          `${PAYMENT_API_URL}/api/create-order`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              amount: payableAmount,
-              courseId: course.id,
-              courseName: course.title,
-              uid: user.uid,
-            }),
-          }
-        );
-
-        const orderData = await orderResponse.json();
-
-        if (!orderResponse.ok || !orderData?.success) {
-          throw new Error(
-            orderData?.message ||
-            "Unable to create Razorpay order."
-          );
-        }
-
-        /* -----------------------------------------------
-           OPEN RAZORPAY CHECKOUT
-        ------------------------------------------------ */
-
-        const options = {
-          key: orderData.keyId,
-          amount: orderData.amount,
-          currency: orderData.currency || "INR",
+        const razorpay = new window.Razorpay({
+          key: RAZORPAY_KEY_ID,
+          amount: Math.round(payableAmount * 100),
+          currency: "INR",
           name: "Creative Adhyayan",
           description: course.title,
-          order_id: orderData.orderId,
 
           prefill: {
-            name:
-              user.displayName ||
-              "",
-            email:
-              user.email ||
-              "",
-            contact:
-              user.phoneNumber ||
-              "",
+            name: user.displayName || "",
+            email: user.email || "",
+            contact: user.phoneNumber || "",
           },
 
           notes: {
@@ -650,120 +613,51 @@ export default function CourseDetails() {
           handler: async (response) => {
             try {
               setEnrollmentMessage(
-                "Payment received. Verifying your payment..."
+                "Payment received. Enrolling you in the course..."
               );
 
-              /* -------------------------------------------
-                 VERIFY PAYMENT ON OUR SERVER
-              -------------------------------------------- */
-
-              const verifyResponse = await fetch(
-                `${PAYMENT_API_URL}/api/verify-payment`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    razorpay_order_id:
-                      response.razorpay_order_id,
-                    razorpay_payment_id:
-                      response.razorpay_payment_id,
-                    razorpay_signature:
-                      response.razorpay_signature,
-                    courseId: course.id,
-                    courseName: course.title,
-                    uid: user.uid,
-                  }),
-                }
-              );
-
-              const verifyData =
-                await verifyResponse.json();
-
-              if (
-                !verifyResponse.ok ||
-                !verifyData?.success
-              ) {
-                throw new Error(
-                  verifyData?.message ||
-                  "Payment verification failed."
-                );
-              }
-
-              /* -------------------------------------------
-                 PAYMENT + ENROLLMENT SUCCESS
-              -------------------------------------------- */
-
-              setEnrollment({
-                id: verifyData.enrollmentId,
-                uid: user.uid,
+              const newEnrollment = await enrollStudent({
                 courseId: course.id,
-                courseName: course.title,
-                status: "active",
                 paymentStatus: "paid",
-                paymentId:
-                  verifyData.paymentId ||
-                  response.razorpay_payment_id,
+                paymentId: response.razorpay_payment_id,
               });
 
+              setEnrollment(newEnrollment);
               setEnrollmentMessage(
                 "Payment successful! Your course is now unlocked."
               );
 
-              /*
-                Give the success message a moment to appear,
-                then take the student directly to the course.
-              */
               setTimeout(() => {
-                navigate(
-                  `/student/courses/${course.id}`
-                );
+                navigate(`/student/courses/${course.id}`);
               }, 800);
             } catch (err) {
-              console.error(
-                "Payment verification failed:",
-                err
-              );
+              console.error("Enrollment failed after payment:", err);
 
               setEnrollmentError(
                 err?.message ||
-                "Payment was completed, but verification failed. Please contact the institute with your Razorpay payment ID."
+                "Payment was successful, but enrollment could not be completed. Please contact the institute with your Razorpay payment ID."
               );
 
               setEnrolling(false);
             }
           },
-        };
+        });
 
-        const razorpay = new window.Razorpay(
-          options
-        );
+        razorpay.on("payment.failed", (response) => {
+          console.error("Razorpay payment failed:", response?.error);
 
-        razorpay.on(
-          "payment.failed",
-          (response) => {
-            console.error(
-              "Razorpay payment failed:",
-              response?.error
-            );
+          setEnrollmentError(
+            response?.error?.description ||
+            "Payment failed. Please try again."
+          );
 
-            setEnrollmentError(
-              response?.error?.description ||
-              "Payment failed. Please try again."
-            );
-
-            setEnrollmentMessage("");
-            setEnrolling(false);
-          }
-        );
+          setEnrollmentMessage("");
+          setEnrolling(false);
+        });
 
         razorpay.open();
       } catch (err) {
-        console.error(
-          "Razorpay checkout failed:",
-          err
-        );
+        console.error("Razorpay checkout failed:", err);
 
         setEnrollmentError(
           err?.message ||

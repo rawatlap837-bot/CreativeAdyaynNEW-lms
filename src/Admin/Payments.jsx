@@ -1,125 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { onAuthStateChanged } from "firebase/auth";
-import {
-  collection,
-  onSnapshot,
-  query,
-  where,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-import { auth, db } from "../firebase/Firebase";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase/Firebase";
 
 import {
-  CreditCard,
+  AlertCircle,
   CheckCircle2,
+  Clock3,
+  CreditCard,
+  Eye,
   IndianRupee,
   Loader2,
-  ShieldCheck,
   Receipt,
+  Search,
+  UserRound,
   X,
-  Printer,
-  AlertCircle,
+  XCircle,
 } from "lucide-react";
-
-import { Skeleton } from "../components/Skeleton";
-
-/* =========================================================
-   DESIGN
-========================================================= */
-
-const ACCENT = "#16A34A";
-const VIOLET = "#166534";
-
-const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
-
-const cardShadow = "shadow-lg shadow-green-900/[0.06]";
-
-const fadeUp = {
-  hidden: {
-    opacity: 0,
-    y: 14,
-  },
-
-  show: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.4,
-      delay: i * 0.06,
-      ease: "easeOut",
-    },
-  }),
-};
-
-/* =========================================================
-   RAZORPAY SCRIPT
-========================================================= */
-
-let razorpayScriptPromise = null;
-
-function loadRazorpayScript() {
-  if (typeof window === "undefined") {
-    return Promise.reject(
-      new Error("Razorpay can only be loaded in the browser.")
-    );
-  }
-
-  if (window.Razorpay) {
-    return Promise.resolve(true);
-  }
-
-  if (razorpayScriptPromise) {
-    return razorpayScriptPromise;
-  }
-
-  razorpayScriptPromise = new Promise((resolve, reject) => {
-    const existingScript = document.querySelector(
-      'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
-    );
-
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(true));
-
-      existingScript.addEventListener("error", () =>
-        reject(
-          new Error("Failed to load Razorpay checkout script.")
-        )
-      );
-
-      return;
-    }
-
-    const script = document.createElement("script");
-
-    script.src =
-      "https://checkout.razorpay.com/v1/checkout.js";
-
-    script.async = true;
-
-    script.onload = () => {
-      razorpayScriptPromise = null;
-      resolve(true);
-    };
-
-    script.onerror = () => {
-      razorpayScriptPromise = null;
-
-      reject(
-        new Error("Failed to load Razorpay checkout script.")
-      );
-    };
-
-    document.body.appendChild(script);
-  });
-
-  return razorpayScriptPromise;
-}
 
 /* =========================================================
    HELPERS
@@ -134,23 +30,25 @@ function toDate(value) {
 
   const date = new Date(value);
 
-  return Number.isNaN(date.getTime()) ? null : date;
+  return Number.isNaN(date.getTime())
+    ? null
+    : date;
 }
 
-function formatDate(date) {
-  if (!date) return "—";
+function formatAmount(amount, currency = "INR") {
+  const value = Number(amount) || 0;
 
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function formatDateTime(date) {
   if (!date) return "—";
 
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString("en-IN", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -159,336 +57,191 @@ function formatDateTime(date) {
   });
 }
 
-function getCourseName(course) {
-  return course?.name || course?.title || "Course";
-}
-
-function getCoursePrice(course) {
-  const discountPrice = Number(course?.discountPrice);
-  const regularPrice = Number(course?.price);
+function normalizeStatus(status) {
+  const value = String(status || "paid").toLowerCase();
 
   if (
-    Number.isFinite(discountPrice) &&
-    discountPrice > 0 &&
-    Number.isFinite(regularPrice) &&
-    discountPrice < regularPrice
+    value === "paid" ||
+    value === "success" ||
+    value === "successful" ||
+    value === "captured"
   ) {
-    return discountPrice;
+    return "paid";
   }
 
-  return Number.isFinite(regularPrice)
-    ? regularPrice
-    : 0;
+  if (
+    value === "pending" ||
+    value === "processing" ||
+    value === "created"
+  ) {
+    return "pending";
+  }
+
+  return "failed";
 }
 
-function getPaymentAmount(payment) {
-  const amount = Number(payment?.amount);
+function statusLabel(status) {
+  if (status === "paid") return "Paid";
+  if (status === "pending") return "Pending";
 
-  return Number.isFinite(amount) ? amount : 0;
+  return "Failed";
 }
 
-function isSuccessfulPayment(payment) {
+function statusClasses(status) {
+  if (status === "paid") {
+    return "bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "pending") {
+    return "bg-amber-50 text-amber-700";
+  }
+
+  return "bg-red-50 text-red-700";
+}
+
+function getUserName(user) {
+  if (!user) return "";
+
   return (
-    !payment?.status ||
-    payment.status === "paid" ||
-    payment.status === "success"
+    user.name ||
+    user.displayName ||
+    user.fullName ||
+    [user.firstName, user.lastName]
+      .filter(Boolean)
+      .join(" ")
   );
 }
 
 /* =========================================================
-   RECEIPT MODAL
+   PAYMENT DETAILS MODAL
 ========================================================= */
 
-function ReceiptModal({ payment, onClose }) {
+function PaymentDetailsModal({
+  payment,
+  onClose,
+}) {
   if (!payment) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="
-          fixed inset-0 z-50
-          flex items-center justify-center
-          bg-black/40
-          p-3
-          backdrop-blur-sm
-          sm:p-4
-          print:bg-white
-          print:p-0
-        "
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
       >
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 16,
-            scale: 0.97,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-            scale: 1,
-          }}
-          exit={{
-            opacity: 0,
-            y: 16,
-            scale: 0.97,
-          }}
-          transition={{
-            duration: 0.2,
-            ease: "easeOut",
-          }}
-          onClick={(e) => e.stopPropagation()}
-          className="
-            flex
-            max-h-[calc(100dvh-1.5rem)]
-            w-full
-            max-w-md
-            flex-col
-            overflow-hidden
-            rounded-3xl
-            bg-white
-            shadow-2xl
-          "
-        >
-          {/* Header */}
+        <div className="flex items-center justify-between bg-[#16351F] px-5 py-4 text-white">
+          <div className="flex items-center gap-2">
+            <Receipt className="h-5 w-5" />
 
-          <div
-            className="
-              flex
-              items-center
-              justify-between
-              gap-3
-              px-4
-              py-3.5
-              sm:px-5
-            "
-            style={{
-              background: `linear-gradient(
-                135deg,
-                ${ACCENT},
-                ${VIOLET}
-              )`,
-            }}
-          >
-            <div className="flex min-w-0 items-center gap-2 text-white">
-              <Receipt className="h-4 w-4 shrink-0" />
-
-              <span className="truncate text-sm font-bold">
-                Payment Receipt
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close receipt"
-              className="
-                flex
-                h-8
-                w-8
-                shrink-0
-                items-center
-                justify-center
-                rounded-full
-                bg-white/15
-                text-white
-                transition-colors
-                hover:bg-white/25
-              "
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            <h3 className="font-bold">
+              Payment details
+            </h3>
           </div>
 
-          {/* Body */}
-
-          <div
-            className="
-              min-h-0
-              overflow-y-auto
-              overscroll-contain
-              px-4
-              py-4
-              sm:px-6
-              sm:py-5
-            "
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 transition hover:bg-white/15"
+            aria-label="Close payment details"
           >
-            <div className="mb-4 flex items-center gap-2 text-emerald-600">
-              <CheckCircle2 className="h-5 w-5 shrink-0" />
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-              <span className="text-sm font-bold">
-                Payment successful
-              </span>
-            </div>
+        <div className="space-y-4 p-5">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <DetailRow
+              label="Status"
+              value={
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${statusClasses(
+                    payment.status
+                  )}`}
+                >
+                  {statusLabel(payment.status)}
+                </span>
+              }
+            />
 
-            <div className="space-y-3 rounded-2xl bg-[#F3FDF6] p-3.5 sm:p-4">
-              <Row
-                label="Course"
-                value={payment.courseName}
-                bold
-              />
+            <DetailRow
+              label="Student"
+              value={payment.studentName}
+            />
 
-              <Row
-                label="Amount paid"
-                value={`₹${getPaymentAmount(
-                  payment
-                ).toLocaleString("en-IN")}`}
-                bold
-              />
+            <DetailRow
+              label="Email"
+              value={payment.studentEmail}
+            />
 
-              <Row
-                label="Date & time"
-                value={formatDateTime(payment.paidAt)}
-              />
+            <DetailRow
+              label="Course"
+              value={payment.courseName}
+            />
 
-              {payment.razorpayPaymentId && (
-                <Row
-                  label="Payment ID"
-                  value={payment.razorpayPaymentId}
-                  mono
-                />
+            <DetailRow
+              label="Amount"
+              value={formatAmount(
+                payment.amount,
+                payment.currency
               )}
+              strong
+            />
 
-              <Row
-                label="Receipt ID"
-                value={payment.id}
-                mono
-              />
-            </div>
+            <DetailRow
+              label="Date"
+              value={formatDateTime(payment.paidAt)}
+            />
 
-            <p
-              className="
-                mt-4
-                flex
-                items-start
-                justify-center
-                gap-1.5
-                text-center
-                text-[10px]
-                leading-4
-                text-[#A1AEA5]
-              "
-            >
-              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <DetailRow
+              label="Razorpay payment ID"
+              value={payment.razorpayPaymentId}
+              mono
+            />
 
-              <span>
-                Payment processed by Razorpay and recorded automatically.
-              </span>
-            </p>
-
-            <div
-              className="
-                mt-5
-                flex
-                flex-col
-                gap-2
-                print:hidden
-                min-[400px]:flex-row
-              "
-            >
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="
-                  flex
-                  min-h-[42px]
-                  w-full
-                  items-center
-                  justify-center
-                  gap-1.5
-                  rounded-full
-                  py-2.5
-                  text-xs
-                  font-bold
-                  text-white
-                  transition-transform
-                  active:scale-[0.98]
-                "
-                style={{
-                  background: `linear-gradient(
-                    135deg,
-                    ${ACCENT},
-                    ${VIOLET}
-                  )`,
-                }}
-              >
-                <Printer className="h-3.5 w-3.5" />
-
-                Print / Save PDF
-              </button>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="
-                  flex
-                  min-h-[42px]
-                  w-full
-                  items-center
-                  justify-center
-                  rounded-full
-                  bg-[#ECFDF3]
-                  py-2.5
-                  text-xs
-                  font-bold
-                  text-[#16351F]
-                  transition-transform
-                  active:scale-[0.98]
-                "
-              >
-                Close
-              </button>
-            </div>
+            <DetailRow
+              label="Firestore record ID"
+              value={payment.id}
+              mono
+            />
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+            This record was created by the current client-side
+            payment flow. A server/webhook is needed to independently
+            verify Razorpay payments.
+          </p>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-full bg-[#16351F] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#24552f]"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
-/* =========================================================
-   RECEIPT ROW
-========================================================= */
-
-function Row({
+function DetailRow({
   label,
   value,
-  bold = false,
+  strong = false,
   mono = false,
 }) {
   return (
-    <div
-      className="
-        flex
-        min-w-0
-        flex-col
-        gap-1.5
-        text-xs
-        min-[400px]:flex-row
-        min-[400px]:items-start
-        min-[400px]:justify-between
-        min-[400px]:gap-3
-      "
-    >
-      <span className="shrink-0 text-[#708074]">
+    <div className="flex flex-col gap-1 border-b border-slate-200 py-3 last:border-b-0 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
+      <span className="shrink-0 text-xs text-slate-500">
         {label}
       </span>
 
       <span
-        className={`
-          min-w-0
-          text-left
-          text-[#16351F]
-          min-[400px]:text-right
-          ${bold ? "font-bold" : "font-medium"}
-          ${mono
-            ? "break-all font-mono text-[10px] leading-4"
-            : "break-words"
-          }
-        `}
+        className={`break-words text-sm text-[#16351F] sm:text-right ${strong ? "font-bold" : "font-medium"
+          } ${mono ? "font-mono text-xs" : ""
+          }`}
       >
         {value || "—"}
       </span>
@@ -497,204 +250,112 @@ function Row({
 }
 
 /* =========================================================
-   PAYMENT PAGE
+   STAT CARD
+========================================================= */
+
+function StatCard({
+  title,
+  value,
+  icon,
+  color = "green",
+}) {
+  const styles = {
+    green: "bg-emerald-50 text-emerald-700",
+    blue: "bg-blue-50 text-blue-700",
+    amber: "bg-amber-50 text-amber-700",
+    red: "bg-red-50 text-red-700",
+  };
+
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-slate-500">
+            {title}
+          </p>
+
+          <p className="mt-1 text-xl font-black text-[#16351F]">
+            {value}
+          </p>
+        </div>
+
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-xl ${styles[color]}`}
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   ADMIN PAYMENTS PAGE
 ========================================================= */
 
 export default function Payments() {
-  const [uid, setUid] = useState(null);
-
-  const [userProfile, setUserProfile] = useState({
-    name: "",
-    email: "",
-    phone: "",
-  });
-
-  const [courses, setCourses] = useState([]);
-  const [coursesLoading, setCoursesLoading] =
-    useState(true);
-
-  const [enrolledIds, setEnrolledIds] = useState(
-    new Set()
-  );
-
-  const [history, setHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] =
-    useState(true);
-
-  const [payingId, setPayingId] = useState(null);
-
+  const [payments, setPayments] = useState([]);
+  const [usersById, setUsersById] = useState({});
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [receiptFor, setReceiptFor] =
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState("all");
+
+  const [selectedPayment, setSelectedPayment] =
     useState(null);
 
-  /* =====================================================
-     AUTH
-  ===================================================== */
+  /* =======================================================
+     LOAD PAYMENT RECORDS
+  ======================================================= */
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(
-      auth,
-      (user) => {
-        setUid(user?.uid ?? null);
-
-        setUserProfile({
-          name: user?.displayName || "",
-          email: user?.email || "",
-          phone: user?.phoneNumber || "",
-        });
-      }
-    );
-
-    return unsub;
-  }, []);
-
-  /* =====================================================
-     PUBLISHED COURSES
-  ===================================================== */
-
-  useEffect(() => {
-    setCoursesLoading(true);
-
-    const coursesQuery = query(
-      collection(db, "courses"),
-      where("status", "==", "published")
-    );
-
-    const unsub = onSnapshot(
-      coursesQuery,
-      (snap) => {
-        const rows = snap.docs
-          .map((d) => ({
-            id: d.id,
-            ...d.data(),
-          }))
-          .filter((course) => {
-            return getCoursePrice(course) > 0;
-          });
-
-        rows.sort((a, b) => {
-          const orderA = Number.isFinite(
-            Number(a.order)
-          )
-            ? Number(a.order)
-            : 999999;
-
-          const orderB = Number.isFinite(
-            Number(b.order)
-          )
-            ? Number(b.order)
-            : 999999;
-
-          return orderA - orderB;
-        });
-
-        setCourses(rows);
-        setCoursesLoading(false);
-      },
-      (err) => {
-        console.error(
-          "Published courses error:",
-          err
-        );
-
-        setCoursesLoading(false);
-
-        setError(
-          "Unable to load available courses."
-        );
-      }
-    );
-
-    return unsub;
-  }, []);
-
-  /* =====================================================
-     ENROLLMENTS
-  ===================================================== */
-
-  useEffect(() => {
-    if (!uid) {
-      setEnrolledIds(new Set());
-      return;
-    }
-
-    const enrollmentQuery = query(
-      collection(db, "enrollments"),
-      where("uid", "==", uid)
-    );
-
-    const unsub = onSnapshot(
-      enrollmentQuery,
-      (snap) => {
-        const ids = new Set();
-
-        snap.docs.forEach((d) => {
-          const data = d.data();
-
-          if (
-            data.courseId &&
-            (!data.status ||
-              data.status === "active")
-          ) {
-            ids.add(data.courseId);
-          }
-        });
-
-        setEnrolledIds(ids);
-      },
-      (err) => {
-        console.error(
-          "Enrollment listener error:",
-          err
-        );
-      }
-    );
-
-    return unsub;
-  }, [uid]);
-
-  /* =====================================================
-     PAYMENT HISTORY
-  ===================================================== */
-
-  useEffect(() => {
-    if (!uid) {
-      setHistory([]);
-      setHistoryLoading(false);
-      return;
-    }
-
-    setHistoryLoading(true);
-
-    const paymentQuery = query(
+    const unsubscribe = onSnapshot(
       collection(db, "payments"),
-      where("uid", "==", uid)
-    );
-
-    const unsub = onSnapshot(
-      paymentQuery,
-      (snap) => {
-        const rows = snap.docs
-          .map((d) => {
-            const data = d.data();
+      (snapshot) => {
+        const rows = snapshot.docs.map(
+          (paymentDoc) => {
+            const data = paymentDoc.data();
 
             return {
-              id: d.id,
+              id: paymentDoc.id,
 
-              courseId:
-                data.courseId || null,
+              userId:
+                data.userId ||
+                data.uid ||
+                data.studentId ||
+                "",
+
+              studentName:
+                data.studentName ||
+                data.userName ||
+                "",
+
+              studentEmail:
+                data.studentEmail ||
+                data.userEmail ||
+                data.email ||
+                "",
+
+              courseId: data.courseId || "",
 
               courseName:
                 data.courseName ||
                 data.courseTitle ||
-                "Course",
+                "Untitled course",
 
               amount:
-                Number(data.amount) || 0,
+                Number(
+                  data.amount ??
+                  data.paymentAmount ??
+                  0
+                ) || 0,
 
-              status:
-                data.status || "paid",
+              currency:
+                data.currency || "INR",
+
+              status: normalizeStatus(data.status),
 
               paidAt:
                 toDate(data.paidAt) ||
@@ -703,1010 +364,449 @@ export default function Payments() {
               razorpayPaymentId:
                 data.razorpayPaymentId ||
                 data.razorpay_payment_id ||
-                null,
+                paymentDoc.id,
             };
-          })
-          .filter(isSuccessfulPayment);
+          }
+        );
 
         rows.sort((a, b) => {
-          const timeA =
+          const firstTime =
             a.paidAt?.getTime() || 0;
 
-          const timeB =
+          const secondTime =
             b.paidAt?.getTime() || 0;
 
-          return timeB - timeA;
+          return secondTime - firstTime;
         });
 
-        setHistory(rows);
-        setHistoryLoading(false);
+        setPayments(rows);
+        setLoading(false);
       },
-      (err) => {
+      (snapshotError) => {
         console.error(
-          "Payment history error:",
-          err
+          "Unable to load payments:",
+          snapshotError
         );
-
-        setHistoryLoading(false);
 
         setError(
-          "Unable to load payment history."
+          "Unable to load payment records. Check the Firestore rules and your admin role."
+        );
+
+        setLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, []);
+
+  /* =======================================================
+     LOAD USER NAMES
+  ======================================================= */
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, "users"),
+      (snapshot) => {
+        const nextUsers = {};
+
+        snapshot.docs.forEach((userDoc) => {
+          nextUsers[userDoc.id] = userDoc.data();
+        });
+
+        setUsersById(nextUsers);
+      },
+      (snapshotError) => {
+        console.warn(
+          "Unable to load user names:",
+          snapshotError
         );
       }
     );
 
-    return unsub;
-  }, [uid]);
+    return unsubscribe;
+  }, []);
 
-  /* =====================================================
-     AVAILABLE COURSES
-  ===================================================== */
+  /* =======================================================
+     MERGE PAYMENT + STUDENT INFORMATION
+  ======================================================= */
 
-  const availableCourses = useMemo(() => {
-    return courses.filter(
-      (course) => !enrolledIds.has(course.id)
-    );
-  }, [courses, enrolledIds]);
+  const paymentRows = useMemo(() => {
+    return payments.map((payment) => {
+      const user = usersById[payment.userId];
 
-  /* =====================================================
-     BUY COURSE
-     (Fully client-side: Firestore client SDK only,
-     no server, no Blaze. Razorpay Checkout opens
-     directly against `amount` — there is no order
-     creation step and no signature verification,
-     since both require RAZORPAY_KEY_SECRET which must
-     never be shipped to the browser.)
-  ===================================================== */
+      return {
+        ...payment,
 
-  const handleBuy = async (course) => {
-    setError("");
+        studentName:
+          payment.studentName ||
+          getUserName(user) ||
+          "Unknown student",
 
-    if (!uid) {
-      setError(
-        "Please log in to purchase a course."
-      );
-      return;
-    }
-
-    if (!course?.id) {
-      setError(
-        "Invalid course. Please refresh the page."
-      );
-      return;
-    }
-
-    if (enrolledIds.has(course.id)) {
-      setError(
-        "You are already enrolled in this course."
-      );
-      return;
-    }
-
-    const clientPrice = getCoursePrice(course);
-
-    if (!clientPrice || clientPrice <= 0) {
-      setError(
-        "This course is currently unavailable for purchase."
-      );
-      return;
-    }
-
-    if (!RAZORPAY_KEY_ID) {
-      setError(
-        "Payments are not configured. Missing Razorpay key."
-      );
-      return;
-    }
-
-    setPayingId(course.id);
-
-    try {
-      /* -----------------------------------------------
-         Load Razorpay
-      ------------------------------------------------ */
-
-      await loadRazorpayScript();
-
-      if (!window.Razorpay) {
-        throw new Error(
-          "Razorpay checkout is unavailable."
-        );
-      }
-
-      /* -----------------------------------------------
-         RAZORPAY CHECKOUT (no server order needed)
-      ------------------------------------------------ */
-
-      const razorpayOptions = {
-        key: RAZORPAY_KEY_ID,
-
-        amount: Math.round(clientPrice * 100),
-
-        currency: "INR",
-
-        name: "Creative Adhyayan",
-
-        description: getCourseName(course),
-
-        prefill: {
-          name: userProfile.name,
-          email: userProfile.email,
-          contact: userProfile.phone,
-        },
-
-        notes: {
-          courseId: course.id,
-          uid,
-        },
-
-        theme: {
-          color: ACCENT,
-        },
-
-        handler: async (razorpayResponse) => {
-          try {
-            setError("");
-
-            const paymentId =
-              razorpayResponse.razorpay_payment_id;
-
-            /* -------------------------------------
-               DUPLICATE CHECK
-            ------------------------------------- */
-
-            const existingPaymentSnap = await getDoc(
-              doc(db, "payments", paymentId)
-            );
-
-            if (existingPaymentSnap.exists()) {
-              setReceiptFor({
-                id: paymentId,
-                ...existingPaymentSnap.data(),
-                paidAt:
-                  toDate(existingPaymentSnap.data().paidAt) ||
-                  new Date(),
-              });
-              setPayingId(null);
-              return;
-            }
-
-            /* -------------------------------------
-               WRITE PAYMENT
-            ------------------------------------- */
-
-            const paymentData = {
-              uid,
-              courseId: course.id,
-              courseName: getCourseName(course),
-              amount: clientPrice,
-              currency: "INR",
-              status: "paid",
-              razorpayPaymentId: paymentId,
-              paidAt: serverTimestamp(),
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            };
-
-            await setDoc(
-              doc(db, "payments", paymentId),
-              paymentData
-            );
-
-            /* -------------------------------------
-               CREATE / UPDATE ENROLLMENT
-            ------------------------------------- */
-
-            const enrollmentQuery = query(
-              collection(db, "enrollments"),
-              where("uid", "==", uid),
-              where("courseId", "==", course.id)
-            );
-
-            const enrollmentSnap = await getDocs(
-              enrollmentQuery
-            );
-
-            let enrollmentId;
-
-            if (!enrollmentSnap.empty) {
-              const enrollmentDoc =
-                enrollmentSnap.docs[0];
-
-              enrollmentId = enrollmentDoc.id;
-
-              await updateDoc(enrollmentDoc.ref, {
-                status: "active",
-                courseName: getCourseName(course),
-                lastPaymentId: paymentId,
-                lastPaymentAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-              });
-            } else {
-              const newEnrollmentRef = doc(
-                collection(db, "enrollments")
-              );
-
-              enrollmentId = newEnrollmentRef.id;
-
-              await setDoc(newEnrollmentRef, {
-                uid,
-                courseId: course.id,
-                courseName: getCourseName(course),
-                status: "active",
-                paymentId,
-                paymentAmount: clientPrice,
-                enrolledAt: serverTimestamp(),
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-              });
-            }
-
-            /* -------------------------------------
-               RECEIPT
-            ------------------------------------- */
-
-            setReceiptFor({
-              id: paymentId,
-              courseId: course.id,
-              courseName: getCourseName(course),
-              amount: clientPrice,
-              paidAt: new Date(),
-              razorpayPaymentId: paymentId,
-              status: "paid",
-            });
-          } catch (err) {
-            console.error(
-              "Post-payment write error:",
-              err
-            );
-
-            setError(
-              "Payment succeeded but we couldn't record it (Payment ID: " +
-              razorpayResponse.razorpay_payment_id +
-              "). Please contact support."
-            );
-          } finally {
-            setPayingId(null);
-          }
-        },
-
-        modal: {
-          ondismiss: () => {
-            setPayingId(null);
-          },
-        },
+        studentEmail:
+          payment.studentEmail ||
+          user?.email ||
+          "—",
       };
+    });
+  }, [payments, usersById]);
 
-      const razorpay = new window.Razorpay(
-        razorpayOptions
-      );
+  /* =======================================================
+     TOTALS
+  ======================================================= */
 
-      razorpay.on(
-        "payment.failed",
-        (response) => {
-          console.error(
-            "Razorpay payment failed:",
-            response?.error
-          );
+  const totals = useMemo(() => {
+    const paid = paymentRows.filter(
+      (payment) => payment.status === "paid"
+    );
 
-          const description =
-            response?.error?.description;
+    const pending = paymentRows.filter(
+      (payment) => payment.status === "pending"
+    );
 
-          setError(
-            description
-              ? `Payment failed: ${description}`
-              : "Payment failed. Please try again."
-          );
+    const failed = paymentRows.filter(
+      (payment) => payment.status === "failed"
+    );
 
-          setPayingId(null);
-        }
-      );
+    return {
+      revenue: paid.reduce(
+        (total, payment) =>
+          total + payment.amount,
+        0
+      ),
 
-      razorpay.open();
-    } catch (err) {
-      console.error(
-        "Checkout initialization error:",
-        err
-      );
+      paid: paid.length,
+      pending: pending.length,
+      failed: failed.length,
+    };
+  }, [paymentRows]);
 
-      setError(
-        err?.message ||
-        "Couldn't start checkout. Please try again."
-      );
+  /* =======================================================
+     FILTERED PAYMENT LIST
+  ======================================================= */
 
-      setPayingId(null);
-    }
-  };
+  const filteredPayments = useMemo(() => {
+    const searchText = search.trim().toLowerCase();
 
-  /* =====================================================
-     UI
-  ===================================================== */
+    return paymentRows.filter((payment) => {
+      const matchesStatus =
+        statusFilter === "all" ||
+        payment.status === statusFilter;
+
+      const searchableText = [
+        payment.id,
+        payment.razorpayPaymentId,
+        payment.studentName,
+        payment.studentEmail,
+        payment.userId,
+        payment.courseName,
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch =
+        !searchText ||
+        searchableText.includes(searchText);
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [
+    paymentRows,
+    search,
+    statusFilter,
+  ]);
 
   return (
-    <div
-      className="
-        mx-auto
-        w-full
-        min-w-0
-        max-w-5xl
-        overflow-x-hidden
-        px-0
-      "
-    >
-      {/* HEADER */}
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-black tracking-tight text-[#16351F] sm:text-3xl">
+          Payment records
+        </h1>
 
-      <motion.div
-        variants={fadeUp}
-        initial="hidden"
-        animate="show"
-        custom={0}
-        className="mb-5 sm:mb-6"
-      >
-        <h2
-          className="
-            text-xl
-            font-black
-            tracking-tight
-            text-[#16351F]
-            sm:text-2xl
-          "
-        >
-          Payments
-        </h2>
-
-        <p
-          className="
-            mt-1
-            max-w-2xl
-            text-xs
-            leading-5
-            text-[#64756A]
-            sm:text-sm
-          "
-        >
-          Secure checkout powered by Razorpay —
-          UPI, cards, netbanking and wallets.
+        <p className="mt-1 text-sm text-slate-500">
+          Review recorded course payments and student enrollments.
         </p>
-      </motion.div>
-
-      {/* ERROR */}
+      </div>
 
       {error && (
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          custom={1}
-          className="
-            mb-4
-            flex
-            items-start
-            gap-2.5
-            rounded-2xl
-            bg-red-50
-            px-3.5
-            py-3
-            text-xs
-            font-semibold
-            leading-5
-            text-red-600
-            sm:px-4
-          "
-        >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="mb-5 flex items-start gap-2 rounded-2xl bg-red-50 p-4 text-sm text-red-700">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
 
-          <span className="min-w-0 flex-1 break-words">
+          <span className="flex-1">
             {error}
           </span>
 
           <button
             type="button"
             onClick={() => setError("")}
-            className="
-              shrink-0
-              rounded-md
-              p-1
-              transition-colors
-              hover:bg-red-100
-            "
             aria-label="Close error"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-5 w-5" />
           </button>
-        </motion.div>
+        </div>
       )}
 
-      {/* AVAILABLE COURSES */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Recorded revenue"
+          value={formatAmount(totals.revenue)}
+          color="green"
+          icon={<IndianRupee className="h-5 w-5" />}
+        />
 
-      <motion.div
-        variants={fadeUp}
-        initial="hidden"
-        animate="show"
-        custom={2}
-      >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3
-            className="
-              text-sm
-              font-bold
-              text-[#16351F]
-            "
-          >
-            Available courses
-          </h3>
+        <StatCard
+          title="Successful payments"
+          value={totals.paid}
+          color="blue"
+          icon={<CheckCircle2 className="h-5 w-5" />}
+        />
 
-          {availableCourses.length > 0 && (
-            <span
-              className="
-                rounded-full
-                bg-[#ECFDF3]
-                px-2.5
-                py-1
-                text-[10px]
-                font-bold
-                text-[#477254]
-              "
-            >
-              {availableCourses.length} available
-            </span>
-          )}
-        </div>
+        <StatCard
+          title="Pending payments"
+          value={totals.pending}
+          color="amber"
+          icon={<Clock3 className="h-5 w-5" />}
+        />
 
-        {coursesLoading ? (
-          <div
-            className="
-              grid
-              grid-cols-1
-              gap-3
-              sm:grid-cols-2
-              sm:gap-4
-            "
-          >
-            {Array.from({ length: 2 }).map(
-              (_, i) => (
-                <div
-                  key={i}
-                  className={`
-                    space-y-3
-                    rounded-2xl
-                    bg-white
-                    p-4
-                    sm:rounded-3xl
-                    sm:p-5
-                    ${cardShadow}
-                  `}
-                >
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-3 w-4/5" />
-                  <Skeleton className="h-5 w-1/3" />
-                  <Skeleton className="mt-2 h-10 w-full rounded-full" />
-                </div>
-              )
-            )}
-          </div>
-        ) : courses.length === 0 ? (
-          <EmptyPaymentState
-            text="No paid courses are currently available."
-          />
-        ) : availableCourses.length === 0 ? (
-          <EmptyPaymentState
-            success
-            text="You are already enrolled in all available courses."
-          />
-        ) : (
-          <div
-            className="
-              grid
-              grid-cols-1
-              gap-3
-              sm:grid-cols-2
-              sm:gap-4
-            "
-          >
-            {availableCourses.map(
-              (course, i) => {
-                const paying =
-                  payingId === course.id;
-
-                const price =
-                  getCoursePrice(course);
-
-                const regularPrice =
-                  Number(course.price) || 0;
-
-                const hasDiscount =
-                  regularPrice > price &&
-                  price > 0;
-
-                return (
-                  <motion.div
-                    key={course.id}
-                    variants={fadeUp}
-                    initial="hidden"
-                    animate="show"
-                    custom={3 + i}
-                    className={`
-                      flex
-                      min-w-0
-                      flex-col
-                      justify-between
-                      rounded-2xl
-                      bg-white
-                      p-4
-                      sm:rounded-3xl
-                      sm:p-5
-                      ${cardShadow}
-                    `}
-                  >
-                    <div className="min-w-0">
-                      {course.type && (
-                        <span
-                          className="
-                            inline-flex
-                            rounded-full
-                            bg-[#ECFDF3]
-                            px-2.5
-                            py-1
-                            text-[9px]
-                            font-bold
-                            uppercase
-                            tracking-wide
-                            text-[#477254]
-                          "
-                        >
-                          {course.type}
-                        </span>
-                      )}
-
-                      <p
-                        className="
-                          mt-2
-                          break-words
-                          text-sm
-                          font-bold
-                          leading-5
-                          text-[#16351F]
-                        "
-                      >
-                        {getCourseName(course)}
-                      </p>
-
-                      {course.description && (
-                        <p
-                          className="
-                            mt-1
-                            line-clamp-3
-                            break-words
-                            text-[11px]
-                            leading-4
-                            text-[#708074]
-                          "
-                        >
-                          {course.description}
-                        </p>
-                      )}
-
-                      <div className="mt-3 flex flex-wrap items-end gap-2">
-                        <p
-                          className="
-                            flex
-                            items-center
-                            gap-0.5
-                            text-lg
-                            font-black
-                          "
-                          style={{
-                            color: ACCENT,
-                          }}
-                        >
-                          <IndianRupee className="h-4 w-4 shrink-0" />
-
-                          {price.toLocaleString(
-                            "en-IN"
-                          )}
-                        </p>
-
-                        {hasDiscount && (
-                          <p
-                            className="
-                              mb-0.5
-                              text-[11px]
-                              font-medium
-                              text-[#A1AEA5]
-                              line-through
-                            "
-                          >
-                            ₹
-                            {regularPrice.toLocaleString(
-                              "en-IN"
-                            )}
-                          </p>
-                        )}
-
-                        {hasDiscount && (
-                          <span
-                            className="
-                              mb-0.5
-                              rounded-full
-                              bg-emerald-50
-                              px-2
-                              py-0.5
-                              text-[9px]
-                              font-bold
-                              text-emerald-600
-                            "
-                          >
-                            OFF
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={
-                        paying ||
-                        !uid ||
-                        enrolledIds.has(course.id)
-                      }
-                      onClick={() =>
-                        handleBuy(course)
-                      }
-                      className="
-                        mt-4
-                        flex
-                        min-h-[42px]
-                        w-full
-                        items-center
-                        justify-center
-                        gap-1.5
-                        rounded-full
-                        py-2.5
-                        text-xs
-                        font-bold
-                        text-white
-                        transition-transform
-                        active:scale-[0.98]
-                        disabled:cursor-not-allowed
-                        disabled:opacity-60
-                      "
-                      style={{
-                        background:
-                          `linear-gradient(
-                            135deg,
-                            ${ACCENT},
-                            ${VIOLET}
-                          )`,
-                      }}
-                    >
-                      {paying ? (
-                        <>
-                          <Loader2
-                            className="
-                              h-3.5
-                              w-3.5
-                              animate-spin
-                            "
-                          />
-
-                          Processing…
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="h-3.5 w-3.5" />
-
-                          Buy now
-                        </>
-                      )}
-                    </button>
-                  </motion.div>
-                );
-              }
-            )}
-          </div>
-        )}
-      </motion.div>
-
-      {/* PURCHASE HISTORY */}
-
-      <motion.div
-        variants={fadeUp}
-        initial="hidden"
-        animate="show"
-        custom={8}
-        className="mt-7 sm:mt-8"
-      >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3
-            className="
-              text-sm
-              font-bold
-              text-[#16351F]
-            "
-          >
-            Purchase history
-          </h3>
-
-          {history.length > 0 && (
-            <span
-              className="
-                text-[10px]
-                font-medium
-                text-[#94A39A]
-              "
-            >
-              {history.length} payment
-              {history.length === 1
-                ? ""
-                : "s"}
-            </span>
-          )}
-        </div>
-
-        {historyLoading ? (
-          <div
-            className={`
-              overflow-hidden
-              rounded-2xl
-              bg-white
-              sm:rounded-3xl
-              ${cardShadow}
-            `}
-          >
-            {Array.from({ length: 3 }).map(
-              (_, i) => (
-                <div
-                  key={i}
-                  className="
-                    flex
-                    flex-col
-                    gap-3
-                    border-b
-                    border-[#ECFDF3]
-                    px-4
-                    py-3
-                    last:border-0
-                    min-[420px]:flex-row
-                    min-[420px]:items-center
-                    min-[420px]:justify-between
-                    sm:px-5
-                  "
-                >
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <Skeleton className="h-3 w-2/3" />
-                    <Skeleton className="h-2 w-1/3" />
-                  </div>
-
-                  <Skeleton className="h-8 w-20 rounded-full" />
-                </div>
-              )
-            )}
-          </div>
-        ) : history.length === 0 ? (
-          <EmptyPaymentState
-            text="No successful payments yet."
-          />
-        ) : (
-          <div
-            className={`
-              overflow-hidden
-              rounded-2xl
-              bg-white
-              sm:rounded-3xl
-              ${cardShadow}
-            `}
-          >
-            {history.map((payment, i) => (
-              <button
-                key={payment.id}
-                type="button"
-                onClick={() =>
-                  setReceiptFor(payment)
-                }
-                className={`
-                  flex
-                  w-full
-                  min-w-0
-                  flex-col
-                  gap-3
-                  px-4
-                  py-3.5
-                  text-left
-                  transition-colors
-                  hover:bg-[#F3FDF6]
-                  sm:flex-row
-                  sm:items-center
-                  sm:justify-between
-                  sm:gap-3
-                  sm:px-5
-                  sm:py-3
-                  ${i !== history.length - 1
-                    ? "border-b border-[#ECFDF3]"
-                    : ""
-                  }
-                `}
-              >
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="
-                      break-words
-                      text-xs
-                      font-bold
-                      leading-4
-                      text-[#16351F]
-                    "
-                  >
-                    {payment.courseName}
-                  </p>
-
-                  <p
-                    className="
-                      mt-1
-                      text-[10px]
-                      text-[#708074]
-                    "
-                  >
-                    {formatDate(payment.paidAt)}
-                  </p>
-                </div>
-
-                <div
-                  className="
-                    flex
-                    w-full
-                    min-w-0
-                    items-center
-                    justify-between
-                    gap-2
-                    sm:w-auto
-                    sm:shrink-0
-                    sm:justify-end
-                    sm:gap-3
-                  "
-                >
-                  <span
-                    className="
-                      flex
-                      items-center
-                      gap-1
-                      text-xs
-                      font-bold
-                      text-[#16351F]
-                    "
-                  >
-                    <IndianRupee className="h-3 w-3 shrink-0" />
-
-                    {getPaymentAmount(
-                      payment
-                    ).toLocaleString("en-IN")}
-                  </span>
-
-                  <span
-                    className="
-                      flex
-                      min-h-[32px]
-                      items-center
-                      justify-center
-                      gap-1
-                      rounded-full
-                      px-3
-                      py-1
-                      text-[10px]
-                      font-bold
-                      text-white
-                    "
-                    style={{
-                      background:
-                        `linear-gradient(
-                          135deg,
-                          ${ACCENT},
-                          ${VIOLET}
-                        )`,
-                    }}
-                  >
-                    <Receipt className="h-3 w-3" />
-
-                    Receipt
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </motion.div>
-
-      {/* SECURITY NOTE */}
-
-      <p
-        className="
-          mt-5
-          flex
-          items-start
-          justify-center
-          gap-1.5
-          px-3
-          text-center
-          text-[10px]
-          leading-4
-          text-[#A1AEA5]
-          sm:mt-6
-        "
-      >
-        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-
-        <span>
-          Payments are processed securely by Razorpay.
-        </span>
-      </p>
-
-      {/* RECEIPT */}
-
-      <ReceiptModal
-        payment={receiptFor}
-        onClose={() => setReceiptFor(null)}
-      />
-    </div>
-  );
-}
-
-/* =========================================================
-   EMPTY PAYMENT STATE
-========================================================= */
-
-function EmptyPaymentState({
-  text,
-  success = false,
-}) {
-  return (
-    <div
-      className={`
-        rounded-2xl
-        bg-white
-        p-7
-        text-center
-        sm:rounded-3xl
-        sm:p-9
-        ${cardShadow}
-      `}
-    >
-      <div
-        className="
-          mx-auto
-          flex
-          h-10
-          w-10
-          items-center
-          justify-center
-          rounded-full
-        "
-        style={{
-          background: success
-            ? "#ECFDF3"
-            : "#F3FDF6",
-        }}
-      >
-        {success ? (
-          <CheckCircle2
-            className="h-5 w-5 text-emerald-500"
-          />
-        ) : (
-          <CreditCard
-            className="h-5 w-5 text-[#708074]"
-          />
-        )}
+        <StatCard
+          title="Failed payments"
+          value={totals.failed}
+          color="red"
+          icon={<XCircle className="h-5 w-5" />}
+        />
       </div>
 
-      <p
-        className="
-          mt-3
-          text-xs
-          font-medium
-          text-[#94A39A]
-        "
-      >
-        {text}
-      </p>
+      <section className="mt-6 overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div>
+            <h2 className="font-bold text-[#16351F]">
+              Transactions
+            </h2>
+
+            <p className="mt-1 text-xs text-slate-500">
+              {filteredPayments.length} record
+              {filteredPayments.length === 1
+                ? ""
+                : "s"}{" "}
+              shown
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <label className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+              <input
+                type="search"
+                value={search}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
+                placeholder="Search payment, student, course..."
+                className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 sm:w-64"
+              />
+            </label>
+
+            <select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value)
+              }
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-emerald-500"
+            >
+              <option value="all">
+                All statuses
+              </option>
+
+              <option value="paid">
+                Paid
+              </option>
+
+              <option value="pending">
+                Pending
+              </option>
+
+              <option value="failed">
+                Failed
+              </option>
+            </select>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-slate-500">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Loading payment records...
+          </div>
+        ) : filteredPayments.length === 0 ? (
+          <div className="flex min-h-64 flex-col items-center justify-center px-5 text-center">
+            <CreditCard className="h-10 w-10 text-slate-300" />
+
+            <h3 className="mt-4 font-bold text-slate-700">
+              No payment records found
+            </h3>
+
+            <p className="mt-1 max-w-sm text-sm text-slate-500">
+              Payments recorded in the Firestore
+              <code className="mx-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+                payments
+              </code>
+              collection will appear here.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[820px] text-left">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3 font-semibold">
+                      Student
+                    </th>
+
+                    <th className="px-5 py-3 font-semibold">
+                      Course
+                    </th>
+
+                    <th className="px-5 py-3 font-semibold">
+                      Amount
+                    </th>
+
+                    <th className="px-5 py-3 font-semibold">
+                      Status
+                    </th>
+
+                    <th className="px-5 py-3 font-semibold">
+                      Date
+                    </th>
+
+                    <th className="px-5 py-3 font-semibold">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredPayments.map((payment) => (
+                    <tr
+                      key={payment.id}
+                      className="border-t border-slate-100 transition hover:bg-emerald-50/30"
+                    >
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                            <UserRound className="h-4 w-4" />
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-[#16351F]">
+                              {payment.studentName}
+                            </p>
+
+                            <p className="truncate text-xs text-slate-500">
+                              {payment.studentEmail}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <p className="max-w-48 truncate text-sm font-medium text-slate-700">
+                          {payment.courseName}
+                        </p>
+                      </td>
+
+                      <td className="px-5 py-4 text-sm font-bold text-[#16351F]">
+                        {formatAmount(
+                          payment.amount,
+                          payment.currency
+                        )}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${statusClasses(
+                            payment.status
+                          )}`}
+                        >
+                          {statusLabel(payment.status)}
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-4 text-sm text-slate-500">
+                        {formatDateTime(payment.paidAt)}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedPayment(payment)
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[#16351F] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#24552f]"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-slate-100 md:hidden">
+              {filteredPayments.map((payment) => (
+                <button
+                  key={payment.id}
+                  type="button"
+                  onClick={() =>
+                    setSelectedPayment(payment)
+                  }
+                  className="w-full p-4 text-left transition hover:bg-emerald-50/30"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-[#16351F]">
+                        {payment.studentName}
+                      </p>
+
+                      <p className="mt-1 truncate text-xs text-slate-500">
+                        {payment.courseName}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${statusClasses(
+                        payment.status
+                      )}`}
+                    >
+                      {statusLabel(payment.status)}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="font-bold text-[#16351F]">
+                      {formatAmount(
+                        payment.amount,
+                        payment.currency
+                      )}
+                    </span>
+
+                    <span className="text-xs text-slate-500">
+                      {formatDateTime(payment.paidAt)}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
+      <PaymentDetailsModal
+        payment={selectedPayment}
+        onClose={() => setSelectedPayment(null)}
+      />
     </div>
   );
 }

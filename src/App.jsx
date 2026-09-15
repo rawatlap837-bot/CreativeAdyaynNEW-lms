@@ -26,6 +26,7 @@ import About from "./pages/About.jsx";
 import Contact from "./pages/Contact.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
 
 /* ============================================================
    AUTH GUARDS
@@ -47,12 +48,10 @@ const RequireTeacher = lazy(() =>
    LAYOUTS
    ============================================================ */
 
-// Admin layout
 const AdminLayout = lazy(() =>
   import("./layouts/AdminLayout.jsx")
 );
 
-// Teacher layout
 const TeacherLayout = lazy(() =>
   import("./layouts/TeacherLayout.jsx")
 );
@@ -101,10 +100,6 @@ const Admins = lazy(() =>
   import("./Admin/Admins.jsx")
 );
 
-/* ============================================================
-   ADMIN COMMUNICATION
-   ============================================================ */
-
 const Announcements = lazy(() =>
   import("./Admin/Announcements.jsx")
 );
@@ -113,37 +108,30 @@ const Announcements = lazy(() =>
    TEACHER PAGES
    ============================================================ */
 
-// Teacher dashboard
 const TeacherDashboard = lazy(() =>
   import("./Teacher/Dashboard.jsx")
 );
 
-// Teacher courses
 const TeacherCourses = lazy(() =>
   import("./Teacher/Courses.jsx")
 );
 
-// Teacher attendance
 const TeacherAttendance = lazy(() =>
   import("./Teacher/Attendance.jsx")
 );
 
-// Create course
 const CreateCourse = lazy(() =>
   import("./Teacher/CreateCourse.jsx")
 );
 
-// Edit course
 const EditCourse = lazy(() =>
   import("./Teacher/EditCourse.jsx")
 );
 
-// Manage course content
 const CourseContent = lazy(() =>
   import("./Teacher/CourseContent.jsx")
 );
 
-// Edit lesson
 const LessonEditor = lazy(() =>
   import("./Teacher/LessonEditor.jsx")
 );
@@ -221,13 +209,11 @@ function App() {
   return (
     <Suspense fallback={<LoadingScreen />}>
       <Routes>
-
         {/* ======================================================
             PUBLIC WEBSITE + STUDENT AREA
         ====================================================== */}
 
         <Route element={<PublicLayout />}>
-
           {/* ====================================================
               PUBLIC WEBSITE
           ==================================================== */}
@@ -267,6 +253,12 @@ function App() {
             element={<Register />}
           />
 
+          {/* Forgot password page */}
+          <Route
+            path="/forgot-password"
+            element={<ForgotPassword />}
+          />
+
           {/* ==================================================
               STUDENT DASHBOARD
           ================================================== */}
@@ -279,10 +271,6 @@ function App() {
               </RequireAuth>
             }
           />
-
-          {/* ==================================================
-              STUDENT PROFILE
-          ================================================== */}
 
           <Route
             path="/dashboard/profile"
@@ -341,7 +329,6 @@ function App() {
               />
             }
           />
-
         </Route>
 
         {/* ======================================================
@@ -349,81 +336,45 @@ function App() {
         ====================================================== */}
 
         <Route element={<RequireTeacher />}>
-
-          {/* ====================================================
-              TEACHER LAYOUT
-          ==================================================== */}
-
           <Route
             path="/Teacher"
             element={<TeacherLayout />}
           >
-
-            {/* ==================================================
-                TEACHER DASHBOARD
-            ================================================== */}
-
             <Route
               index
               element={<TeacherDashboard />}
             />
-
-            {/* ==================================================
-                MY COURSES
-            ================================================== */}
 
             <Route
               path="courses"
               element={<TeacherCourses />}
             />
 
-            {/* ==================================================
-                ATTENDANCE
-            ================================================== */}
-
             <Route
               path="attendance"
               element={<TeacherAttendance />}
             />
-
-            {/* ==================================================
-                CREATE COURSE
-            ================================================== */}
 
             <Route
               path="courses/create"
               element={<CreateCourse />}
             />
 
-            {/* ==================================================
-                EDIT COURSE
-            ================================================== */}
-
             <Route
               path="courses/edit/:courseId"
               element={<EditCourse />}
             />
-
-            {/* ==================================================
-                COURSE CONTENT
-            ================================================== */}
 
             <Route
               path="courses/:courseId/content"
               element={<CourseContent />}
             />
 
-            {/* ==================================================
-                LESSON EDITOR
-            ================================================== */}
-
             <Route
               path="courses/:courseId/content/:moduleId/lesson/:lessonId"
               element={<LessonEditor />}
             />
-
           </Route>
-
         </Route>
 
         {/* ======================================================
@@ -431,86 +382,50 @@ function App() {
         ====================================================== */}
 
         <Route element={<RequireAdmin />}>
-
           <Route
             path="/admin"
             element={<AdminLayout />}
           >
-
-            {/* ==================================================
-                ADMIN DASHBOARD
-            ================================================== */}
-
             <Route
               index
               element={<AdminDashboard />}
             />
-
-            {/* ==================================================
-                STUDENTS
-            ================================================== */}
 
             <Route
               path="students"
               element={<Students />}
             />
 
-            {/* ==================================================
-                COURSES
-            ================================================== */}
-
             <Route
               path="courses"
               element={<AdminCourses />}
             />
-
-            {/* ==================================================
-                LESSONS
-            ================================================== */}
 
             <Route
               path="lessons"
               element={<Lessons />}
             />
 
-            {/* ==================================================
-                PAYMENTS
-            ================================================== */}
-
             <Route
               path="payments"
               element={<AdminPayments />}
             />
-
-            {/* ==================================================
-                ANALYTICS
-            ================================================== */}
 
             <Route
               path="analytics"
               element={<Analytics />}
             />
 
-            {/* ==================================================
-                ADMINS
-            ================================================== */}
-
             <Route
               path="admins"
               element={<Admins />}
             />
 
-            {/* ==================================================
-                ANNOUNCEMENTS
-            ================================================== */}
-
             <Route
               path="announcements"
               element={<Announcements />}
             />
-
           </Route>
-
         </Route>
 
         {/* ======================================================
@@ -526,7 +441,6 @@ function App() {
             />
           }
         />
-
       </Routes>
     </Suspense>
   );

@@ -175,15 +175,25 @@ export async function enrollStudent({
     };
   }
 
-  const isFree =
-    paymentStatus === "free";
+  const isFree = paymentStatus === "free";
+  const isPaid = paymentStatus === "paid";
+
+  if (!isFree && !isPaid) {
+    throw new Error("Invalid payment status.");
+  }
+
+  if (isPaid && !paymentId) {
+    throw new Error("Payment ID is required for a paid enrollment.");
+  }
 
   /*
-    FREE:
-      active immediately
+    Firebase-only flow:
+    Razorpay Checkout has returned a payment ID before this function
+    is called, so both free and paid enrollments are unlocked here.
 
-    PAID:
-      pending until payment is verified
+    Important: this is intentionally client-side and therefore cannot
+    verify a Razorpay signature. Add server-side verification before
+    using this as the final production payment flow.
   */
 
   const enrollment = {
@@ -192,13 +202,9 @@ export async function enrollStudent({
 
     courseId,
 
-    status: isFree
-      ? "active"
-      : "pending",
+    status: "active",
 
-    paymentStatus: isFree
-      ? "free"
-      : "pending",
+    paymentStatus: isFree ? "free" : "paid",
 
     paymentId: paymentId || "",
 

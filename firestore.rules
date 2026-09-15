@@ -196,82 +196,85 @@ service cloud.firestore {
     }
 
 
-    // ============================================================
-    // ENROLLMENTS
-    //
-    // Document ID MUST be `{uid}_{courseId}` — isEnrolled()
-    // above depends on this exact ID scheme everywhere it's used
-    // (modules, lessons, discussions, attendance, announcements,
-    // schedule, tasks, liveClasses).
-    //
-    // Students can self-enroll ONLY as a direct result of a
-    // matching, just-created payment doc for the same uid+course
-    // — this is what stands in for server-side verification now
-    // that there is no backend. It stops a student from writing
-    // an enrollment out of thin air, but NOT from writing a fake
-    // "paid" payment doc first (see payments section below for
-    // that caveat).
-    // ============================================================
+// ============================================================
+// ENROLLMENTS
+// Document ID: {uid}_{courseId}
+// ============================================================
 
-    match /enrollments/{enrollmentId} {
+match /enrollments/{enrollmentId} {
 
-      allow read: if
-        isAdmin()
-        || (
-          isStudent()
-          && resource.data.uid == request.auth.uid
-        )
-        || (
-          isTeacher()
-          && resource.data.courseId is string
-          && isCourseOwner(resource.data.courseId)
-        );
+  // Lets getEnrollment() return null when a student has not
+  // enrolled yet, instead of returning permission-denied.
+  allow get: if
+    isAdmin()
+    || (
+      isStudent()
+      && enrollmentId.matches("^" + request.auth.uid + "_.*")
+    )
+    || (
+      isTeacher()
+      && resource.data.courseId is string
+      && isCourseOwner(resource.data.courseId)
+    );
 
-      allow create: if
-        isAdmin()
-        || (
-          isStudent()
-          && enrollmentId == request.auth.uid + "_" + request.resource.data.courseId
-          && request.resource.data.uid == request.auth.uid
-          && request.resource.data.courseId is string
-          && request.resource.data.status == "active"
-          && request.resource.data.paymentId is string
-          && exists(
-            /databases/$(database)/documents/payments/$(request.resource.data.paymentId)
-          )
-          && get(
-            /databases/$(database)/documents/payments/$(request.resource.data.paymentId)
-          ).data.userId == request.auth.uid
-          && get(
-            /databases/$(database)/documents/payments/$(request.resource.data.paymentId)
-          ).data.courseId == request.resource.data.courseId
-        );
+  // Used by getMyEnrollments(), which queries:
+  // where("uid", "==", currentUser.uid)
+  allow list: if
+    isAdmin()
+    || (
+      isStudent()
+      && resource.data.uid == request.auth.uid
+    )
+    || (
+      isTeacher()
+      && resource.data.courseId is string
+      && isCourseOwner(resource.data.courseId)
+    );
 
-      allow update: if
-        isAdmin()
-        || (
-          isStudent()
-          && enrollmentId == request.auth.uid + "_" + resource.data.courseId
-          && resource.data.uid == request.auth.uid
-          && request.resource.data.uid == resource.data.uid
-          && request.resource.data.courseId == resource.data.courseId
-          && request.resource.data.status == "active"
-          && request.resource.data.lastPaymentId is string
-          && exists(
-            /databases/$(database)/documents/payments/$(request.resource.data.lastPaymentId)
-          )
-          && get(
-            /databases/$(database)/documents/payments/$(request.resource.data.lastPaymentId)
-          ).data.userId == request.auth.uid
-          && get(
-            /databases/$(database)/documents/payments/$(request.resource.data.lastPaymentId)
-          ).data.courseId == resource.data.courseId
-        );
+  // Used by enrollStudent()
+  allow create: if
+    isAdmin()
+    || (
+      isStudent()
+      && enrollmentId ==
+        request.auth.uid + "_" + request.resource.data.courseId
+      && request.resource.data.uid == request.auth.uid
+      && request.resource.data.studentId == request.auth.uid
+      && request.resource.data.courseId is string
+      && request.resource.data.status == "active"
+      && request.resource.data.paymentStatus in ["free", "paid"]
+      && request.resource.data.paymentId is string
+      && request.resource.data.progress == 0
+    );
 
-      allow delete: if isAdmin();
-    }
+  // Students can update only their learning progress.
+  allow update: if
+    isAdmin()
+    || (
+      isStudent()
+      && resource.data.uid == request.auth.uid
+      && request.resource.data.uid == resource.data.uid
+      && request.resource.data.studentId == resource.data.studentId
+      && request.resource.data.courseId == resource.data.courseId
+      && request.resource.data.status == resource.data.status
+      && request.resource.data.paymentStatus ==
+        resource.data.paymentStatus
+      && request.resource.data.paymentId ==
+        resource.data.paymentId
+      && request.resource.data
+        .diff(resource.data)
+        .affectedKeys()
+        .hasOnly([
+          "completedLessons",
+          "progress",
+          "lastLessonId",
+          "lastAccessedAt",
+          "updatedAt"
+        ])
+    );
 
-
+  allow delete: if isAdmin();
+}
     // ============================================================
     // ATTENDANCE SESSIONS
     // ============================================================
