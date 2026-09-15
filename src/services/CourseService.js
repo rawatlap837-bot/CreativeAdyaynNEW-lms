@@ -17,9 +17,7 @@ import {
 
 import {
   deleteObject,
-  getDownloadURL,
   ref,
-  uploadBytesResumable,
 } from "firebase/storage";
 
 import {
@@ -27,6 +25,8 @@ import {
   db,
   storage,
 } from "../firebase/Firebase";
+
+import { uploadImage } from "../lib/Cloudinary";
 
 /* ============================================================
    COLLECTION
@@ -400,7 +400,11 @@ export async function createCourse(courseData = {}) {
     instructorName:
       courseData.instructorName?.trim() || user.displayName || "",
 
-    /* MEDIA */
+    /* MEDIA
+       thumbnailPath holds a Cloudinary publicId (see
+       uploadCourseThumbnail below), NOT a Firebase Storage
+       path. bannerPath / previewVideoPath are still Firebase
+       Storage paths until those are migrated too. */
 
     thumbnailUrl: courseData.thumbnailUrl || "",
 
@@ -578,7 +582,7 @@ export async function updateCourse(courseId, courseData = {}) {
   const discountChanged =
     courseData.discountPrice !== undefined &&
     Number(courseData.discountPrice) !==
-      Number(existingCourse.discountPrice || 0);
+    Number(existingCourse.discountPrice || 0);
 
   const typeChanged =
     courseData.type !== undefined &&
@@ -629,10 +633,17 @@ export async function deleteCourse(courseId) {
 
   /* ----------------------------------------------------------
      DELETE DIRECT STORAGE FILES
+
+     NOTE: thumbnailPath is NOT included here. It's a Cloudinary
+     publicId now, not a Firebase Storage path, and it gets
+     cleaned up server-side by the onCourseDeleted Cloud Function
+     (functions/cloudinaryCleanup.js) once this document is
+     deleted below — that function has the API secret this
+     client can't safely hold. bannerPath / previewVideoPath are
+     still Firebase Storage and are cleaned up here directly.
   ---------------------------------------------------------- */
 
   const directStoragePaths = [
-    course.thumbnailPath,
     course.bannerPath,
     course.previewVideoPath,
   ].filter(Boolean);
@@ -697,6 +708,9 @@ export async function deleteCourse(courseId) {
 
   /* ----------------------------------------------------------
      DELETE COURSE
+
+     This triggers the onCourseDeleted Cloud Function, which
+     removes the Cloudinary thumbnail using thumbnailPath.
   ---------------------------------------------------------- */
 
   await deleteDoc(courseRef);
@@ -905,92 +919,65 @@ export async function getPublishedCourseByIdOrSlug(idOrSlug) {
 }
 
 /* ============================================================
-   THUMBNAIL UPLOAD
+   THUMBNAIL UPLOAD (Cloudinary)
+
+   Signature is unchanged from the old Firebase Storage version,
+   so CreateCourse.jsx and EditCourse.jsx don't need any edits:
+
+     const uploaded = await uploadCourseThumbnail(courseId, file, onProgress);
+     // uploaded.url  -> course.thumbnailUrl
+     // uploaded.path -> course.thumbnailPath (Cloudinary publicId)
 ============================================================ */
 
-export function uploadCourseThumbnail(courseId, file, onProgress) {
+export async function uploadCourseThumbnail(courseId, file, onProgress) {
   if (!courseId) {
-    return Promise.reject(new Error("Course ID is required."));
+    throw new Error("Course ID is required.");
   }
 
-  if (!file) {
-    return Promise.reject(new Error("Thumbnail file is required."));
-  }
+  requireAuthUser();
 
-  if (!file.type?.startsWith("image/")) {
-    return Promise.reject(
-      new Error("Please upload a valid image file.")
-    );
+  // validateImage() inside uploadImage() also checks type/size, but
+  // failing fast here avoids a network round trip for an obviously
+  // bad file.
+  if (!file?.type?.startsWith("image/")) {
+    throw new Error("Please upload a valid image file.");
   }
 
   const MAX_SIZE = 5 * 1024 * 1024;
 
   if (file.size > MAX_SIZE) {
-    return Promise.reject(
-      new Error("Thumbnail must be smaller than 5MB.")
-    );
+    throw new Error("Thumbnail must be smaller than 5MB.");
   }
 
-  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-
-  const storagePath = `courseThumbnails/${courseId}/thumbnail-${Date.now()}.${extension}`;
-
-  const storageRef = ref(storage, storagePath);
-
-  return new Promise((resolve, reject) => {
-    const uploadTask = uploadBytesResumable(storageRef, file, {
-      contentType: file.type,
-    });
-
-    uploadTask.on(
-      "state_changed",
-
-      (snapshot) => {
-        const progress = Math.round(
-          (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-        );
-
-        if (typeof onProgress === "function") {
-          onProgress(progress);
-        }
-      },
-
-      (error) => {
-        console.error("Thumbnail upload error:", error);
-
-        reject(error);
-      },
-
-      async () => {
-        try {
-          const url = await getDownloadURL(uploadTask.snapshot.ref);
-
-          resolve({
-            url,
-            path: storagePath,
-          });
-        } catch (error) {
-          reject(error);
-        }
-      }
-    );
+  const result = await uploadImage(file, {
+    folder: `lms/courses/${courseId}`,
+    onProgress,
   });
+
+  return {
+    url: result.url,
+    path: result.publicId,
+  };
 }
 
 /* ============================================================
    DELETE THUMBNAIL
+
+   Kept as a no-op-safe client stub. Cloudinary deletion needs
+   the API secret, which must never live in this bundle — actual
+   deletion happens in the onCourseDeleted / onCourseImageReplaced
+   Cloud Functions (functions/cloudinaryCleanup.js), triggered
+   automatically whenever thumbnailPath changes or the course
+   document is deleted. There is deliberately nothing to call here.
 ============================================================ */
 
-export async function deleteCourseThumbnail(path) {
-  if (!path) {
-    return;
-  }
-
-  await safeDeleteStorageFile(path);
+export async function deleteCourseThumbnail() {
+  return;
 }
 
 /* ============================================================
-   SAFE STORAGE DELETE
+   SAFE STORAGE DELETE (Firebase Storage only — banners, preview
+   videos, lesson videos/resources. NOT used for thumbnails.)
 ============================================================ */
 
 async function safeDeleteStorageFile(path) {

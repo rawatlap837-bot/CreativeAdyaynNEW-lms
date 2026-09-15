@@ -227,6 +227,10 @@ export default function Courses() {
   const [deleteCourse, setDeleteCourse] =
     useState(null);
 
+  const [confirmAction, setConfirmAction] =
+    useState(null);
+  // shape: { type: "publish" | "unpublish", course }
+
   const [busyAction, setBusyAction] =
     useState("");
 
@@ -496,25 +500,11 @@ export default function Courses() {
 
 
   // ==========================================================
-  // PUBLISH (from draft)
+  // PUBLISH
   // ==========================================================
 
-  async function handlePublish(course) {
-    const confirmed = window.confirm(
-      `Publish "${course.title}" directly?\n\nThis skips the pending-review step and makes it visible to students immediately.`
-    );
-
-    if (!confirmed) return;
-
-    await runAction(
-      `publish-${course.id}`,
-
-      async () => {
-        await adminPublishCourse(course.id);
-
-        setSelectedCourse(null);
-      }
-    );
+  function handlePublish(course) {
+    setConfirmAction({ type: "publish", course });
   }
 
 
@@ -553,22 +543,33 @@ export default function Courses() {
   // UNPUBLISH
   // ==========================================================
 
-  async function handleUnpublish(course) {
-    const confirmed = window.confirm(
-      `Unpublish "${course.title}"?\n\nThis will remove the course from the public LMS.`
-    );
+  function handleUnpublish(course) {
+    setConfirmAction({ type: "unpublish", course });
+  }
 
-    if (!confirmed) return;
 
-    await runAction(
-      `unpublish-${course.id}`,
+  // ==========================================================
+  // CONFIRM PUBLISH / UNPUBLISH
+  // ==========================================================
 
-      async () => {
-        await adminUnpublishCourse(
-          course.id
-        );
-      }
-    );
+  async function handleConfirmAction() {
+    if (!confirmAction) return;
+
+    const { type, course } = confirmAction;
+    setConfirmAction(null);
+
+    if (type === "publish") {
+      await runAction(`publish-${course.id}`, async () => {
+        await adminPublishCourse(course.id);
+        setSelectedCourse(null);
+      });
+    }
+
+    if (type === "unpublish") {
+      await runAction(`unpublish-${course.id}`, async () => {
+        await adminUnpublishCourse(course.id);
+      });
+    }
   }
 
 
@@ -1670,6 +1671,85 @@ export default function Courses() {
                 ? "Rejecting..."
                 : "Reject Course"}
             </button>
+          </div>
+        </Modal>
+      )}
+
+
+      {/* ======================================================
+          PUBLISH / UNPUBLISH CONFIRMATION
+      ====================================================== */}
+
+      {confirmAction && (
+        <Modal
+          title={
+            confirmAction.type === "publish"
+              ? "Publish Course"
+              : "Unpublish Course"
+          }
+          onClose={() => setConfirmAction(null)}
+        >
+          <div
+            className="mb-4 flex items-start gap-3 rounded-xl p-3"
+            style={{
+              background:
+                confirmAction.type === "publish"
+                  ? AT.successSoft
+                  : AT.warnSoft,
+            }}
+          >
+            <AlertCircle
+              size={18}
+              className="mt-0.5 shrink-0"
+              color={
+                confirmAction.type === "publish"
+                  ? AT.success
+                  : AT.warn
+              }
+            />
+
+            <p
+              className="text-sm leading-6"
+              style={{
+                color:
+                  confirmAction.type === "publish"
+                    ? AT.success
+                    : AT.warn,
+              }}
+            >
+              {confirmAction.type === "publish" ? (
+                <>
+                  Publish <strong>{confirmAction.course.title}</strong> directly?
+                  This skips the pending-review step and makes it visible to
+                  students immediately.
+                </>
+              ) : (
+                <>
+                  Unpublish <strong>{confirmAction.course.title}</strong>? This
+                  will remove the course from the public LMS.
+                </>
+              )}
+            </p>
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <GhostButton onClick={() => setConfirmAction(null)}>
+              Cancel
+            </GhostButton>
+
+            <PrimaryButton onClick={handleConfirmAction}>
+              {confirmAction.type === "publish" ? (
+                <>
+                  <Check size={15} />
+                  Publish
+                </>
+              ) : (
+                <>
+                  <Archive size={15} />
+                  Unpublish
+                </>
+              )}
+            </PrimaryButton>
           </div>
         </Modal>
       )}

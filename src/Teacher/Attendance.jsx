@@ -98,7 +98,6 @@ export default function Attendance() {
   const [courses, setCourses] = useState([]);
   const [attendance, setAttendance] = useState([]);
 
-  const [selectedCourse, setSelectedCourse] = useState("all");
   const [search, setSearch] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -130,6 +129,10 @@ export default function Attendance() {
 
   /* ==========================================================
      LOAD TEACHER COURSES
+     NOTE: this still runs in the background — it's how we know
+     which course IDs to pull attendance for below. There's no
+     dropdown or course-picking UI anymore, this just silently
+     resolves the teacher's course IDs.
   ========================================================== */
 
   useEffect(() => {
@@ -171,7 +174,7 @@ export default function Attendance() {
 
         if (!cancelled) {
           setError(
-            "Unable to load your courses."
+            "Unable to load attendance."
           );
         }
       } finally {
@@ -189,16 +192,13 @@ export default function Attendance() {
   }, [teacher]);
 
   /* ==========================================================
-     LOAD ATTENDANCE
+     LOAD ATTENDANCE (always all of the teacher's courses)
   ========================================================== */
 
   useEffect(() => {
     if (!teacher?.uid) return;
 
-    if (
-      selectedCourse === "all" &&
-      courses.length === 0
-    ) {
+    if (courses.length === 0) {
       setAttendance([]);
       setAttendanceLoading(false);
       return;
@@ -211,25 +211,16 @@ export default function Attendance() {
       setError("");
 
       try {
-        let records = [];
-
-        if (selectedCourse === "all") {
-          const results =
-            await Promise.all(
-              courses.map((course) =>
-                getCourseAttendance(
-                  course.id
-                )
+        const results =
+          await Promise.all(
+            courses.map((course) =>
+              getCourseAttendance(
+                course.id
               )
-            );
+            )
+          );
 
-          records = results.flat();
-        } else {
-          records =
-            await getCourseAttendance(
-              selectedCourse
-            );
-        }
+        const records = results.flat();
 
         if (cancelled) return;
 
@@ -277,7 +268,6 @@ export default function Attendance() {
   }, [
     teacher,
     courses,
-    selectedCourse,
   ]);
 
   /* ==========================================================
@@ -355,25 +345,16 @@ export default function Attendance() {
       setError("");
 
       try {
-        let records = [];
-
-        if (selectedCourse === "all") {
-          const results =
-            await Promise.all(
-              courses.map((course) =>
-                getCourseAttendance(
-                  course.id
-                )
+        const results =
+          await Promise.all(
+            courses.map((course) =>
+              getCourseAttendance(
+                course.id
               )
-            );
+            )
+          );
 
-          records = results.flat();
-        } else {
-          records =
-            await getCourseAttendance(
-              selectedCourse
-            );
-        }
+        const records = results.flat();
 
         const courseMap = new Map(
           courses.map((course) => [
@@ -496,55 +477,6 @@ export default function Attendance() {
           {error}
         </div>
       )}
-
-      {/* ======================================================
-          COURSE FILTER
-      ====================================================== */}
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-5">
-
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-
-          <div className="flex items-center gap-2">
-
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
-              <BookOpen className="h-4 w-4" />
-            </div>
-
-            <span className="text-sm font-semibold text-slate-900">
-              Course
-            </span>
-
-          </div>
-
-          <select
-            value={selectedCourse}
-            onChange={(e) =>
-              setSelectedCourse(
-                e.target.value
-              )
-            }
-            className="w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100 sm:w-auto sm:min-w-[240px]"
-          >
-            <option value="all">
-              All my courses
-            </option>
-
-            {courses.map((course) => (
-              <option
-                key={course.id}
-                value={course.id}
-              >
-                {course.title ||
-                  course.name ||
-                  "Untitled course"}
-              </option>
-            ))}
-          </select>
-
-        </div>
-
-      </div>
 
       {/* ======================================================
           SUMMARY

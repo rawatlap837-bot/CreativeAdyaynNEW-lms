@@ -99,9 +99,25 @@ service cloud.firestore {
 
     match /courses/{courseId} {
 
+      // NOTE: read/update/delete check resource.data.instructorId
+      // directly instead of calling isCourseOwner(courseId), which
+      // re-fetches this same document via get(). That self-referential
+      // get() is what was causing "Missing or insufficient permissions"
+      // on the teacher's own-courses list query
+      // (where("instructorId","==",uid)) in Attendance.jsx — resource.data
+      // is already available for free while this rule evaluates, so no
+      // extra read is needed. isCourseOwner() itself is untouched and
+      // still used by every other collection below (modules, lessons,
+      // attendanceSessions, schedule, tasks, liveClasses, payments,
+      // discussions), which genuinely need to look up a *different*
+      // document's parent course.
+
       allow read: if
         isAdmin()
-        || isCourseOwner(courseId)
+        || (
+          isTeacher()
+          && resource.data.instructorId == request.auth.uid
+        )
         || resource.data.status == "published";
 
       allow create: if
@@ -114,13 +130,17 @@ service cloud.firestore {
       allow update: if
         isAdmin()
         || (
-          isCourseOwner(courseId)
+          isTeacher()
+          && resource.data.instructorId == request.auth.uid
           && request.resource.data.instructorId == request.auth.uid
         );
 
       allow delete: if
         isAdmin()
-        || isCourseOwner(courseId);
+        || (
+          isTeacher()
+          && resource.data.instructorId == request.auth.uid
+        );
     }
 
 

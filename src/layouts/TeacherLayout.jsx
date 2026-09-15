@@ -8,6 +8,7 @@ import {
 import {
   LayoutDashboard,
   ClipboardCheck,
+  BookOpen,
   PlusCircle,
   LogOut,
   Menu,
@@ -56,6 +57,11 @@ const TeacherLayout = () => {
       path: "/teacher/attendance",
       icon: ClipboardCheck,
     },
+    {
+      name: "My Courses",
+      path: "/teacher/courses",
+      icon: BookOpen,
+    },
   ];
 
   // =====================================================
@@ -69,6 +75,10 @@ const TeacherLayout = () => {
 
     if (location.pathname === "/teacher/attendance") {
       return "Attendance";
+    }
+
+    if (location.pathname === "/teacher/courses") {
+      return "My Courses";
     }
 
     if (location.pathname.includes("/teacher/courses/create")) {
