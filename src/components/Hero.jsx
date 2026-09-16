@@ -8,7 +8,7 @@ import React, {
   Suspense,
 } from "react";
 import { Link } from "react-router-dom";
-import Button from "../components/Buttons"; // adjust path to wherever you save it
+import Button from "../components/Buttons";
 import { motion, animate, useInView } from "framer-motion";
 import {
   Star,
@@ -28,6 +28,12 @@ import { SlotText } from "slot-text/react";
 // until after the rest of the hero has mounted instead of blocking
 // the initial page load for every visitor.
 const GradientWaves = lazy(() => import("../Animiations/GradientWaves"));
+
+// react-router's Link wrapped in framer-motion so "Watch Demo" gets a
+// real client-side route change to the Short Courses page while
+// keeping the same whileHover/whileTap animation the old <motion.a>
+// anchor had.
+const MotionLink = motion(Link);
 
 /**
  * TOKENS
@@ -120,6 +126,17 @@ const ImageCardFan = memo(function ImageCardFan({ isMobile }) {
   // Recomputed only when `isMobile` actually flips (this component is
   // memoized on that single prop), so the width/height clamp() strings
   // and per-card style objects aren't rebuilt on unrelated parent renders.
+  //
+  // NOTE on the clamp() floors below: the desktop card sizes used to use
+  // small floors (e.g. clamp(118px, 25vw, 320px)) which meant the cards
+  // would visibly shrink any time the *browser window* got narrower —
+  // including just from having DevTools docked open — since `vw` tracks
+  // window width, not available content width. isMobile only flips on
+  // an actual touch/coarse pointer, so a narrowed desktop window still
+  // used these "desktop" sizes, just scaled down toward the floor. The
+  // floors are raised here so the cards stay at their full, intended
+  // size on desktop regardless of how narrow the window gets — only a
+  // true mobile/touch device (isMobile) drops to the smaller sizing.
   const cards = useMemo(() => {
     const source = isMobile ? FAN_CARDS_MOBILE : FAN_CARDS;
     return source.map((c, i) => ({
@@ -132,15 +149,15 @@ const ImageCardFan = memo(function ImageCardFan({ isMobile }) {
             ? "clamp(150px, 34vw, 220px)"
             : "clamp(110px, 26vw, 170px)"
           : c.featured
-            ? "clamp(118px, 25vw, 320px)"
-            : "clamp(88px, 18vw, 245px)",
+            ? "clamp(220px, 25vw, 320px)"
+            : "clamp(165px, 18vw, 245px)",
         height: isMobile
           ? c.featured
             ? "clamp(230px, 52vw, 330px)"
             : "clamp(170px, 40vw, 250px)"
           : c.featured
-            ? "clamp(178px, 36vw, 445px)"
-            : "clamp(132px, 27vw, 345px)",
+            ? "clamp(310px, 36vw, 445px)"
+            : "clamp(235px, 27vw, 345px)",
         background: `linear-gradient(160deg, ${c.from} 0%, ${c.to} 100%)`,
       },
       hover: c.featured ? FAN_HOVER_FEATURED : FAN_HOVER_DEFAULT,
@@ -557,12 +574,12 @@ export default function Hero() {
           <StatsStrip />
           <div className="mt-9 flex w-full max-w-sm flex-nowrap items-center justify-center gap-3 sm:max-w-none sm:w-auto sm:gap-4">
             <Button
-              href="#programs"
+              href="#live-courses"
               text="Explore Courses"
-              className="flex-1 min-w-0 justify-center whitespace-nowrap px-4 py-3 text-sm sm:flex-none sm:px-8 sm:py-4 sm:text-base"
+              className="flex-1 min-w-0 sm:flex-none"
             />
-            <motion.a
-              href="#demo"
+            <MotionLink
+              to="/ShortCourses"
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
@@ -578,7 +595,7 @@ export default function Hero() {
                 className="relative shrink-0 text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110 sm:size-5"
               />
               <span className="relative">Watch Demo</span>
-            </motion.a>
+            </MotionLink>
           </div>
 
           <ImageCardFan isMobile={isMobile} />

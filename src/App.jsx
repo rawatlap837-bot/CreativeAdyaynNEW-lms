@@ -68,6 +68,10 @@ const Profile = lazy(() =>
   import("./student/Profile.jsx")
 );
 
+const LearnCourse = lazy(() =>
+  import("./student/LearnCourse.jsx")
+);
+
 /* ============================================================
    ADMIN PAGES
    ============================================================ */
@@ -277,6 +281,15 @@ function App() {
             element={
               <RequireAuth>
                 <Profile />
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/student/courses/:courseId"
+            element={
+              <RequireAuth>
+                <LearnCourse />
               </RequireAuth>
             }
           />

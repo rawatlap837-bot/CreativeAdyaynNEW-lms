@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertCircle,
   ArrowRight,
+  ArrowUp,
   BookOpen,
   CheckCircle2,
   Clock3,
@@ -11,6 +12,7 @@ import {
   RefreshCw,
   Search,
   SlidersHorizontal,
+  Sparkles,
   Users,
   X,
   Zap,
@@ -39,6 +41,19 @@ const HEADER_CLEARANCE = "pt-24 sm:pt-28";
 const FILTER_BAR_TOP = "top-16";
 
 /* ================================================================
+   NEW LAUNCH SETTINGS
+================================================================ */
+
+/* A course counts as "new" if it was published within this window */
+const NEW_WINDOW_DAYS = 45;
+
+/* How many launches appear in the scrolling strip */
+const MAX_LAUNCHES = 10;
+
+/* Seconds per card — loop time grows with the number of cards */
+const SECONDS_PER_CARD = 6;
+
+/* ================================================================
    FORMATTERS
 ================================================================ */
 
@@ -61,6 +76,10 @@ const SORT_OPTIONS = [
   {
     value: "featured",
     label: "Featured",
+  },
+  {
+    value: "newest",
+    label: "Newest",
   },
   {
     value: "popular",
@@ -142,6 +161,54 @@ function getMode(course) {
   );
 }
 
+/* --------------------------------------------------------------
+   DATE HANDLING
+   Firestore returns Timestamp objects, but a course may also
+   carry a Date, an ISO string, or millis depending on how it
+   was written. Normalise all of them to a number.
+-------------------------------------------------------------- */
+
+function getCreatedTime(course) {
+  const raw =
+    course?.publishedAt ??
+    course?.createdAt ??
+    course?.created_at ??
+    course?.updatedAt;
+
+  if (!raw) {
+    return 0;
+  }
+
+  if (typeof raw?.toDate === "function") {
+    return raw.toDate().getTime();
+  }
+
+  if (typeof raw?.seconds === "number") {
+    return raw.seconds * 1000;
+  }
+
+  if (raw instanceof Date) {
+    return raw.getTime();
+  }
+
+  const parsed = new Date(raw).getTime();
+
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function isNewCourse(course, days = NEW_WINDOW_DAYS) {
+  const created = getCreatedTime(course);
+
+  if (!created) {
+    return false;
+  }
+
+  return (
+    Date.now() - created <=
+    days * 24 * 60 * 60 * 1000
+  );
+}
+
 function useDebounced(value, delay = 200) {
   const [debounced, setDebounced] = useState(value);
 
@@ -178,6 +245,54 @@ export default function ShortCourses() {
   const hasFilters =
     Boolean(search.trim()) ||
     category !== "all";
+
+  /* --------------------------------------------------------------
+     SCROLL TO TOP
+  -------------------------------------------------------------- */
+
+  const scrollToTop = useCallback(() => {
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    window.scrollTo({
+      top: 0,
+      behavior: prefersReducedMotion
+        ? "auto"
+        : "smooth",
+    });
+  }, []);
+
+  /* Jump back to the top whenever the visible result set changes,
+     so a new filter never leaves the user mid-page. */
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    scrollToTop();
+  }, [query, category, sort, loading, scrollToTop]);
+
+  /* --------------------------------------------------------------
+     NEW LAUNCHES
+  -------------------------------------------------------------- */
+
+  const launches = useMemo(() => {
+    const byNewest = [...courses].sort(
+      (a, b) => getCreatedTime(b) - getCreatedTime(a)
+    );
+
+    const recent = byNewest.filter((course) =>
+      isNewCourse(course)
+    );
+
+    /* Fall back to the newest courses so the strip never
+       disappears during a quiet month. */
+    const source =
+      recent.length > 0 ? recent : byNewest;
+
+    return source.slice(0, MAX_LAUNCHES);
+  }, [courses]);
 
   /* --------------------------------------------------------------
      CATEGORIES
@@ -239,6 +354,11 @@ export default function ShortCourses() {
 
     sorted.sort((a, b) => {
       switch (sort) {
+        case "newest":
+          return (
+            getCreatedTime(b) - getCreatedTime(a)
+          );
+
         case "popular":
           return (
             (Number(b.studentCount) || 0) -
@@ -263,11 +383,21 @@ export default function ShortCourses() {
           );
 
         case "featured":
-        default:
-          return (
+        default: {
+          /* Featured first, then newest within each group so a
+             fresh launch outranks an older course. */
+          const byFeatured =
             Number(Boolean(b.featured)) -
-            Number(Boolean(a.featured))
+            Number(Boolean(a.featured));
+
+          if (byFeatured !== 0) {
+            return byFeatured;
+          }
+
+          return (
+            getCreatedTime(b) - getCreatedTime(a)
           );
+        }
       }
     });
 
@@ -283,6 +413,11 @@ export default function ShortCourses() {
     !error &&
     (loading || courses.length > 0);
 
+  const showLaunches =
+    !error &&
+    !loading &&
+    launches.length > 0;
+
   function clearFilters() {
     setSearch("");
     setCategory("all");
@@ -293,6 +428,10 @@ export default function ShortCourses() {
     <div className="min-h-screen bg-white">
 
       <PageHeader courseCount={courses.length} />
+
+      {showLaunches && (
+        <NewCourseLaunches launches={launches} />
+      )}
 
       {showFilters && (
         <FilterBar
@@ -351,7 +490,245 @@ export default function ShortCourses() {
           </>
         )}
       </main>
+
+      <ScrollToTopButton onClick={scrollToTop} />
     </div>
+  );
+}
+
+/* ================================================================
+   NEW COURSE LAUNCHES
+   Auto-scrolling strip of the most recent courses. The track is
+   duplicated and shifted by exactly 50%, which makes the loop
+   seamless. Pauses on hover and on keyboard focus.
+================================================================ */
+
+function NewCourseLaunches({ launches }) {
+  /* A short list just jitters, so only animate once there is
+     enough content to fill more than the viewport. */
+  const shouldScroll = launches.length >= 3;
+
+  const duration = launches.length * SECONDS_PER_CARD;
+
+  const track = shouldScroll
+    ? [...launches, ...launches]
+    : launches;
+
+  return (
+    <section
+      aria-label="New course launches"
+      className="border-b border-slate-200 bg-slate-50"
+    >
+      <style>{`
+        @keyframes launch-marquee {
+          from { transform: translate3d(0, 0, 0); }
+          to   { transform: translate3d(-50%, 0, 0); }
+        }
+
+        .launch-track {
+          display: flex;
+          gap: 1rem;
+          width: max-content;
+        }
+
+        .launch-track--animated {
+          animation: launch-marquee var(--launch-duration, 60s) linear infinite;
+        }
+
+        .launch-viewport:hover .launch-track--animated,
+        .launch-viewport:focus-within .launch-track--animated {
+          animation-play-state: paused;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .launch-track--animated {
+            animation: none;
+          }
+        }
+      `}</style>
+
+      <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="inline-flex items-center gap-2 text-sm font-bold text-slate-900">
+            <Sparkles
+              size={16}
+              className="text-orange-500"
+            />
+
+            Just launched
+          </h2>
+
+          <p className="text-xs text-slate-500">
+            {shouldScroll
+              ? "Hover to pause"
+              : `${launches.length} new`}
+          </p>
+        </div>
+
+        <div
+          className="
+            launch-viewport
+            overflow-x-auto
+            [scrollbar-width:none]
+            [&::-webkit-scrollbar]:hidden
+          "
+        >
+          <ul
+            className={`launch-track ${shouldScroll
+              ? "launch-track--animated"
+              : ""
+              }`}
+            style={{
+              "--launch-duration": `${duration}s`,
+            }}
+          >
+            {track.map((course, index) => (
+              <li
+                key={`${course.id}-${index}`}
+                aria-hidden={
+                  shouldScroll &&
+                  index >= launches.length
+                }
+              >
+                <LaunchCard course={course} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ================================================================
+   LAUNCH CARD
+================================================================ */
+
+function LaunchCard({ course }) {
+  const pricing = getPricing(course);
+
+  const thumbnail =
+    course.thumbnailUrl ||
+    course.imageUrl ||
+    course.thumbnail;
+
+  return (
+    <Link
+      to={`/courses/${course.id}`}
+      className="
+        group
+        flex w-72
+        items-center gap-3
+        rounded-xl
+        border border-slate-200
+        bg-white
+        p-3
+        transition
+        hover:border-violet-200
+        hover:shadow-md
+        hover:shadow-violet-900/[0.06]
+        focus-visible:outline
+        focus-visible:outline-2
+        focus-visible:outline-offset-2
+        focus-visible:outline-violet-700
+      "
+    >
+      <div
+        className="
+          flex h-14 w-14 shrink-0
+          items-center justify-center
+          overflow-hidden
+          rounded-lg
+          bg-gradient-to-br from-violet-100 to-orange-50
+          text-violet-300
+        "
+      >
+        {thumbnail ? (
+          <img
+            src={thumbnail}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <BookOpen size={20} />
+        )}
+      </div>
+
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-900 group-hover:text-violet-700">
+          {getCourseTitle(course)}
+        </p>
+
+        <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+          <span className="rounded bg-orange-50 px-1.5 py-0.5 font-semibold text-orange-600">
+            New
+          </span>
+
+          <span>
+            {pricing.isFree
+              ? "Free"
+              : inr.format(pricing.effective)}
+          </span>
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+/* ================================================================
+   SCROLL TO TOP BUTTON
+================================================================ */
+
+function ScrollToTopButton({ onClick }) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    function handleScroll() {
+      setVisible(window.scrollY > 600);
+    }
+
+    handleScroll();
+
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+
+    return () =>
+      window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Back to top"
+      className="
+        fixed bottom-6 right-6
+        z-40
+        flex h-12 w-12
+        items-center justify-center
+        rounded-full
+        bg-violet-700
+        text-white
+        shadow-lg
+        shadow-violet-900/20
+        transition
+        hover:bg-violet-800
+        focus-visible:outline
+        focus-visible:outline-2
+        focus-visible:outline-offset-2
+        focus-visible:outline-violet-700
+      "
+    >
+      <ArrowUp size={20} />
+    </button>
   );
 }
 
@@ -639,10 +1016,9 @@ function FilterBar({
                         font-semibold
                         transition
                         disabled:opacity-60
-                        ${
-                          selected
-                            ? "bg-violet-700 text-white shadow-sm"
-                            : "bg-slate-100 text-slate-600 hover:bg-violet-50 hover:text-violet-700"
+                        ${selected
+                          ? "bg-violet-700 text-white shadow-sm"
+                          : "bg-slate-100 text-slate-600 hover:bg-violet-50 hover:text-violet-700"
                         }
                       `}
                     >
@@ -796,6 +1172,8 @@ function CourseCard({ course }) {
     Boolean(thumbnail) &&
     !imageFailed;
 
+  const isNew = isNewCourse(course);
+
   const href =
     `/courses/${course.id}`;
 
@@ -888,6 +1266,25 @@ function CourseCard({ course }) {
         >
           <div className="flex flex-wrap gap-2">
 
+            {isNew && (
+              <span
+                className="
+                  inline-flex items-center gap-1.5
+                  rounded-full
+                  bg-orange-500
+                  px-3 py-1.5
+                  text-xs
+                  font-bold
+                  text-white
+                  shadow-sm
+                "
+              >
+                <Sparkles size={12} />
+
+                New
+              </span>
+            )}
+
             {course.featured && (
               <span
                 className="
@@ -912,7 +1309,7 @@ function CourseCard({ course }) {
               <span
                 className="
                   rounded-full
-                  bg-orange-500
+                  bg-violet-700
                   px-3 py-1.5
                   text-xs
                   font-bold

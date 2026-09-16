@@ -1,10 +1,12 @@
 import React from 'react';
 import styled from 'styled-components';
 
-const Button = () => {
+const Button = ({ href, text = 'Explore Courses', className = '' }) => {
   return (
     <StyledWrapper>
-      <button className="btn-donate">Exlpore Courses</button>
+      <a href={href} className={`btn-donate ${className}`}>
+        {text}
+      </a>
     </StyledWrapper>
   );
 }
@@ -17,6 +19,10 @@ const StyledWrapper = styled.div`
     --btn-bg-color: hsla(360 100% 100% / 1);
     --radii: 0.5em;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
     padding: 0.9em 1.4em;
     min-width: 120px;
     min-height: 44px;
