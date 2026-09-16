@@ -44,6 +44,7 @@ import {
   Pin,
   Globe2,
   GraduationCap,
+  AlertTriangle,
 } from "lucide-react";
 
 import {
@@ -158,8 +159,8 @@ function getWeekRange(offset = 0) {
 
   monday.setDate(
     now.getDate() +
-      mondayOffset +
-      offset * 7
+    mondayOffset +
+    offset * 7
   );
 
   const sunday = new Date(monday);
@@ -259,7 +260,7 @@ function formatAnnouncementDate(date) {
     month: "short",
     year:
       date.getFullYear() !==
-      now.getFullYear()
+        now.getFullYear()
         ? "numeric"
         : undefined,
   });
@@ -295,9 +296,8 @@ function timeAgo(date) {
   );
 
   if (hrs < 24) {
-    return `${hrs} hr${
-      hrs > 1 ? "s" : ""
-    } ago`;
+    return `${hrs} hr${hrs > 1 ? "s" : ""
+      } ago`;
   }
 
   const days = Math.round(
@@ -338,7 +338,7 @@ function normalizeAnnouncement(item) {
   } else if (
     rawDate &&
     typeof rawDate.toDate ===
-      "function"
+    "function"
   ) {
     date = rawDate.toDate();
   } else if (rawDate) {
@@ -428,8 +428,8 @@ export default function Dashboard() {
       key === "overview"
         ? {}
         : {
-            tab: key,
-          },
+          tab: key,
+        },
       {
         replace: true,
       }
@@ -467,6 +467,11 @@ export default function Dashboard() {
     setNotifLoading,
   ] = useState(true);
 
+  const [
+    notifError,
+    setNotifError,
+  ] = useState(false);
+
   /* =======================================================
      TASKS
   ======================================================= */
@@ -480,6 +485,11 @@ export default function Dashboard() {
     tasksLoading,
     setTasksLoading,
   ] = useState(true);
+
+  const [
+    tasksError,
+    setTasksError,
+  ] = useState(false);
 
   /* =======================================================
      SCHEDULE
@@ -495,6 +505,11 @@ export default function Dashboard() {
     setScheduleLoading,
   ] = useState(true);
 
+  const [
+    scheduleError,
+    setScheduleError,
+  ] = useState(false);
+
   /* =======================================================
      LIVE CLASS
   ======================================================= */
@@ -508,6 +523,11 @@ export default function Dashboard() {
     liveClassLoading,
     setLiveClassLoading,
   ] = useState(true);
+
+  const [
+    liveClassError,
+    setLiveClassError,
+  ] = useState(false);
 
   /* =======================================================
      ANNOUNCEMENTS
@@ -710,25 +730,20 @@ export default function Dashboard() {
     if (!uid) {
       setNotifications([]);
       setNotifLoading(false);
+      setNotifError(false);
       return;
     }
 
     setNotifLoading(true);
+    setNotifError(false);
 
     const q = query(
       collection(
         db,
         "notifications"
       ),
-      where(
-        "uid",
-        "==",
-        uid
-      ),
-      orderBy(
-        "createdAt",
-        "desc"
-      ),
+      where("recipientId", "==", uid),
+      orderBy("createdAt", "desc"),
       limit(10)
     );
 
@@ -744,7 +759,7 @@ export default function Dashboard() {
 
                 const createdAt =
                   data.createdAt instanceof
-                  Timestamp
+                    Timestamp
                     ? data.createdAt.toDate()
                     : new Date();
 
@@ -769,6 +784,7 @@ export default function Dashboard() {
 
           setNotifications(items);
           setNotifLoading(false);
+          setNotifError(false);
         },
         (error) => {
           console.error(
@@ -776,7 +792,9 @@ export default function Dashboard() {
             error
           );
 
+          setNotifications([]);
           setNotifLoading(false);
+          setNotifError(true);
         }
       );
 
@@ -791,10 +809,12 @@ export default function Dashboard() {
     if (!uid) {
       setTasks([]);
       setTasksLoading(false);
+      setTasksError(false);
       return;
     }
 
     setTasksLoading(true);
+    setTasksError(false);
 
     const {
       start,
@@ -802,29 +822,10 @@ export default function Dashboard() {
     } = startEndOfToday();
 
     const q = query(
-      collection(
-        db,
-        "tasks"
-      ),
-      where(
-        "uid",
-        "==",
-        uid
-      ),
-      where(
-        "date",
-        ">=",
-        Timestamp.fromDate(
-          start
-        )
-      ),
-      where(
-        "date",
-        "<=",
-        Timestamp.fromDate(
-          end
-        )
-      )
+      collection(db, "tasks"),
+      where("uid", "==", uid),
+      where("date", ">=", Timestamp.fromDate(start)),
+      where("date", "<=", Timestamp.fromDate(end))
     );
 
     const unsubscribe =
@@ -862,6 +863,7 @@ export default function Dashboard() {
 
           setTasks(items);
           setTasksLoading(false);
+          setTasksError(false);
         },
         (error) => {
           console.error(
@@ -869,7 +871,9 @@ export default function Dashboard() {
             error
           );
 
+          setTasks([]);
           setTasksLoading(false);
+          setTasksError(true);
         }
       );
 
@@ -884,10 +888,12 @@ export default function Dashboard() {
     if (!uid) {
       setScheduleEvents([]);
       setScheduleLoading(false);
+      setScheduleError(false);
       return;
     }
 
     setScheduleLoading(true);
+    setScheduleError(false);
 
     const {
       start,
@@ -897,33 +903,11 @@ export default function Dashboard() {
     );
 
     const q = query(
-      collection(
-        db,
-        "scheduleEvents"
-      ),
-      where(
-        "uid",
-        "==",
-        uid
-      ),
-      where(
-        "date",
-        ">=",
-        Timestamp.fromDate(
-          start
-        )
-      ),
-      where(
-        "date",
-        "<=",
-        Timestamp.fromDate(
-          end
-        )
-      ),
-      orderBy(
-        "date",
-        "asc"
-      )
+      collection(db, "scheduleEvents"),
+      where("uid", "==", uid),
+      where("date", ">=", Timestamp.fromDate(start)),
+      where("date", "<=", Timestamp.fromDate(end)),
+      orderBy("date", "asc")
     );
 
     const unsubscribe =
@@ -938,7 +922,7 @@ export default function Dashboard() {
 
                 const date =
                   data.date instanceof
-                  Timestamp
+                    Timestamp
                     ? data.date.toDate()
                     : new Date();
 
@@ -965,6 +949,7 @@ export default function Dashboard() {
 
           setScheduleEvents(items);
           setScheduleLoading(false);
+          setScheduleError(false);
         },
         (error) => {
           console.error(
@@ -972,7 +957,9 @@ export default function Dashboard() {
             error
           );
 
+          setScheduleEvents([]);
           setScheduleLoading(false);
+          setScheduleError(true);
         }
       );
 
@@ -1021,10 +1008,12 @@ export default function Dashboard() {
     if (!uid) {
       setLiveClass(null);
       setLiveClassLoading(false);
+      setLiveClassError(false);
       return;
     }
 
     setLiveClassLoading(true);
+    setLiveClassError(false);
 
     const q = query(
       collection(
@@ -1059,6 +1048,7 @@ export default function Dashboard() {
             setLiveClassLoading(
               false
             );
+            setLiveClassError(false);
             return;
           }
 
@@ -1070,13 +1060,13 @@ export default function Dashboard() {
 
           const start =
             data.startTime instanceof
-            Timestamp
+              Timestamp
               ? data.startTime.toDate()
               : new Date();
 
           const end =
             data.endTime instanceof
-            Timestamp
+              Timestamp
               ? data.endTime.toDate()
               : null;
 
@@ -1097,18 +1087,19 @@ export default function Dashboard() {
 
             timeLabel: end
               ? `Today · ${formatTime(
-                  start
-                )}–${formatTime(
-                  end
-                )}`
+                start
+              )}–${formatTime(
+                end
+              )}`
               : `Today · ${formatTime(
-                  start
-                )}`,
+                start
+              )}`,
           });
 
           setLiveClassLoading(
             false
           );
+          setLiveClassError(false);
         },
         (error) => {
           console.error(
@@ -1116,7 +1107,9 @@ export default function Dashboard() {
             error
           );
 
+          setLiveClass(null);
           setLiveClassLoading(false);
+          setLiveClassError(true);
         }
       );
 
@@ -1253,16 +1246,16 @@ export default function Dashboard() {
             (item) =>
               item.id === id
                 ? {
-                    ...item,
+                  ...item,
 
-                    progress:
-                      nextProgress,
+                  progress:
+                    nextProgress,
 
-                    prevProgress:
-                      nowDone
-                        ? item.progress
-                        : item.prevProgress,
-                  }
+                  prevProgress:
+                    nowDone
+                      ? item.progress
+                      : item.prevProgress,
+                }
                 : item
           )
       );
@@ -1306,9 +1299,9 @@ export default function Dashboard() {
         (previous) =>
           previous
             ? {
-                ...previous,
-                status,
-              }
+              ...previous,
+              status,
+            }
             : previous
       );
 
@@ -1339,9 +1332,9 @@ export default function Dashboard() {
     showAllAnnouncements
       ? announcements
       : announcements.slice(
-          0,
-          4
-        );
+        0,
+        4
+      );
 
   const tasksDone =
     tasks.filter(
@@ -1421,20 +1414,20 @@ export default function Dashboard() {
         ================================================= */}
 
         {activeTab ===
-        "certificates" ? (
+          "certificates" ? (
           <Certificates />
 
-        /* =================================================
-           MY COURSES
-        ================================================= */
+          /* =================================================
+             MY COURSES
+          ================================================= */
 
         ) : activeTab ===
           "courses" ? (
           <MyCourses />
 
-        /* =================================================
-           OVERVIEW
-        ================================================= */
+          /* =================================================
+             OVERVIEW
+          ================================================= */
 
         ) : (
           <div>
@@ -1633,21 +1626,21 @@ export default function Dashboard() {
 
                 {announcements.length >
                   4 && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowAllAnnouncements(
-                        (previous) =>
-                          !previous
-                      )
-                    }
-                    className="shrink-0 text-xs font-bold text-emerald-600 transition-colors hover:text-emerald-700"
-                  >
-                    {showAllAnnouncements
-                      ? "Show less"
-                      : "View all"}
-                  </button>
-                )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowAllAnnouncements(
+                          (previous) =>
+                            !previous
+                        )
+                      }
+                      className="shrink-0 text-xs font-bold text-emerald-600 transition-colors hover:text-emerald-700"
+                    >
+                      {showAllAnnouncements
+                        ? "Show less"
+                        : "View all"}
+                    </button>
+                  )}
               </div>
 
               {/* LOADING */}
@@ -1665,7 +1658,7 @@ export default function Dashboard() {
                   )}
                 </div>
 
-              /* ERROR */
+                /* ERROR */
 
               ) : announcementsError ? (
                 <div className="rounded-2xl bg-red-50 px-4 py-6 text-center">
@@ -1682,7 +1675,7 @@ export default function Dashboard() {
                   </p>
                 </div>
 
-              /* EMPTY */
+                /* EMPTY */
 
               ) : announcements.length ===
                 0 ? (
@@ -1700,7 +1693,7 @@ export default function Dashboard() {
                   </p>
                 </div>
 
-              /* ANNOUNCEMENTS */
+                /* ANNOUNCEMENTS */
 
               ) : (
                 <div className="space-y-2">
@@ -1719,11 +1712,10 @@ export default function Dashboard() {
                           {/* ICON */}
 
                           <div
-                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                              announcement.pinned
-                                ? "bg-amber-100 text-amber-600"
-                                : "bg-emerald-100 text-emerald-600"
-                            }`}
+                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${announcement.pinned
+                              ? "bg-amber-100 text-amber-600"
+                              : "bg-emerald-100 text-emerald-600"
+                              }`}
                           >
                             {announcement.pinned ? (
                               <Pin className="h-3.5 w-3.5" />
@@ -1756,7 +1748,7 @@ export default function Dashboard() {
                                   <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[9px] font-bold text-emerald-600">
 
                                     {announcement.audienceType ===
-                                    "global" ? (
+                                      "global" ? (
                                       <>
                                         <Globe2 className="h-2.5 w-2.5" />
                                         Everyone
@@ -1850,16 +1842,16 @@ export default function Dashboard() {
 
                   {notifications.length >
                     0 && (
-                    <button
-                      type="button"
-                      onClick={
-                        clearAllNotifications
-                      }
-                      className="text-xs font-semibold text-[#8A82A6] hover:text-[#6D3FC0]"
-                    >
-                      Clear
-                    </button>
-                  )}
+                      <button
+                        type="button"
+                        onClick={
+                          clearAllNotifications
+                        }
+                        className="text-xs font-semibold text-[#8A82A6] hover:text-[#6D3FC0]"
+                      >
+                        Clear
+                      </button>
+                    )}
 
                 </div>
 
@@ -1874,6 +1866,16 @@ export default function Dashboard() {
                         />
                       )
                     )}
+                  </div>
+                ) : notifError ? (
+                  <div className="flex flex-col items-center gap-1.5 py-6 text-center">
+                    <AlertTriangle className="h-4 w-4 text-red-400" />
+                    <p className="text-xs font-bold text-red-500">
+                      Couldn't load notifications.
+                    </p>
+                    <p className="text-[10px] text-red-400">
+                      Try refreshing the page.
+                    </p>
                   </div>
                 ) : notifications.length ===
                   0 ? (
@@ -2027,13 +2029,13 @@ export default function Dashboard() {
                         style={{
                           background:
                             activeDay ===
-                            day
+                              day
                               ? ACCENT
                               : "transparent",
 
                           color:
                             activeDay ===
-                            day
+                              day
                               ? "#fff"
                               : "#8A82A6",
                         }}
@@ -2042,20 +2044,20 @@ export default function Dashboard() {
 
                         {(
                           agendaByDay[
-                            day
+                          day
                           ] || []
                         ).length > 0 && (
-                          <span
-                            className="h-1 w-1 rounded-full"
-                            style={{
-                              background:
-                                activeDay ===
-                                day
-                                  ? "#fff"
-                                  : AMBER,
-                            }}
-                          />
-                        )}
+                            <span
+                              className="h-1 w-1 rounded-full"
+                              style={{
+                                background:
+                                  activeDay ===
+                                    day
+                                    ? "#fff"
+                                    : AMBER,
+                              }}
+                            />
+                          )}
                       </button>
                     )
                   )}
@@ -2076,10 +2078,17 @@ export default function Dashboard() {
                         )
                       )}
                     </div>
+                  ) : scheduleError ? (
+                    <div className="flex flex-col items-center gap-1.5 py-4 text-center">
+                      <AlertTriangle className="h-4 w-4 text-red-400" />
+                      <p className="text-xs font-bold text-red-500">
+                        Couldn't load your schedule.
+                      </p>
+                    </div>
                   ) : (
                     (
                       agendaByDay[
-                        activeDay
+                      activeDay
                       ] || []
                     ).length === 0 ? (
                       <p className="py-4 text-center text-xs text-[#A79BC4]">
@@ -2178,6 +2187,13 @@ export default function Dashboard() {
                       )
                     )}
                   </div>
+                ) : tasksError ? (
+                  <div className="flex flex-col items-center gap-1.5 py-6 text-center">
+                    <AlertTriangle className="h-4 w-4 text-red-400" />
+                    <p className="text-xs font-bold text-red-500">
+                      Couldn't load today's tasks.
+                    </p>
+                  </div>
                 ) : tasks.length ===
                   0 ? (
                   <p className="py-6 text-center text-xs text-[#A79BC4]">
@@ -2240,11 +2256,10 @@ export default function Dashboard() {
                               <div className="flex items-center justify-between gap-2">
 
                                 <p
-                                  className={`truncate text-xs font-bold ${
-                                    done
-                                      ? "text-[#B4ABCB] line-through"
-                                      : "text-[#1B0E3D]"
-                                  }`}
+                                  className={`truncate text-xs font-bold ${done
+                                    ? "text-[#B4ABCB] line-through"
+                                    : "text-[#1B0E3D]"
+                                    }`}
                                 >
                                   {
                                     task.title
@@ -2376,6 +2391,13 @@ export default function Dashboard() {
                     <Skeleton className="h-3 w-1/2" />
                     <Skeleton className="mt-3 h-8 w-full rounded-full" />
                   </div>
+                ) : liveClassError ? (
+                  <div className="mt-3 flex flex-col items-center gap-1.5 text-center">
+                    <AlertTriangle className="h-4 w-4 text-red-400" />
+                    <p className="text-xs font-bold text-red-500">
+                      Couldn't load your live class.
+                    </p>
+                  </div>
                 ) : !liveClass ? (
                   <p className="mt-3 text-center text-xs text-[#A79BC4]">
                     No upcoming live class.
@@ -2407,7 +2429,7 @@ export default function Dashboard() {
                     )}
 
                     {liveClass.status ===
-                    "joined" ? (
+                      "joined" ? (
                       <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] font-bold text-emerald-600">
                         You're in! See you there.
                       </p>

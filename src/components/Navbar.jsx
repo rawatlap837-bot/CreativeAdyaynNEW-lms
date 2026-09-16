@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import CALogo from "../assets/Images/CA.png";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../firebase/Firebase";
+import { COURSE_TYPES, usePublishedCourses } from "../services/CourseService";
 import {
   Menu,
   X,
@@ -13,28 +14,32 @@ import {
   Cpu,
   Layers,
   Calculator,
+  BookOpen,
   ArrowRight,
   LayoutDashboard,
   UserCircle,
   LogOut,
 } from "lucide-react";
 
-// Category strings here MUST match the category names used in
-// LiveCoursesData.js exactly (case-insensitive match is used as a
-// safety net in LiveCourses.jsx, but exact spelling is safest).
-const NAV_LINKS = [
-  { label: "Home", href: "/" },
-  {
-    label: "Courses",
-    dropdown: [
-      { label: "Digital Marketing", icon: Megaphone, category: "Digital Marketing" },
-      { label: "Web Development", icon: Code2, category: "Web Development" },
-      { label: "UI/UX Design", icon: Palette, category: "UI/UX Design" },
-      { label: "Software Development", icon: Cpu, category: "Software Development" },
-      { label: "Multimedia", icon: Layers, category: "Multimedia" },
-      { label: "E-Accounting", icon: Calculator, category: "E-Accounting" },
-    ],
-  },
+// Icons for the categories we expect. A category a teacher types that
+// isn't in this list still shows up in the dropdown — it just falls
+// back to a generic icon instead of breaking the menu.
+const CATEGORY_ICONS = {
+  "Digital Marketing": Megaphone,
+  "Web Development": Code2,
+  "UI/UX Design": Palette,
+  "Software Development": Cpu,
+  "Multimedia": Layers,
+  "E-Accounting": Calculator,
+};
+
+function getCategoryIcon(category) {
+  return CATEGORY_ICONS[category] || BookOpen;
+}
+
+// Static links that are always shown, regardless of what courses exist.
+const HOME_LINK = { label: "Home", href: "/" };
+const STATIC_LINKS = [
   { label: "Short Courses", href: "/ShortCourses" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
@@ -97,10 +102,67 @@ export default function Navbar() {
   // flash for users who are actually signed in); null = signed out.
   const [user, setUser] = useState(undefined);
   const navigate = useNavigate();
+  const location = useLocation();
   const coursesRef = useRef(null);
   const accountRef = useRef(null);
+  const mobileMenuRef = useRef(null);
+  const mobileToggleRef = useRef(null);
 
   useEffect(() => onAuthStateChanged(auth, setUser), []);
+
+  // Logo + "Home" both use this. If we're already on the homepage,
+  // clicking either wouldn't otherwise do anything — navigating to the
+  // same route doesn't remount the page or move the scroll position — so
+  // this scrolls to the hero manually. If a category link left ?/#
+  // params in the URL, this also clears them back to a bare "/".
+  // Coming from a different page, normal navigation runs and Hero's own
+  // mount effect puts it at the top.
+  const handleHomeClick = (event) => {
+    setMobileOpen(false);
+
+    if (location.pathname === "/") {
+      event.preventDefault();
+
+      if (location.search || location.hash) {
+        navigate("/", { replace: true });
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  // Same source of truth as the homepage's course tabs: only categories
+  // that have at least one published course show up here. If a category
+  // has zero courses, it simply never appears — no empty tabs.
+  const { courses: liveCourses } = usePublishedCourses(COURSE_TYPES.LONG);
+
+  const courseCategories = useMemo(() => {
+    const unique = new Set();
+    liveCourses.forEach((course) => {
+      const category = course.category?.trim();
+      if (category) unique.add(category);
+    });
+    return Array.from(unique).sort((a, b) => a.localeCompare(b));
+  }, [liveCourses]);
+
+  const NAV_LINKS = useMemo(() => {
+    const links = [HOME_LINK];
+
+    // Only render the "Courses" dropdown at all once there's something
+    // to put in it.
+    if (courseCategories.length > 0) {
+      links.push({
+        label: "Courses",
+        dropdown: courseCategories.map((category) => ({
+          label: category,
+          icon: getCategoryIcon(category),
+          category,
+        })),
+      });
+    }
+
+    return [...links, ...STATIC_LINKS];
+  }, [courseCategories]);
 
   const isLoggedIn = Boolean(user);
 
@@ -155,6 +217,19 @@ export default function Navbar() {
     return () => mql.removeEventListener("change", handleChange);
   }, []);
 
+  // The mobile menu panel is always mounted (for the open/close transition)
+  // and gets aria-hidden when closed. If a link inside it still has
+  // keyboard focus at that moment — e.g. the user tabbed to it, or clicked
+  // it and this fires before navigation steals focus — browsers correctly
+  // flag "aria-hidden element contains focus" as invalid. Move focus back
+  // to the toggle button first so the container is genuinely inert.
+  useEffect(() => {
+    if (!mobileOpen && mobileMenuRef.current?.contains(document.activeElement)) {
+      document.activeElement.blur();
+      mobileToggleRef.current?.focus();
+    }
+  }, [mobileOpen]);
+
   return (
     <header className="fixed inset-x-0 top-4 z-50 px-4 sm:px-6">
       <div
@@ -162,7 +237,7 @@ export default function Navbar() {
         style={{ background: CANVAS, borderRadius: 9999 }}
       >
         {/* logo */}
-        <Link to="/" className="flex shrink-0 items-center gap-2">
+        <Link to="/" onClick={handleHomeClick} className="flex shrink-0 items-center gap-2">
           <img
             src={CALogo}
             alt="Creative Adyayan logo"
@@ -217,6 +292,7 @@ export default function Navbar() {
               <Link
                 key={link.label}
                 to={link.href}
+                onClick={link.href === "/" ? handleHomeClick : undefined}
                 onMouseEnter={() => setHoveredLink(link.label)}
                 onMouseLeave={() => setHoveredLink(null)}
                 className="px-4 py-2 text-lg font-bold text-slate-700 transition-all hover:text-[#1B0E3D]"
@@ -339,6 +415,7 @@ export default function Navbar() {
 
         {/* mobile toggle */}
         <button
+          ref={mobileToggleRef}
           type="button"
           onClick={() => setMobileOpen((o) => !o)}
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -365,6 +442,7 @@ export default function Navbar() {
 
       {/* mobile menu — always mounted, animated open/close */}
       <div
+        ref={mobileMenuRef}
         aria-hidden={!mobileOpen}
         className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-300 ease-in-out ${mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
@@ -412,7 +490,11 @@ export default function Navbar() {
                 <Link
                   key={link.label}
                   to={link.href}
-                  onClick={() => setMobileOpen(false)}
+                  onClick={
+                    link.href === "/"
+                      ? handleHomeClick
+                      : () => setMobileOpen(false)
+                  }
                   className="px-4 py-3.5 text-base font-bold text-slate-700"
                   style={raisedSm(20)}
                 >

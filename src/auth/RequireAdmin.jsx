@@ -11,19 +11,14 @@ export default function RequireAdmin() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        console.log("No user logged in"); // TEMP DEBUG
         setState({ checked: true, allowed: false });
         return;
       }
       try {
-        console.log("Checking admin for UID:", user.uid); // TEMP DEBUG
         const snap = await getDoc(doc(db, "users", user.uid));
-        console.log("Doc exists?", snap.exists(), "Data:", snap.data()); // TEMP DEBUG
         const role = snap.exists() ? snap.data()?.role : null;
-        console.log("Role found:", role); // TEMP DEBUG
         setState({ checked: true, allowed: role === "admin" });
       } catch (err) {
-        console.error("RequireAdmin error:", err); // TEMP DEBUG
         setState({ checked: true, allowed: false });
       }
     });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
   motion,
   AnimatePresence,
@@ -243,7 +243,7 @@ function CategoryTabs({
 
       onSelect(
         (index - 1 + categories.length) %
-          categories.length
+        categories.length
       );
     }
   };
@@ -369,8 +369,11 @@ function CourseMedia({
   }, [hovering]);
 
   return (
+    // Shorter aspect ratio on mobile (4:3) so the image doesn't eat the
+    // whole first screen on small phones; opens up to the original,
+    // slightly taller ratio from sm: upward.
     <div
-      className="relative aspect-[16/11] w-full overflow-hidden bg-slate-100"
+      className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100 sm:aspect-[16/11]"
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
@@ -516,18 +519,25 @@ function CourseCard({
   const extraFeatureCount = Math.max(
     0,
     allFeatures.length -
-      FEATURES_PREVIEW_COUNT
+    FEATURES_PREVIEW_COUNT
   );
 
   const [showAllFeatures, setShowAllFeatures] =
     useState(false);
 
+  // Mobile-only: the "what's included" list (and everything under it)
+  // stays collapsed behind a dropdown so a card with a long feature list
+  // doesn't blow past the phone's first screen. On sm: and up this has
+  // no effect — the full list is always shown there, same as before.
+  const [detailsOpen, setDetailsOpen] =
+    useState(false);
+
   const visibleFeatures = showAllFeatures
     ? allFeatures
     : allFeatures.slice(
-        0,
-        FEATURES_PREVIEW_COUNT
-      );
+      0,
+      FEATURES_PREVIEW_COUNT
+    );
 
   const courseId =
     course.id ?? course.title;
@@ -543,13 +553,13 @@ function CourseCard({
 
   const courseLinkProps = external
     ? {
-        href: courseHref,
-        target: "_blank",
-        rel: "noopener noreferrer",
-      }
+      href: courseHref,
+      target: "_blank",
+      rel: "noopener noreferrer",
+    }
     : {
-        to: courseHref,
-      };
+      to: courseHref,
+    };
 
   const prefersReducedMotion =
     useReducedMotion();
@@ -581,12 +591,12 @@ function CourseCard({
 
     const px =
       (event.clientX - rect.left) /
-        rect.width -
+      rect.width -
       0.5;
 
     const py =
       (event.clientY - rect.top) /
-        rect.height -
+      rect.height -
       0.5;
 
     rotateYRaw.set(px * 3);
@@ -596,6 +606,24 @@ function CourseCard({
   const handlePointerLeave = () => {
     rotateXRaw.set(0);
     rotateYRaw.set(0);
+  };
+
+  const toggleDetails = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setDetailsOpen((previous) => {
+      const next = !previous;
+
+      // Opening on mobile should reveal everything in one tap rather
+      // than making the visitor tap twice (once for the section, once
+      // for "+N more benefits").
+      if (next) {
+        setShowAllFeatures(true);
+      }
+
+      return next;
+    });
   };
 
   return (
@@ -643,7 +671,7 @@ function CourseCard({
         />
       </CourseLink>
 
-      <div className="flex flex-1 flex-col p-4 sm:p-6">
+      <div className="flex flex-1 flex-col p-3.5 sm:p-6">
         {course.tags?.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {course.tags.map((tag) => (
@@ -667,90 +695,129 @@ function CourseCard({
           {...courseLinkProps}
           className="hover:text-[#5227FF]"
         >
-          <h3 className="text-base font-bold leading-snug tracking-tight text-[#1B0E3D] sm:text-lg">
+          <h3 className="text-[15px] font-bold leading-snug tracking-tight text-[#1B0E3D] sm:text-lg">
             {course.title}
           </h3>
         </CourseLink>
 
         {(course.shortDescription ||
           course.description) && (
-          <p className="mt-2.5 line-clamp-2 text-sm leading-relaxed text-slate-500">
-            {course.shortDescription ||
-              course.description}
-          </p>
-        )}
+            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-500 sm:mt-2.5">
+              {course.shortDescription ||
+                course.description}
+            </p>
+          )}
 
+        {/* On mobile this whole block — the full feature list — hides
+            behind a "What's included" toggle so the card stays short.
+            From sm: upward it's always expanded, exactly as before. */}
         {allFeatures.length > 0 && (
-          <ul className="mt-4 space-y-2 border-t border-violet-50 pt-4">
-            {visibleFeatures.map(
-              (feature) => (
-                <motion.li
-                  key={feature}
-                  initial={false}
-                  animate={{ opacity: 1 }}
-                  className="flex items-start gap-2 text-[13px] text-slate-600"
-                >
-                  <span className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-violet-100">
-                    <CheckCircle2
-                      className="h-3 w-3 text-[#5227FF]"
-                      strokeWidth={3}
-                    />
-                  </span>
+          <div className="mt-4 border-t border-violet-50 pt-4">
+            <button
+              type="button"
+              onClick={toggleDetails}
+              aria-expanded={detailsOpen}
+              className="flex w-full items-center justify-between gap-2 text-xs font-semibold text-[#5227FF] outline-none transition-colors duration-150 hover:text-[#1B0E3D] focus-visible:ring-2 focus-visible:ring-[#5227FF] sm:hidden"
+            >
+              <span className="flex items-center gap-2">
+                <Layers
+                  className="h-3.5 w-3.5 shrink-0"
+                  strokeWidth={2.5}
+                />
 
-                  <span className="leading-snug">
-                    {feature}
-                  </span>
-                </motion.li>
-              )
-            )}
+                {detailsOpen
+                  ? "Hide what's included"
+                  : `What's included (${allFeatures.length})`}
+              </span>
 
-            {extraFeatureCount > 0 && (
-              <li>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
+              <ChevronDown
+                className={[
+                  "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
+                  detailsOpen ? "rotate-180" : "",
+                ].join(" ")}
+                strokeWidth={2.5}
+              />
+            </button>
 
-                    setShowAllFeatures(
-                      (previous) =>
-                        !previous
-                    );
-                  }}
-                  aria-expanded={
-                    showAllFeatures
-                  }
-                  className="flex w-full items-center gap-2 rounded-md pl-6 text-xs font-semibold text-[#5227FF] outline-none transition-colors duration-150 hover:text-[#1B0E3D] focus-visible:ring-2 focus-visible:ring-[#5227FF]"
-                >
-                  <Layers
-                    className="h-3.5 w-3.5 shrink-0"
-                    strokeWidth={2.5}
-                  />
+            <ul
+              className={[
+                "space-y-2",
+                detailsOpen ? "mt-3 block" : "hidden",
+                "sm:mt-0 sm:block",
+              ].join(" ")}
+            >
+              {visibleFeatures.map(
+                (feature) => (
+                  <motion.li
+                    key={feature}
+                    initial={false}
+                    animate={{ opacity: 1 }}
+                    className="flex items-start gap-2 text-[13px] text-slate-600"
+                  >
+                    <span className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-violet-100">
+                      <CheckCircle2
+                        className="h-3 w-3 text-[#5227FF]"
+                        strokeWidth={3}
+                      />
+                    </span>
 
-                  <span>
-                    {showAllFeatures
-                      ? "Show less"
-                      : `+${extraFeatureCount} more benefit${
-                          extraFeatureCount >
-                          1
-                            ? "s"
-                            : ""
-                        }`}
-                  </span>
+                    <span className="leading-snug">
+                      {feature}
+                    </span>
+                  </motion.li>
+                )
+              )}
 
-                  <ChevronDown
-                    className={[
-                      "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
+              {/* Desktop-only "+N more benefits" toggle — on mobile the
+                  outer "What's included" button above already reveals
+                  every feature in one tap, so this stays hidden there. */}
+              {extraFeatureCount > 0 && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+
+                      setShowAllFeatures(
+                        (previous) =>
+                          !previous
+                      );
+                    }}
+                    aria-expanded={
                       showAllFeatures
-                        ? "rotate-180"
-                        : "",
-                    ].join(" ")}
-                    strokeWidth={2.5}
-                  />
-                </button>
-              </li>
-            )}
-          </ul>
+                    }
+                    className="hidden w-full items-center gap-2 rounded-md pl-6 text-xs font-semibold text-[#5227FF] outline-none transition-colors duration-150 hover:text-[#1B0E3D] focus-visible:ring-2 focus-visible:ring-[#5227FF] sm:flex"
+                  >
+                    <Layers
+                      className="h-3.5 w-3.5 shrink-0"
+                      strokeWidth={2.5}
+                    />
+
+                    <span>
+                      {showAllFeatures
+                        ? "Show less"
+                        : `+${extraFeatureCount} more benefit${extraFeatureCount >
+                          1
+                          ? "s"
+                          : ""
+                        }`}
+                    </span>
+
+                    <ChevronDown
+                      className={[
+                        "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
+                        showAllFeatures
+                          ? "rotate-180"
+                          : "",
+                      ].join(" ")}
+                      strokeWidth={2.5}
+                    />
+                  </button>
+                </li>
+              )}
+            </ul>
+          </div>
         )}
 
         <div className="mt-5 flex flex-col gap-2.5 border-t border-violet-50 pt-4">
@@ -828,6 +895,16 @@ export default function LiveCourses({
   const [savedIds, setSavedIds] =
     useState(() => new Set());
 
+  const [searchParams] = useSearchParams();
+  const requestedCategory =
+    searchParams.get("category");
+
+  // Clicking a category link while already sitting on this page doesn't
+  // remount the component — only the URL changes. `location.key` changes
+  // on every navigation (even to the same path), which is what lets the
+  // effects below re-fire on repeat clicks instead of only on first load.
+  const location = useLocation();
+
   /* ======================================================================
      BUILD CATEGORIES FROM FIRESTORE
      ====================================================================== */
@@ -873,6 +950,63 @@ export default function LiveCourses({
     categories.length,
     activeIndex,
   ]);
+
+  /* ======================================================================
+     JUMP TO THE CATEGORY REQUESTED VIA ?category= (e.g. from the navbar
+     dropdown). Re-applies on every navigation to this page (tracked via
+     location.key) so it fires on repeat clicks too, but won't fight the
+     visitor's own tab switches afterwards or retrigger on unrelated
+     Firestore updates.
+     ====================================================================== */
+
+  const appliedKeyRef = useRef(null);
+
+  useEffect(() => {
+    if (
+      !requestedCategory ||
+      categories.length === 0 ||
+      appliedKeyRef.current === location.key
+    ) {
+      return;
+    }
+
+    const index = categories.findIndex(
+      (category) =>
+        category.toLowerCase() ===
+        requestedCategory.toLowerCase()
+    );
+
+    if (index !== -1) {
+      setActiveIndex(index);
+    }
+
+    appliedKeyRef.current = location.key;
+  }, [requestedCategory, categories, location.key]);
+
+  /* ======================================================================
+     SCROLL TO THIS SECTION WHEN ARRIVING VIA #live-courses (e.g. from the
+     navbar). React Router doesn't scroll to hash fragments on client-side
+     navigation the way a full page load does, so this does it manually.
+     Depends on location.key so it re-fires every time that link is
+     clicked, including repeat clicks while already on this page.
+     ====================================================================== */
+
+  useEffect(() => {
+    if (location.hash !== "#live-courses") {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      document
+        .getElementById("live-courses")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [location.key, location.hash]);
 
   const activeCategory =
     categories[activeIndex] ?? null;
@@ -944,7 +1078,7 @@ export default function LiveCourses({
 
   if (loading) {
     return (
-      <section className="relative overflow-hidden bg-violet-100 py-16 sm:py-24">
+      <section id="live-courses" className="relative overflow-hidden bg-violet-100 py-16 sm:py-24">
         <AmbientBackground />
 
         <div className="relative z-10 mx-auto flex max-w-7xl items-center justify-center px-5">
@@ -966,7 +1100,7 @@ export default function LiveCourses({
 
   if (error) {
     return (
-      <section className="relative overflow-hidden bg-violet-100 py-16 sm:py-24">
+      <section id="live-courses" className="relative overflow-hidden bg-violet-100 py-16 sm:py-24">
         <AmbientBackground />
 
         <div className="relative z-10 mx-auto max-w-3xl px-5">
@@ -1030,40 +1164,6 @@ export default function LiveCourses({
               </p>
             )}
           </div>
-
-          {exploreAllHref && (
-            <div>
-              {isExternalHref(
-                exploreAllHref
-              ) ? (
-                <a
-                  href={exploreAllHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-full px-1 text-xs font-semibold text-[#5227FF] transition-colors hover:text-[#1B0E3D] sm:text-sm"
-                >
-                  Explore all courses
-
-                  <ArrowUpRight
-                    className="h-3.5 w-3.5"
-                    strokeWidth={2.5}
-                  />
-                </a>
-              ) : (
-                <Link
-                  to={exploreAllHref}
-                  className="inline-flex items-center gap-1 rounded-full px-1 text-xs font-semibold text-[#5227FF] transition-colors hover:text-[#1B0E3D] sm:text-sm"
-                >
-                  Explore all courses
-
-                  <ArrowUpRight
-                    className="h-3.5 w-3.5"
-                    strokeWidth={2.5}
-                  />
-                </Link>
-              )}
-            </div>
-          )}
         </div>
 
         {/* ================================================================
@@ -1098,7 +1198,7 @@ export default function LiveCourses({
             {visibleCourses.length}{" "}
             course
             {visibleCourses.length >
-            1
+              1
               ? "s"
               : ""}{" "}
             in {activeCategory}
@@ -1138,8 +1238,8 @@ export default function LiveCourses({
               }}
             >
               {visibleCourses.length >
-              0 ? (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
+                0 ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
                   {visibleCourses.map(
                     (course, index) => {
                       const id =
@@ -1173,7 +1273,7 @@ export default function LiveCourses({
 
                   <p className="text-sm text-slate-400">
                     {courses.length ===
-                    0
+                      0
                       ? "No published live courses yet."
                       : "No courses in this category yet."}
                   </p>

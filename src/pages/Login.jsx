@@ -26,30 +26,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 
-/**
- * Login — Creative Adhyayan
- *
- * ROLE-BASED ROUTING
- * ───────────────────
- * users/{uid} → { role: "admin" | "student", ... }
- * Fails SAFE to /dashboard if the doc/field is missing or unreadable.
- *
- * MOBILE GOOGLE SIGN-IN
- * ───────────────────────
- * Uses signInWithPopup for everyone — desktop and mobile. Modern mobile
- * Chrome/Safari support popups fine in a real browser tab; the redirect
- * dance (signInWithRedirect + custom authDomain + proxy rewrites) is
- * fragile and unnecessary. The one real mobile failure case is an
- * in-app browser (Instagram/Facebook/WhatsApp's built-in webview) —
- * Google blocks OAuth there on purpose, and no client code can fix that,
- * so we just detect it and tell the person to open a real browser.
- *
- * This only needs:
- *   1. Your production domain listed in Firebase Console → Authentication
- *      → Settings → Authorized domains.
- *   2. VITE_FIREBASE_AUTH_DOMAIN left at the default <project>.firebaseapp.com
- *      — no custom domain, no proxy rewrites needed.
- */
+const GOOGLE_SIGNIN_TIMEOUT_MS = 45000;
 
 function DotGrid({ className = "", dot = "fill-white/25" }) {
   return (
@@ -157,6 +134,10 @@ export default function LoginForm() {
   // brand-new Google account gets deleted a moment after it's created,
   // and we don't want a flash of /dashboard in between.
   const suppressAutoRedirect = useRef(false);
+  // Guards the Google sign-in safety-net timeout (see
+  // GOOGLE_SIGNIN_TIMEOUT_MS above) so it can't fire after the flow has
+  // already finished normally.
+  const googleSignInTimeoutRef = useRef(null);
 
   // Already signed in (e.g. hit the back button, or opened /login from a
   // bookmark) — send them straight into their LMS instead of showing the
@@ -174,6 +155,15 @@ export default function LoginForm() {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
+  }, []);
+
+  // Clean up the safety-net timeout if the component unmounts mid-flight.
+  useEffect(() => {
+    return () => {
+      if (googleSignInTimeoutRef.current) {
+        clearTimeout(googleSignInTimeoutRef.current);
+      }
+    };
   }, []);
 
   const pulseCubesFor = (fieldName, value) => {
@@ -235,6 +225,17 @@ export default function LoginForm() {
     const provider = new GoogleAuthProvider();
     suppressAutoRedirect.current = true;
 
+    // Safety net for the COOP / window.closed issue described above: if
+    // signInWithPopup's promise never settles (because the browser
+    // blocked Firebase's popup-closed detection), stop showing "Signing
+    // in…" forever and let the person try again instead.
+    googleSignInTimeoutRef.current = setTimeout(() => {
+      setGoogleLoading(false);
+      suppressAutoRedirect.current = false;
+      setStatus("error");
+      setErrorMsg("Sign-in didn't complete. If you closed the Google window, please try again.");
+    }, GOOGLE_SIGNIN_TIMEOUT_MS);
+
     try {
       await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const { user } = await signInWithPopup(auth, provider);
@@ -266,6 +267,10 @@ export default function LoginForm() {
         setErrorMsg(message);
       }
     } finally {
+      if (googleSignInTimeoutRef.current) {
+        clearTimeout(googleSignInTimeoutRef.current);
+        googleSignInTimeoutRef.current = null;
+      }
       setGoogleLoading(false);
       suppressAutoRedirect.current = false;
     }

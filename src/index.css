@@ -8,14 +8,14 @@
 /* Satoshi — variable font (supports weight range 300–900) */
 @font-face {
   font-family: 'Satoshi';
-  src: url('./assets/Satoshi/Fonts/TTF/Satoshi-Variable.ttf') format('truetype-variations');
+  src: url('./assets/Satoshi/Satoshi_Complete/Fonts/TTF/Satoshi-Variable.ttf') format('truetype-variations');
   font-weight: 300 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Satoshi';
-  src: url('./assets/Satoshi/Fonts/TTF/Satoshi-VariableItalic.ttf') format('truetype-variations');
+  src: url('./assets/Satoshi/Satoshi_Complete/Fonts/TTF/Satoshi-VariableItalic.ttf') format('truetype-variations');
   font-weight: 300 900;
   font-style: italic;
   font-display: swap;
@@ -31,22 +31,6 @@
   font-family: 'Telma';
   src: url('./assets/Telma/Telma_Complete/Fonts/TTF/Telma-Variable.ttf') format('truetype-variations');
   font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Telma';
-  src: url('./assets/Telma/Telma_Complete/Fonts/TTF/<exact-filename>.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-
-@font-face {
-  font-family: 'Telma';
-  src: url('./assets/Telma/Telma_Complete/Fonts/TTF/<exact-filename>.ttf') format('truetype');
-  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
@@ -95,19 +79,10 @@
   font-display: swap;
 }
 
-/* Pochaevsk — single weight */
-@font-face {
-  font-family: 'Pochaevsk';
-  src: url('./assets/Pochaevsk/Pochaevsk-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   --font-display: 'Tirra', sans-serif;
   --font-body: 'Satoshi', sans-serif;
-  --font-mono: 'Pochaevsk', monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --font-sans: 'Geist Variable', sans-serif;
 }
 

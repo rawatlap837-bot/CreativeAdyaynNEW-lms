@@ -252,9 +252,8 @@ function HeaderSearch({ students, courses, payments }) {
       .map((p) => ({
         type: "payment",
         id: p.id,
-        title: `₹${p.amount} — ${
-          p.studentName || p.name || "Unknown"
-        }`,
+        title: `₹${p.amount} — ${p.studentName || p.name || "Unknown"
+          }`,
         subtitle: p.status || "Payment",
       }));
 
@@ -520,6 +519,18 @@ function HeaderBell() {
   }, []);
 
   /* --------------------------------------------------------------
+   * Close on Escape too (nice on mobile keyboards / a11y)
+   * -------------------------------------------------------------- */
+
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, []);
+
+  /* --------------------------------------------------------------
    * Unread count
    * -------------------------------------------------------------- */
 
@@ -702,13 +713,17 @@ function HeaderBell() {
       </button>
 
       {/* Dropdown */}
+      {/*
+        Responsive fix:
+        - On mobile (< sm): `fixed`, pinned to the viewport with left-3/right-3
+          margins instead of a rigid 340px panel anchored to the bell button.
+          This is what stops it overflowing off-screen on narrow phones.
+        - On sm+: reverts to the original 340px panel anchored under the bell.
+      */}
       {open && (
         <div
+          className="fixed sm:absolute left-3 right-3 sm:left-auto sm:right-0 top-16 sm:top-[calc(100%+10px)] w-auto sm:w-[340px]"
           style={{
-            position: "absolute",
-            top: "calc(100% + 10px)",
-            right: 0,
-            width: 340,
             background: "#fff",
             border: `1px solid ${AT.line}`,
             borderRadius: 12,
@@ -756,7 +771,7 @@ function HeaderBell() {
           {/* Notification list */}
           <div
             style={{
-              maxHeight: 360,
+              maxHeight: "min(360px, 60vh)",
               overflowY: "auto",
             }}
           >
@@ -978,6 +993,19 @@ const AdminLayout = () => {
   }, []);
 
   /* --------------------------------------------------------------
+   * Lock body scroll while the mobile sidebar is open
+   * -------------------------------------------------------------- */
+
+  useEffect(() => {
+    document.body.style.overflow = mobileNavOpen
+      ? "hidden"
+      : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileNavOpen]);
+
+  /* --------------------------------------------------------------
    * Logout
    * -------------------------------------------------------------- */
 
@@ -1002,16 +1030,26 @@ const AdminLayout = () => {
           "Inter, system-ui, sans-serif",
       }}
     >
+      {/* Backdrop behind the mobile sidebar so it can be dismissed
+          by tapping outside, and so it reads as a modal overlay
+          rather than content floating over content. */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* ==========================================================
           SIDEBAR
       ========================================================== */}
 
       <aside
-        className={`w-64 shrink-0 flex-col ${
-          mobileNavOpen
+        className={`w-64 shrink-0 flex-col ${mobileNavOpen
             ? "flex fixed inset-y-0 left-0 z-40"
             : "hidden"
-        } md:flex md:static`}
+          } md:flex md:static`}
         style={{
           background: AT.chrome,
         }}
@@ -1035,7 +1073,7 @@ const AdminLayout = () => {
             onClick={() =>
               setMobileNavOpen(false)
             }
-          > 
+          >
             <X size={18} />
           </button>
         </div>
@@ -1060,17 +1098,17 @@ const AdminLayout = () => {
                 style={({ isActive }) =>
                   isActive
                     ? {
-                        background:
-                          AT.chromeLight,
-                        color: "white",
-                        borderLeft:
-                          `3px solid ${AT.accent}`,
-                      }
+                      background:
+                        AT.chromeLight,
+                      color: "white",
+                      borderLeft:
+                        `3px solid ${AT.accent}`,
+                    }
                     : {
-                        color: "#94A3B8",
-                        borderLeft:
-                          "3px solid transparent",
-                      }
+                      color: "#94A3B8",
+                      borderLeft:
+                        "3px solid transparent",
+                    }
                 }
               >
                 <Icon size={17} />
@@ -1108,17 +1146,18 @@ const AdminLayout = () => {
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Header */}
         <header
-          className="flex items-center gap-3 px-5 py-4 bg-white border-b"
+          className="flex items-center gap-3 px-4 sm:px-5 py-4 bg-white border-b"
           style={{
             borderColor: AT.line,
           }}
         >
           {/* Mobile menu */}
           <button
-            className="md:hidden"
+            className="md:hidden shrink-0"
             onClick={() =>
               setMobileNavOpen(true)
             }
+            aria-label="Open menu"
           >
             <Menu
               size={20}
@@ -1134,12 +1173,12 @@ const AdminLayout = () => {
           />
 
           {/* Right side */}
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex items-center gap-3 sm:gap-4 shrink-0">
             <HeaderBell />
 
             {/* Admin avatar */}
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
               style={{
                 background: AT.chrome,
               }}
@@ -1151,7 +1190,7 @@ const AdminLayout = () => {
         </header>
 
         {/* Page */}
-        <main className="p-5 md:p-6 overflow-y-auto flex-1">
+        <main className="p-4 sm:p-5 md:p-6 overflow-y-auto flex-1 min-w-0">
           <Outlet />
         </main>
       </div>

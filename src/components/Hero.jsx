@@ -33,7 +33,11 @@ const GradientWaves = lazy(() => import("../Animiations/GradientWaves"));
 // real client-side route change to the Short Courses page while
 // keeping the same whileHover/whileTap animation the old <motion.a>
 // anchor had.
-const MotionLink = motion(Link);
+//
+// motion.create(...) is the current Framer Motion API for wrapping an
+// arbitrary custom component — motion(Link) still works today but logs
+// a deprecation warning; motion.create is the same thing, just renamed.
+const MotionLink = motion.create(Link);
 
 /**
  * TOKENS
@@ -399,7 +403,7 @@ const RotatingCourseWord = memo(function RotatingCourseWord({ words }) {
   }, [words]);
 
   return (
-    <span className="text-[#FFDE21] text-4xl sm:text-6xl">
+    <span className="text-[#FFDE21] whitespace-nowrap text-[clamp(20px,7.5vw,60px)]">
       <SlotText text={words[index]} options={{ direction: "up", stagger: 40 }} />
     </span>
   );
