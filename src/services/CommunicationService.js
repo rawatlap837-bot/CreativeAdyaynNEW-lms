@@ -802,7 +802,7 @@ export async function getMyTeacherAnnouncements({
           courseTitle:
             announcement.courseId
               ? announcement.courseTitle ||
-                "Course"
+              "Course"
               : null,
         })
       )
@@ -1009,6 +1009,104 @@ export async function getMyCreatedAnnouncements({
 }
 
 /* ============================================================
+   TEACHER ACTIVITY NOTIFICATIONS
+============================================================ */
+
+/**
+ * Build a notification feed from activity in the teacher's courses.
+ * These are derived from the source collections, so no duplicate
+ * notification documents are needed.
+ */
+export async function getTeacherActivityNotifications({
+  limitCount = 50,
+} = {}) {
+  const teacherCourses = await getMyTeacherCourses();
+  const announcements = await getMyTeacherAnnouncements({
+    limitCount,
+  });
+
+  const activities = [
+    ...teacherCourses.map((course) => ({
+      id: `course-${course.id}`,
+      type: "course",
+      title: "Course updated",
+      message: course.title || course.name || "Your course was updated.",
+      courseId: course.id,
+      actionUrl: `/teacher/courses/${course.id}`,
+      createdAt: course.updatedAt || course.createdAt,
+    })),
+    ...announcements.map((announcement) => ({
+      id: `announcement-${announcement.id}`,
+      type: "announcement",
+      title: announcement.title || "New announcement",
+      message: announcement.body || announcement.message || "Announcement updated.",
+      courseId: announcement.courseId || null,
+      actionUrl: announcement.courseId
+        ? `/teacher/courses/${announcement.courseId}`
+        : "/teacher",
+      createdAt: announcement.updatedAt || announcement.createdAt,
+    })),
+  ];
+
+  const courseActivities = await Promise.all(
+    teacherCourses.map(async (course) => {
+      if (!course?.id) return [];
+
+      const [assignmentSnapshot, attendanceSnapshot] = await Promise.all([
+        getDocs(
+          query(
+            collection(db, "assignments"),
+            where("courseId", "==", course.id)
+          )
+        ),
+        getDocs(
+          query(
+            collection(db, "attendanceSessions"),
+            where("courseId", "==", course.id)
+          )
+        ),
+      ]);
+
+      return [
+        ...assignmentSnapshot.docs.map((assignmentDoc) => {
+          const assignment = assignmentDoc.data();
+
+          return {
+            id: `assignment-${assignmentDoc.id}`,
+            type: "assignment",
+            title: assignment.title || "Assignment updated",
+            message: `Assignment in ${course.title || "your course"}`,
+            courseId: course.id,
+            actionUrl: `/teacher/courses/${course.id}/assignments`,
+            createdAt: assignment.updatedAt || assignment.createdAt,
+          };
+        }),
+        ...attendanceSnapshot.docs.map((sessionDoc) => {
+          const session = sessionDoc.data();
+
+          return {
+            id: `attendance-${sessionDoc.id}`,
+            type: "attendance",
+            title: session.title || "Attendance session",
+            message: `Attendance activity in ${course.title || "your course"}`,
+            courseId: course.id,
+            actionUrl: "/teacher/attendance",
+            createdAt: session.updatedAt || session.createdAt,
+          };
+        }),
+      ];
+    })
+  );
+
+  return sortNewestFirst(
+    removeDuplicates([
+      ...activities,
+      ...courseActivities.flat(),
+    ])
+  ).slice(0, limitCount);
+}
+
+/* ============================================================
    CREATE ANNOUNCEMENT
 ============================================================ */
 
@@ -1033,7 +1131,7 @@ export async function createAnnouncement({
   courseId = null,
   pinned = false,
   status =
-    ANNOUNCEMENT_STATUS.PUBLISHED,
+  ANNOUNCEMENT_STATUS.PUBLISHED,
 }) {
   const user =
     requireAuthUser();
@@ -1068,9 +1166,9 @@ export async function createAnnouncement({
 
   if (
     finalAudience !==
-      ANNOUNCEMENT_AUDIENCE.GLOBAL &&
+    ANNOUNCEMENT_AUDIENCE.GLOBAL &&
     finalAudience !==
-      ANNOUNCEMENT_AUDIENCE.COURSE
+    ANNOUNCEMENT_AUDIENCE.COURSE
   ) {
     throw new Error(
       "Invalid announcement audience."
@@ -1079,7 +1177,7 @@ export async function createAnnouncement({
 
   if (
     finalAudience ===
-      ANNOUNCEMENT_AUDIENCE.COURSE &&
+    ANNOUNCEMENT_AUDIENCE.COURSE &&
     !courseId
   ) {
     throw new Error(
@@ -1089,9 +1187,9 @@ export async function createAnnouncement({
 
   if (
     status !==
-      ANNOUNCEMENT_STATUS.DRAFT &&
+    ANNOUNCEMENT_STATUS.DRAFT &&
     status !==
-      ANNOUNCEMENT_STATUS.PUBLISHED
+    ANNOUNCEMENT_STATUS.PUBLISHED
   ) {
     throw new Error(
       "Invalid announcement status."
@@ -1190,7 +1288,7 @@ export async function createAnnouncement({
 
     courseId:
       finalAudience ===
-      ANNOUNCEMENT_AUDIENCE.COURSE
+        ANNOUNCEMENT_AUDIENCE.COURSE
         ? courseId
         : null,
 
@@ -1335,9 +1433,9 @@ export async function updateAnnouncement(
   ) {
     if (
       updates.status !==
-        ANNOUNCEMENT_STATUS.DRAFT &&
+      ANNOUNCEMENT_STATUS.DRAFT &&
       updates.status !==
-        ANNOUNCEMENT_STATUS.PUBLISHED
+      ANNOUNCEMENT_STATUS.PUBLISHED
     ) {
       throw new Error(
         "Invalid announcement status."
@@ -2044,6 +2142,124 @@ export async function getMyNotifications({
 }
 
 /**
+ * Build the admin activity feed without Cloud Functions.
+ * This reads source collections directly, so it works on the Spark plan.
+ */
+export async function getAdminActivityNotifications({
+  limitCount = 100,
+} = {}) {
+  await requireAdmin();
+
+  const [users, enrollments, payments, courses, announcements] =
+    await Promise.all([
+      getDocs(collection(db, "users")),
+      getDocs(collection(db, "enrollments")),
+      getDocs(collection(db, "payments")),
+      getDocs(collection(db, "courses")),
+      getDocs(collection(db, "announcements")),
+    ]);
+
+  const activities = [];
+  const addActivity = (id, type, title, message, link, data = {}) => {
+    const createdAt =
+      data.createdAt || data.updatedAt || data.date || null;
+
+    if (!createdAt) return;
+
+    activities.push({
+      id,
+      type,
+      title,
+      message,
+      link,
+      courseId: data.courseId || null,
+      createdAt,
+      read: false,
+    });
+  };
+
+  users.docs.forEach((item) => {
+    const user = item.data();
+    if (user.role === "admin") return;
+
+    addActivity(
+      `user-${item.id}`,
+      "system",
+      "New user joined",
+      `${user.name || user.fullName || user.email || "A user"} joined as ${user.role || "student"}.`,
+      "/admin/students",
+      user
+    );
+  });
+
+  enrollments.docs.forEach((item) => {
+    const enrollment = item.data();
+    addActivity(
+      `enrollment-${item.id}`,
+      "enrollment",
+      "New enrollment",
+      `A student enrolled in ${enrollment.courseName || "a course"}.`,
+      "/admin/students",
+      enrollment
+    );
+  });
+
+  payments.docs.forEach((item) => {
+    const payment = item.data();
+    const isRefund = ["refunded", "refund_completed"].includes(payment.status);
+    const isPaid = payment.status === "paid" || payment.status === "captured";
+
+    if (!isRefund && !isPaid) return;
+
+    addActivity(
+      `payment-${item.id}`,
+      isRefund ? "refund" : "payment",
+      isRefund ? "Refund processed" : "Payment received",
+      isRefund
+        ? `A refund was processed for ${payment.courseName || "a course"}.`
+        : `Payment received for ${payment.courseName || "a course"}.`,
+      "/admin/payments",
+      payment
+    );
+  });
+
+  courses.docs.forEach((item) => {
+    const course = item.data();
+    addActivity(
+      `course-${item.id}`,
+      course.status === "published" ? "course_published" : "course_updated",
+      course.status === "published" ? "Course published" : "Course updated",
+      course.title || course.name || "A course was updated.",
+      "/admin/courses",
+      { ...course, courseId: item.id }
+    );
+  });
+
+  announcements.docs.forEach((item) => {
+    const announcement = item.data();
+    const expired = announcement.status === "expired";
+    if (announcement.status !== "published" && !expired) return;
+
+    addActivity(
+      `announcement-${item.id}`,
+      expired ? "announcement_expired" : "announcement",
+      expired ? "Announcement expired" : "New announcement",
+      announcement.title || "An announcement was published.",
+      "/admin/announcements",
+      announcement
+    );
+  });
+
+  return activities
+    .sort(
+      (a, b) =>
+        getTimestampValue(b.createdAt) -
+        getTimestampValue(a.createdAt)
+    )
+    .slice(0, limitCount);
+}
+
+/**
  * Get unread notification count.
  */
 export async function getUnreadNotificationCount() {
@@ -2215,7 +2431,7 @@ export async function deleteNotification(
 export async function createNotification({
   recipientId,
   type =
-    NOTIFICATION_TYPES.SYSTEM,
+  NOTIFICATION_TYPES.SYSTEM,
   title,
   message,
   link = "",

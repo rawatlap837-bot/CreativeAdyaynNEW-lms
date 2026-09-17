@@ -6,6 +6,7 @@ import {
 } from "firebase/storage";
 
 import { auth, storage } from "../firebase/Firebase";
+import { uploadImage } from "../lib/Cloudinary";
 
 /* --------------------------------------------------
    AUTH
@@ -347,6 +348,29 @@ export async function uploadAssignmentSubmission(
 ) {
   if (!assignmentId) {
     throw new Error("Assignment ID is required.");
+  }
+
+  const imageTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/avif",
+  ];
+
+  if (imageTypes.includes(file?.type)) {
+    const user = requireUser();
+    const result = await uploadImage(file, {
+      folder: `lms/assignments/${assignmentId}/submissions/${user.uid}`,
+      onProgress,
+    });
+
+    return {
+      url: result.url,
+      path: result.publicId,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    };
   }
 
   return uploadFile(

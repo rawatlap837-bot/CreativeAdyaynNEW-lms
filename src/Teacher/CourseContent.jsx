@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -15,7 +15,6 @@ import {
   Plus,
   Send,
   Trash2,
-  Upload,
   Video,
   X,
 } from "lucide-react";
@@ -35,9 +34,7 @@ import {
 
 import {
   deleteObject,
-  getDownloadURL,
   ref,
-  uploadBytesResumable,
 } from "firebase/storage";
 
 import { auth, db, storage } from "../firebase/Firebase";
@@ -54,6 +51,18 @@ const LESSON_TYPES = {
   VIDEO: "video",
   TEXT: "text",
 };
+
+function isYouTubeLink(value) {
+  try {
+    const url = new URL(value);
+    return (
+      url.hostname.includes("youtube.com") ||
+      url.hostname.includes("youtu.be")
+    );
+  } catch {
+    return false;
+  }
+}
 
 export default function CourseContent() {
   const { courseId } = useParams();
@@ -89,12 +98,7 @@ export default function CourseContent() {
     isPreview: false,
   });
 
-  const [lessonVideo, setLessonVideo] = useState(null);
-  const [videoPreviewUrl, setVideoPreviewUrl] = useState("");
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadingVideo, setUploadingVideo] = useState(false);
-
-  const videoInputRef = useRef(null);
+  const [videoLinkInput, setVideoLinkInput] = useState("");
 
   useEffect(() => {
     loadCourse();
@@ -507,14 +511,7 @@ export default function CourseContent() {
       isPreview: false,
     });
 
-    setLessonVideo(null);
-
-    if (videoPreviewUrl) {
-      URL.revokeObjectURL(videoPreviewUrl);
-    }
-
-    setVideoPreviewUrl("");
-    setUploadProgress(0);
+    setVideoLinkInput("");
 
     setShowLessonModal(true);
   };
@@ -537,32 +534,16 @@ export default function CourseContent() {
       isPreview: Boolean(lesson.isPreview),
     });
 
-    setLessonVideo(null);
-
-    if (videoPreviewUrl) {
-      URL.revokeObjectURL(videoPreviewUrl);
-    }
-
-    setVideoPreviewUrl("");
-    setUploadProgress(0);
+    setVideoLinkInput(lesson.videoUrl || "");
 
     setShowLessonModal(true);
   };
 
   const closeLessonModal = () => {
-    if (uploadingVideo) return;
-
     setShowLessonModal(false);
     setEditingLesson(null);
     setActiveModuleId(null);
-    setLessonVideo(null);
-
-    if (videoPreviewUrl) {
-      URL.revokeObjectURL(videoPreviewUrl);
-    }
-
-    setVideoPreviewUrl("");
-    setUploadProgress(0);
+    setVideoLinkInput("");
   };
 
   const updateLessonField = (field, value) => {
@@ -572,101 +553,6 @@ export default function CourseContent() {
     }));
 
     clearMessages();
-  };
-
-  const handleLessonVideoChange = (event) => {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-
-    if (!file.type.startsWith("video/")) {
-      setError("Please select a valid video file.");
-      return;
-    }
-
-    /*
-     * Keep the same 500MB limit used by the Storage rules.
-     */
-    if (file.size > 500 * 1024 * 1024) {
-      setError("Video must be smaller than 500MB.");
-      return;
-    }
-
-    if (videoPreviewUrl) {
-      URL.revokeObjectURL(videoPreviewUrl);
-    }
-
-    setLessonVideo(file);
-    setVideoPreviewUrl(URL.createObjectURL(file));
-
-    setError("");
-    setSuccess("");
-  };
-
-  const uploadLessonVideo = async (
-    moduleId,
-    lessonId,
-    file
-  ) => {
-    const extension =
-      file.name.split(".").pop()?.toLowerCase() || "mp4";
-
-    const safeExtension = extension.replace(
-      /[^a-z0-9]/g,
-      ""
-    );
-
-    /*
-     * Matches storage.rules:
-     *
-     * courseVideos/{courseId}/{moduleId}/{lessonId}/{fileName}
-     */
-    const storagePath =
-      `courseVideos/${courseId}/${moduleId}/${lessonId}/` +
-      `video-${Date.now()}.${safeExtension}`;
-
-    const storageRef = ref(storage, storagePath);
-
-    const uploadTask = uploadBytesResumable(
-      storageRef,
-      file,
-      {
-        contentType: file.type,
-      }
-    );
-
-    return new Promise((resolve, reject) => {
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const progress = Math.round(
-            (snapshot.bytesTransferred /
-              snapshot.totalBytes) *
-            100
-          );
-
-          setUploadProgress(progress);
-        },
-        (uploadError) => {
-          reject(uploadError);
-        },
-        async () => {
-          try {
-            const downloadUrl =
-              await getDownloadURL(
-                uploadTask.snapshot.ref
-              );
-
-            resolve({
-              url: downloadUrl,
-              path: storagePath,
-            });
-          } catch (error) {
-            reject(error);
-          }
-        }
-      );
-    });
   };
 
   const deleteLessonVideo = async (videoPath) => {
@@ -698,9 +584,19 @@ export default function CourseContent() {
     if (
       lessonForm.type === LESSON_TYPES.VIDEO &&
       !editingLesson &&
-      !lessonVideo
+      !videoLinkInput.trim()
     ) {
-      setError("Please upload a video for this lesson.");
+      setError("Please paste a YouTube video link.");
+      return;
+    }
+
+    if (
+      lessonForm.type === LESSON_TYPES.VIDEO &&
+      videoLinkInput.trim() &&
+      !isYouTubeLink(videoLinkInput.trim()) &&
+      videoLinkInput.trim() !== lessonForm.videoUrl
+    ) {
+      setError("Please paste a valid YouTube video link.");
       return;
     }
 
@@ -718,6 +614,21 @@ export default function CourseContent() {
       );
 
       let lessonId = editingLesson?.id;
+      let videoUrl = lessonForm.videoUrl || null;
+      let videoPath = lessonForm.videoPath || null;
+
+      if (
+        lessonForm.type === LESSON_TYPES.VIDEO &&
+        videoLinkInput.trim() &&
+        isYouTubeLink(videoLinkInput.trim())
+      ) {
+        if (videoPath) {
+          await deleteLessonVideo(videoPath);
+        }
+
+        videoUrl = videoLinkInput.trim();
+        videoPath = null;
+      }
 
       /*
        * ---------------------------------------------------
@@ -739,8 +650,15 @@ export default function CourseContent() {
             description:
               lessonForm.description.trim(),
             duration: lessonForm.duration.trim(),
-            videoUrl: null,
-            videoPath: null,
+            videoUrl:
+              lessonForm.type === LESSON_TYPES.VIDEO
+                ? videoUrl
+                : null,
+            videoPath:
+              lessonForm.type === LESSON_TYPES.VIDEO
+                ? videoPath
+                : null,
+            published: true,
             isPreview: Boolean(
               lessonForm.isPreview
             ),
@@ -751,44 +669,6 @@ export default function CourseContent() {
         );
 
         lessonId = newLessonRef.id;
-      }
-
-      /*
-       * ---------------------------------------------------
-       * UPLOAD VIDEO
-       * ---------------------------------------------------
-       */
-      let videoUrl = lessonForm.videoUrl || null;
-      let videoPath = lessonForm.videoPath || null;
-
-      if (
-        lessonForm.type === LESSON_TYPES.VIDEO &&
-        lessonVideo
-      ) {
-        setUploadingVideo(true);
-        setUploadProgress(0);
-
-        const uploaded = await uploadLessonVideo(
-          activeModuleId,
-          lessonId,
-          lessonVideo
-        );
-
-        /*
-         * Delete old video only after the new upload
-         * has successfully completed.
-         */
-        if (
-          videoPath &&
-          videoPath !== uploaded.path
-        ) {
-          await deleteLessonVideo(videoPath);
-        }
-
-        videoUrl = uploaded.url;
-        videoPath = uploaded.path;
-
-        setUploadingVideo(false);
       }
 
       /*
@@ -806,25 +686,25 @@ export default function CourseContent() {
         lessonId
       );
 
-      await updateDoc(lessonRef, {
-        title: lessonForm.title.trim(),
-        type: lessonForm.type,
-        description:
-          lessonForm.description.trim(),
-        duration: lessonForm.duration.trim(),
-        videoUrl:
-          lessonForm.type === LESSON_TYPES.VIDEO
-            ? videoUrl
-            : null,
-        videoPath:
-          lessonForm.type === LESSON_TYPES.VIDEO
-            ? videoPath
-            : null,
-        isPreview: Boolean(
-          lessonForm.isPreview
-        ),
-        updatedAt: serverTimestamp(),
-      });
+      if (editingLesson) {
+        await updateDoc(lessonRef, {
+          title: lessonForm.title.trim(),
+          type: lessonForm.type,
+          description: lessonForm.description.trim(),
+          duration: lessonForm.duration.trim(),
+          videoUrl:
+            lessonForm.type === LESSON_TYPES.VIDEO
+              ? videoUrl
+              : null,
+          videoPath:
+            lessonForm.type === LESSON_TYPES.VIDEO
+              ? videoPath
+              : null,
+          published: true,
+          isPreview: Boolean(lessonForm.isPreview),
+          updatedAt: serverTimestamp(),
+        });
+      }
 
       closeLessonModal();
 
@@ -838,14 +718,11 @@ export default function CourseContent() {
     } catch (err) {
       console.error("Save lesson error:", err);
 
-      setUploadingVideo(false);
-
       setError(
         err?.message || "Unable to save lesson."
       );
     } finally {
       setSaving(false);
-      setUploadProgress(0);
     }
   };
 
@@ -1667,7 +1544,7 @@ export default function CourseContent() {
               : "Add Lesson"
           }
           onClose={closeLessonModal}
-          disabled={saving || uploadingVideo}
+          disabled={saving}
           wide
         >
           <div className="space-y-5">
@@ -1688,7 +1565,7 @@ export default function CourseContent() {
                 }
                 placeholder="e.g. What is Digital Marketing?"
                 disabled={
-                  saving || uploadingVideo
+                  saving
                 }
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
               />
@@ -1716,7 +1593,7 @@ export default function CourseContent() {
                     )
                   }
                   disabled={
-                    saving || uploadingVideo
+                    saving
                   }
                 />
 
@@ -1735,7 +1612,7 @@ export default function CourseContent() {
                     )
                   }
                   disabled={
-                    saving || uploadingVideo
+                    saving
                   }
                 />
               </div>
@@ -1758,7 +1635,7 @@ export default function CourseContent() {
                 }
                 placeholder="Explain what students will learn in this lesson."
                 disabled={
-                  saving || uploadingVideo
+                  saving
                 }
                 className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
               />
@@ -1781,7 +1658,7 @@ export default function CourseContent() {
                 }
                 placeholder="e.g. 12 min"
                 disabled={
-                  saving || uploadingVideo
+                  saving
                 }
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
               />
@@ -1795,118 +1672,21 @@ export default function CourseContent() {
                     Lesson Video
                   </label>
 
-                  {videoPreviewUrl ? (
-                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-black">
-                      <video
-                        src={videoPreviewUrl}
-                        controls
-                        className="max-h-[300px] w-full"
-                      />
-
-                      <div className="flex items-center justify-between gap-3 bg-white px-4 py-3">
-                        <span className="max-w-[70%] truncate text-xs text-slate-500">
-                          {lessonVideo?.name}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (
-                              uploadingVideo
-                            ) {
-                              return;
-                            }
-
-                            if (
-                              videoPreviewUrl
-                            ) {
-                              URL.revokeObjectURL(
-                                videoPreviewUrl
-                              );
-                            }
-
-                            setLessonVideo(
-                              null
-                            );
-                            setVideoPreviewUrl(
-                              ""
-                            );
-
-                            if (
-                              videoInputRef.current
-                            ) {
-                              videoInputRef.current.value =
-                                "";
-                            }
-                          }}
-                          disabled={
-                            uploadingVideo
-                          }
-                          className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        videoInputRef.current?.click()
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                    <input
+                      type="url"
+                      value={videoLinkInput}
+                      onChange={(event) =>
+                        setVideoLinkInput(event.target.value)
                       }
-                      disabled={
-                        saving ||
-                        uploadingVideo
-                      }
-                      className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center hover:border-blue-400 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm">
-                        <Upload size={22} />
-                      </div>
-
-                      <span className="mt-3 text-sm font-semibold text-slate-700">
-                        {editingLesson
-                          ? "Replace video"
-                          : "Upload lesson video"}
-                      </span>
-
-                      <span className="mt-1 text-xs text-slate-400">
-                        MP4, WebM or other browser-supported
-                        video · Max 500MB
-                      </span>
-                    </button>
-                  )}
-
-                  <input
-                    ref={videoInputRef}
-                    type="file"
-                    accept="video/*"
-                    onChange={
-                      handleLessonVideoChange
-                    }
-                    className="hidden"
-                    disabled={
-                      saving ||
-                      uploadingVideo
-                    }
-                  />
-
-                  {editingLesson &&
-                    !videoPreviewUrl &&
-                    lessonForm.videoUrl && (
-                      <div className="mt-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                        <PlayCircle
-                          size={16}
-                          className="text-blue-600"
-                        />
-
-                        <span>
-                          Existing video is attached.
-                          Upload a new video to replace
-                          it.
-                        </span>
-                      </div>
-                    )}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      disabled={saving}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
+                    />
+                    <p className="mt-2 text-xs text-slate-500">
+                      Students will watch this video inside the LMS.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -1926,7 +1706,7 @@ export default function CourseContent() {
                       )
                     }
                     disabled={
-                      saving || uploadingVideo
+                      saving
                     }
                     className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
                   />
@@ -1944,43 +1724,12 @@ export default function CourseContent() {
                 </label>
               )}
 
-            {/* Progress */}
-            {uploadingVideo && (
-              <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                <div className="mb-2 flex items-center justify-between text-xs">
-                  <span className="font-semibold text-blue-900">
-                    Uploading video...
-                  </span>
-
-                  <span className="font-medium text-blue-700">
-                    {uploadProgress}%
-                  </span>
-                </div>
-
-                <div className="h-2 overflow-hidden rounded-full bg-blue-100">
-                  <div
-                    className="h-full rounded-full bg-blue-600 transition-all"
-                    style={{
-                      width: `${uploadProgress}%`,
-                    }}
-                  />
-                </div>
-
-                <p className="mt-2 text-xs text-blue-700">
-                  Keep this window open until the upload
-                  finishes.
-                </p>
-              </div>
-            )}
-
             {/* Actions */}
             <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={closeLessonModal}
-                disabled={
-                  saving || uploadingVideo
-                }
+                disabled={saving}
                 className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
               >
                 Cancel
@@ -1989,12 +1738,10 @@ export default function CourseContent() {
               <button
                 type="button"
                 onClick={saveLesson}
-                disabled={
-                  saving || uploadingVideo
-                }
+                disabled={saving}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
               >
-                {saving || uploadingVideo ? (
+                {saving ? (
                   <Loader2
                     size={17}
                     className="animate-spin"
@@ -2003,11 +1750,9 @@ export default function CourseContent() {
                   <Check size={17} />
                 )}
 
-                {uploadingVideo
-                  ? "Uploading..."
-                  : editingLesson
-                    ? "Save Lesson"
-                    : "Create Lesson"}
+                {editingLesson
+                  ? "Save Lesson"
+                  : "Create Lesson"}
               </button>
             </div>
           </div>
@@ -2046,8 +1791,8 @@ function LessonRow({
 
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isVideo
-              ? "bg-blue-50 text-blue-600"
-              : "bg-slate-100 text-slate-600"
+            ? "bg-blue-50 text-blue-600"
+            : "bg-slate-100 text-slate-600"
             }`}
         >
           {isVideo ? (
@@ -2208,15 +1953,15 @@ function LessonTypeCard({
       onClick={onClick}
       disabled={disabled}
       className={`rounded-xl border-2 p-4 text-left transition ${selected
-          ? "border-blue-600 bg-blue-50"
-          : "border-slate-200 hover:border-slate-300"
+        ? "border-blue-600 bg-blue-50"
+        : "border-slate-200 hover:border-slate-300"
         } disabled:cursor-not-allowed disabled:opacity-50`}
     >
       <div className="flex items-center gap-3">
         <div
           className={`flex h-10 w-10 items-center justify-center rounded-xl ${selected
-              ? "bg-blue-100 text-blue-600"
-              : "bg-slate-100 text-slate-500"
+            ? "bg-blue-100 text-blue-600"
+            : "bg-slate-100 text-slate-500"
             }`}
         >
           {icon}
@@ -2314,8 +2059,8 @@ function IconButton({
       onClick={onClick}
       disabled={disabled}
       className={`flex h-9 w-9 items-center justify-center rounded-lg border bg-white transition disabled:cursor-not-allowed disabled:opacity-40 ${danger
-          ? "border-red-200 text-red-500 hover:bg-red-50"
-          : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+        ? "border-red-200 text-red-500 hover:bg-red-50"
+        : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800"
         }`}
     >
       {children}

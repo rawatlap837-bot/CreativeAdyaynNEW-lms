@@ -268,22 +268,26 @@ export const submitAssignment = async (
             submissionRef
         );
 
+        const existingData = existingSubmission.exists()
+            ? existingSubmission.data()
+            : {};
+
         const data = {
             ...submissionData,
             studentId,
 
+            // Always send protected grading fields so Firestore rules can
+            // validate resubmissions consistently, including older records.
+            grade: existingData.grade ?? null,
+            feedback: existingData.feedback ?? "",
+            gradedAt: existingData.gradedAt ?? null,
+            gradedBy: existingData.gradedBy ?? null,
+
             updatedAt: serverTimestamp(),
 
-            // Keep grading information safe when resubmitting.
             ...(existingSubmission.exists()
-                ? {}
-                : {
-                    grade: null,
-                    feedback: "",
-                    gradedAt: null,
-                    gradedBy: null,
-                    submittedAt: serverTimestamp(),
-                }),
+                ? { submittedAt: existingData.submittedAt ?? serverTimestamp() }
+                : { submittedAt: serverTimestamp() }),
         };
 
         await setDoc(
@@ -430,6 +434,27 @@ export const getMyAssignments = async (courseIds = []) => {
         const assignments = [];
 
         for (const courseId of courseIds) {
+            let courseName = "";
+
+            try {
+                const courseSnapshot = await getDoc(
+                    doc(db, "courses", courseId)
+                );
+
+                if (courseSnapshot.exists()) {
+                    const course = courseSnapshot.data();
+                    courseName =
+                        course.title ||
+                        course.courseName ||
+                        "";
+                }
+            } catch (courseError) {
+                console.warn(
+                    `Failed to load course name for ${courseId}:`,
+                    courseError
+                );
+            }
+
             const q = query(
                 collection(db, "assignments"),
                 where("courseId", "==", courseId),
@@ -441,6 +466,7 @@ export const getMyAssignments = async (courseIds = []) => {
             snapshot.docs.forEach((assignmentDoc) => {
                 assignments.push({
                     id: assignmentDoc.id,
+                    courseName,
                     ...assignmentDoc.data(),
                 });
             });
@@ -456,16 +482,27 @@ export const getMyAssignments = async (courseIds = []) => {
             ).values()
         );
 
-        // Sort by due date when available.
+        // Show the newest published assignments first.
         uniqueAssignments.sort((a, b) => {
-            const aDate = getDateValue(a.dueDate);
-            const bDate = getDateValue(b.dueDate);
+            const aCreatedAt = getDateValue(a.createdAt);
+            const bCreatedAt = getDateValue(b.createdAt);
 
-            if (aDate === null && bDate === null) return 0;
-            if (aDate === null) return 1;
-            if (bDate === null) return -1;
+            if (aCreatedAt !== null || bCreatedAt !== null) {
+                if (aCreatedAt === null) return 1;
+                if (bCreatedAt === null) return -1;
 
-            return aDate - bDate;
+                return bCreatedAt - aCreatedAt;
+            }
+
+            // Keep a predictable order for legacy records without createdAt.
+            const aDueDate = getDateValue(a.dueDate);
+            const bDueDate = getDateValue(b.dueDate);
+
+            if (aDueDate === null && bDueDate === null) return 0;
+            if (aDueDate === null) return 1;
+            if (bDueDate === null) return -1;
+
+            return aDueDate - bDueDate;
         });
 
         return uniqueAssignments;

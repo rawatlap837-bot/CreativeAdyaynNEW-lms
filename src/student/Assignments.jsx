@@ -455,9 +455,6 @@ export default function Assignments({
                 [assignment.id]: 100,
             }));
 
-            alert(
-                "Assignment submitted successfully."
-            );
         } catch (err) {
             console.error(
                 "Assignment submission error:",
@@ -748,6 +745,12 @@ export default function Assignments({
 
                                                     <p className="mt-1 text-sm text-gray-500">
                                                         {assignment.points || 100} points
+                                                    </p>
+
+                                                    <p className="mt-1 truncate text-sm font-medium text-indigo-600">
+                                                        {assignment.courseName ||
+                                                            assignment.courseTitle ||
+                                                            `Course ${assignment.courseId || ""}`}
                                                     </p>
 
                                                 </div>

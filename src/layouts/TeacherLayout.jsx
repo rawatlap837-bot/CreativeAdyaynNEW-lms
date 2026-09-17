@@ -15,12 +15,189 @@ import {
   X,
   ChevronRight,
   UserCircle,
+  Bell,
+  Check,
+  Loader2,
 } from "lucide-react";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../firebase/Firebase";
 import CA2Logo from "../assets/Images/CA.png";
+import {
+  getTeacherActivityNotifications,
+} from "../services/CommunicationService";
+
+function TeacherNotificationBell() {
+  const navigate = useNavigate();
+  const [notifications, setNotifications] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [readIds, setReadIds] = useState(() => new Set());
+  const boxRef = useRef(null);
+  const readStorageKey = auth.currentUser
+    ? `teacher-notifications-read-${auth.currentUser.uid}`
+    : "teacher-notifications-read";
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem(readStorageKey) || "[]"
+      );
+      setReadIds(new Set(stored));
+    } catch {
+      setReadIds(new Set());
+    }
+  }, [readStorageKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadNotifications = async () => {
+      if (!auth.currentUser) {
+        setNotifications([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const items = await getTeacherActivityNotifications();
+
+        if (!cancelled) {
+          setNotifications(items);
+        }
+      } catch (error) {
+        console.error("Failed to load teacher notifications:", error);
+        if (!cancelled) setNotifications([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.currentUser?.uid]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (boxRef.current && !boxRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const unreadCount = notifications.filter(
+    (notification) => !readIds.has(notification.id)
+  ).length;
+
+  const markRead = (notificationId) => {
+    const next = new Set(readIds);
+    next.add(notificationId);
+    setReadIds(next);
+    localStorage.setItem(
+      readStorageKey,
+      JSON.stringify([...next].slice(-100))
+    );
+  };
+
+  const markAllRead = () => {
+    const next = new Set(notifications.map((notification) => notification.id));
+    setReadIds(next);
+    localStorage.setItem(readStorageKey, JSON.stringify([...next].slice(-100)));
+  };
+
+  const openNotification = (notification) => {
+    markRead(notification.id);
+    setOpen(false);
+
+    if (notification.actionUrl) {
+      navigate(notification.actionUrl);
+    }
+  };
+
+  return (
+    <div ref={boxRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-violet-600"
+        aria-label="Open teacher notifications"
+      >
+        <Bell size={20} />
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <div>
+              <p className="text-sm font-bold text-slate-900">Notifications</p>
+              <p className="text-xs text-slate-400">Course activity for you</p>
+            </div>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="text-xs font-semibold text-violet-600 hover:text-violet-700"
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-[min(420px,70vh)] overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500">
+                <Loader2 size={17} className="animate-spin" />
+                Loading activity...
+              </div>
+            ) : notifications.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-slate-500">
+                No course activity yet.
+              </p>
+            ) : (
+              notifications.map((notification) => {
+                const isRead = readIds.has(notification.id);
+
+                return (
+                  <button
+                    type="button"
+                    key={notification.id}
+                    onClick={() => openNotification(notification)}
+                    className={`flex w-full gap-3 border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 ${isRead ? "bg-white" : "bg-violet-50/50"}`}
+                  >
+                    <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isRead ? "bg-slate-100 text-slate-400" : "bg-violet-100 text-violet-600"}`}>
+                      {isRead ? <Check size={15} /> : <Bell size={15} />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-slate-800">
+                        {notification.title}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        {notification.message}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const TeacherLayout = () => {
   const navigate = useNavigate();
@@ -145,6 +322,10 @@ const TeacherLayout = () => {
               className="h-9 w-9 rounded-lg object-contain"
             />
 
+          </div>
+
+          <div className="ml-auto">
+            <TeacherNotificationBell />
           </div>
 
         </div>
@@ -454,6 +635,8 @@ const TeacherLayout = () => {
           {/* TEACHER */}
 
           <div className="flex items-center gap-3">
+
+            <TeacherNotificationBell />
 
             <div className="hidden text-right xl:block">
 

@@ -5,9 +5,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../firebase/Firebase";
 
 import {
-  subscribeToMyNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
+  getAdminActivityNotifications,
 } from "../services/CommunicationService";
 
 import {
@@ -445,9 +443,14 @@ function HeaderBell() {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [readIds, setReadIds] = useState(() => new Set());
 
   const boxRef = useRef(null);
   const navigate = useNavigate();
+
+  const readStorageKey = auth.currentUser
+    ? `admin-activity-read-${auth.currentUser.uid}`
+    : "admin-activity-read";
 
   /* --------------------------------------------------------------
    * Real-time notification subscription
@@ -462,31 +465,39 @@ function HeaderBell() {
 
     setLoading(true);
 
-    let unsubscribe;
+    let cancelled = false;
 
-    try {
-      unsubscribe = subscribeToMyNotifications(
-        (items) => {
-          setNotifications(items || []);
-          setLoading(false);
-        }
-      );
-    } catch (error) {
-      console.error(
-        "Notification subscription failed:",
-        error
-      );
-
-      setNotifications([]);
-      setLoading(false);
-    }
-
-    return () => {
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
+    const load = async () => {
+      try {
+        const items = await getAdminActivityNotifications();
+        if (!cancelled) setNotifications(items || []);
+      } catch (error) {
+        console.error("Admin activity feed failed:", error);
+        if (!cancelled) setNotifications([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
+
+    load();
+    const interval = window.setInterval(load, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem(readStorageKey) || "[]"
+      );
+      setReadIds(new Set(stored));
+    } catch {
+      setReadIds(new Set());
+    }
+  }, [readStorageKey]);
 
   /* --------------------------------------------------------------
    * Close notification dropdown when clicking outside
@@ -529,8 +540,7 @@ function HeaderBell() {
    * -------------------------------------------------------------- */
 
   const unreadCount = notifications.filter(
-    (notification) =>
-      notification.read !== true
+    (notification) => !readIds.has(notification.id)
   ).length;
 
   /* --------------------------------------------------------------
@@ -541,14 +551,10 @@ function HeaderBell() {
     notification
   ) {
     try {
-      if (
-        notification.read !== true &&
-        notification.id
-      ) {
-        await markNotificationRead(
-          notification.id
-        );
-      }
+      const next = new Set(readIds);
+      next.add(notification.id);
+      setReadIds(next);
+      localStorage.setItem(readStorageKey, JSON.stringify([...next].slice(-200)));
 
       setOpen(false);
 
@@ -575,14 +581,9 @@ function HeaderBell() {
    * -------------------------------------------------------------- */
 
   async function handleMarkAllRead() {
-    try {
-      await markAllNotificationsRead();
-    } catch (error) {
-      console.error(
-        "Failed to mark all notifications as read:",
-        error
-      );
-    }
+    const next = new Set(notifications.map((notification) => notification.id));
+    setReadIds(next);
+    localStorage.setItem(readStorageKey, JSON.stringify([...next].slice(-200)));
   }
 
   /* --------------------------------------------------------------

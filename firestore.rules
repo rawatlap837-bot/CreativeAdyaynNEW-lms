@@ -60,6 +60,18 @@ service cloud.firestore {
         ).data.instructorId == request.auth.uid;
     }
 
+    // Single source of truth for "is the parent course published".
+    // Used by modules + lessons so we're not doing 2-3 separate
+    // get() calls per document during list queries.
+    function isCoursePublished(courseId) {
+      return exists(
+        /databases/$(database)/documents/courses/$(courseId)
+      )
+      && get(
+        /databases/$(database)/documents/courses/$(courseId)
+      ).data.status == "published";
+    }
+
     function isEnrolled(courseId) {
       return isSignedIn()
         && exists(
@@ -142,6 +154,11 @@ service cloud.firestore {
 
     // ============================================================
     // COURSE MODULES
+    //
+    // Anyone (signed in or not) can read modules of a published
+    // course. Owners/enrolled students can read regardless of
+    // publish state (e.g. drafts, or a course that was unpublished
+    // after they enrolled).
     // ============================================================
 
     match /courses/{courseId}/modules/{moduleId} {
@@ -150,18 +167,7 @@ service cloud.firestore {
         isAdmin()
         || isCourseOwner(courseId)
         || isEnrolled(courseId)
-        || (
-          isSignedIn() == false
-          && get(
-            /databases/$(database)/documents/courses/$(courseId)
-          ).data.status == "published"
-        )
-        || (
-          isSignedIn()
-          && get(
-            /databases/$(database)/documents/courses/$(courseId)
-          ).data.status == "published"
-        );
+        || isCoursePublished(courseId);
 
       allow create: if
         isAdmin()
@@ -179,6 +185,11 @@ service cloud.firestore {
 
     // ============================================================
     // COURSE LESSONS
+    //
+    // Owners/enrolled students can always read.
+    // Everyone else (signed in or not) can read a lesson ONLY if
+    // BOTH the parent course is published AND the lesson itself
+    // is flagged published (e.g. free preview lessons).
     // ============================================================
 
     match /courses/{courseId}/modules/{moduleId}/lessons/{lessonId} {
@@ -186,22 +197,9 @@ service cloud.firestore {
       allow read: if
         isAdmin()
         || isCourseOwner(courseId)
+        || isEnrolled(courseId)
         || (
-          isEnrolled(courseId)
-          && resource.data.published == true
-        )
-        || (
-          isSignedIn() == false
-          && get(
-            /databases/$(database)/documents/courses/$(courseId)
-          ).data.status == "published"
-          && resource.data.published == true
-        )
-        || (
-          isSignedIn()
-          && get(
-            /databases/$(database)/documents/courses/$(courseId)
-          ).data.status == "published"
+          isCoursePublished(courseId)
           && resource.data.published == true
         );
 
@@ -300,10 +298,6 @@ service cloud.firestore {
 
     match /assignments/{assignmentId} {
 
-      // Admins can read everything.
-      // Teachers can read assignments belonging to their own courses.
-      // Students can read only published assignments from courses
-      // in which they are actively enrolled.
       allow read: if
         isAdmin()
         || (
@@ -318,7 +312,6 @@ service cloud.firestore {
           && isEnrolled(resource.data.courseId)
         );
 
-      // Teachers create assignments only for their own courses.
       allow create: if
         isAdmin()
         || (
@@ -328,8 +321,6 @@ service cloud.firestore {
           && isCourseOwner(request.resource.data.courseId)
         );
 
-      // Teachers can edit only their own course assignments.
-      // Course and teacher ownership cannot be transferred.
       allow update: if
         isAdmin()
         || (
@@ -354,18 +345,10 @@ service cloud.firestore {
 
     // ============================================================
     // ASSIGNMENT SUBMISSIONS
-    //
-    // Path:
-    // /assignments/{assignmentId}/submissions/{studentId}
-    //
-    // The student's UID is used as the submission document ID.
+    // Path: /assignments/{assignmentId}/submissions/{studentId}
     // ============================================================
 
     match /assignments/{assignmentId}/submissions/{studentId} {
-
-      // ----------------------------------------------------------
-      // READ
-      // ----------------------------------------------------------
 
       allow read: if
         isAdmin()
@@ -388,14 +371,6 @@ service cloud.firestore {
           && studentId == request.auth.uid
         );
 
-
-      // ----------------------------------------------------------
-      // CREATE
-      // ----------------------------------------------------------
-
-      // Teacher/admin creation is allowed for administrative use.
-      // Students can create only their own submission for an
-      // assignment belonging to an actively enrolled course.
       allow create: if
         isAdmin()
         || (
@@ -449,15 +424,6 @@ service cloud.firestore {
           )
         );
 
-
-      // ----------------------------------------------------------
-      // UPDATE
-      // ----------------------------------------------------------
-
-      // Teachers can grade/edit submissions for their own courses.
-      //
-      // Students can update only their own submission and cannot
-      // modify grade, feedback, gradedAt, or gradedBy.
       allow update: if
         isAdmin()
         || (
@@ -479,16 +445,11 @@ service cloud.firestore {
           isStudent()
           && studentId == request.auth.uid
           && request.resource.data.studentId == resource.data.studentId
-          && request.resource.data.grade == resource.data.grade
-          && request.resource.data.feedback == resource.data.feedback
-          && request.resource.data.gradedAt == resource.data.gradedAt
-          && request.resource.data.gradedBy == resource.data.gradedBy
+          && request.resource.data.get("grade", null) == resource.data.get("grade", null)
+          && request.resource.data.get("feedback", "") == resource.data.get("feedback", "")
+          && request.resource.data.get("gradedAt", null) == resource.data.get("gradedAt", null)
+          && request.resource.data.get("gradedBy", null) == resource.data.get("gradedBy", null)
         );
-
-
-      // ----------------------------------------------------------
-      // DELETE
-      // ----------------------------------------------------------
 
       allow delete: if
         isAdmin()

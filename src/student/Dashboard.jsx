@@ -57,6 +57,10 @@ import {
   getAccessibleAnnouncements,
 } from "../services/CommunicationService";
 
+import {
+  getMyEnrollments,
+} from "../services/EnrollmentService";
+
 /* =========================================================
    DESIGN
 ========================================================= */
@@ -454,6 +458,11 @@ export default function Dashboard() {
     useState(null);
 
   const [
+    assignmentCourseIds,
+    setAssignmentCourseIds,
+  ] = useState([]);
+
+  const [
     firstName,
     setFirstName,
   ] = useState("there");
@@ -615,6 +624,44 @@ export default function Dashboard() {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!uid) {
+      setAssignmentCourseIds([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAssignmentCourses = async () => {
+      try {
+        const enrollments = await getMyEnrollments();
+
+        if (!cancelled) {
+          setAssignmentCourseIds(
+            enrollments
+              .map((enrollment) => enrollment.courseId)
+              .filter(Boolean)
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load assignment courses:",
+          error
+        );
+
+        if (!cancelled) {
+          setAssignmentCourseIds([]);
+        }
+      }
+    };
+
+    loadAssignmentCourses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
 
   /* =======================================================
      LOAD ANNOUNCEMENTS
@@ -1454,7 +1501,9 @@ export default function Dashboard() {
 
         ) : activeTab ===
           "assignments" ? (
-          <Assignments />
+          <Assignments
+            courseIds={assignmentCourseIds}
+          />
 
           /* =================================================
              MY COURSES
@@ -1742,8 +1791,8 @@ export default function Dashboard() {
 
                           <div
                             className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${announcement.pinned
-                                ? "bg-amber-100 text-amber-600"
-                                : "bg-emerald-100 text-emerald-600"
+                              ? "bg-amber-100 text-amber-600"
+                              : "bg-emerald-100 text-emerald-600"
                               }`}
                           >
                             {announcement.pinned ? (
@@ -2295,8 +2344,8 @@ export default function Dashboard() {
 
                                 <p
                                   className={`truncate text-xs font-bold ${done
-                                      ? "text-[#B4ABCB] line-through"
-                                      : "text-[#1B0E3D]"
+                                    ? "text-[#B4ABCB] line-through"
+                                    : "text-[#1B0E3D]"
                                     }`}
                                 >
                                   {

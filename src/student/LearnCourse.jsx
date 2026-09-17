@@ -6,7 +6,6 @@ import {
   getDocs,
   orderBy,
   query,
-  where,
 } from "firebase/firestore";
 
 import {
@@ -53,6 +52,31 @@ const getTimestampValue = (value) => {
 
   return Number.isNaN(date.getTime()) ? null : date;
 };
+
+function getYouTubeEmbedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    let videoId = "";
+
+    if (parsed.hostname.includes("youtu.be")) {
+      videoId = parsed.pathname.slice(1).split("/")[0];
+    } else if (parsed.hostname.includes("youtube.com")) {
+      if (parsed.pathname.startsWith("/embed/")) {
+        videoId = parsed.pathname.split("/embed/")[1]?.split("/")[0];
+      } else if (parsed.pathname.startsWith("/shorts/")) {
+        videoId = parsed.pathname.split("/shorts/")[1]?.split("/")[0];
+      } else {
+        videoId = parsed.searchParams.get("v") || "";
+      }
+    }
+
+    if (!videoId) return null;
+
+    return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&fs=0&disablekb=1`;
+  } catch {
+    return null;
+  }
+}
 
 
 const isEnrollmentActive = (enrollment) => {
@@ -101,6 +125,46 @@ export default function LearnCourse() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [completing, setCompleting] = useState(false);
+
+  const [screenProtectionActive, setScreenProtectionActive] =
+    useState(false);
+
+  useEffect(() => {
+    const protectScreen = () => setScreenProtectionActive(true);
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        protectScreen();
+      } else {
+        setScreenProtectionActive(false);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const blockCaptureShortcuts = (event) => {
+      const key = event.key.toLowerCase();
+      const blocked =
+        key === "printscreen" ||
+        (event.ctrlKey && ["p", "s", "u"].includes(key)) ||
+        (event.metaKey && ["p", "s", "u"].includes(key));
+
+      if (blocked) {
+        event.preventDefault();
+        setScreenProtectionActive(true);
+        window.setTimeout(() => setScreenProtectionActive(false), 1500);
+      }
+    };
+
+    document.addEventListener("keydown", blockCaptureShortcuts);
+    return () => document.removeEventListener("keydown", blockCaptureShortcuts);
+  }, []);
 
 
   /* =====================================================
@@ -182,7 +246,12 @@ export default function LearnCourse() {
       } catch (err) {
         console.error(
           "Failed to load learning page:",
-          err
+          {
+            code: err?.code,
+            message: err?.message,
+            courseId,
+            uid: auth.currentUser?.uid,
+          }
         );
 
         if (!cancelled) {
@@ -243,8 +312,24 @@ export default function LearnCourse() {
           orderBy("order", "asc")
         );
 
-        const modulesSnapshot =
-          await getDocs(modulesQuery);
+        let modulesSnapshot;
+
+        try {
+          modulesSnapshot = await getDocs(modulesQuery);
+        } catch (err) {
+          // Tag the error so we know it failed on the
+          // MODULES collection specifically, not lessons.
+          console.error(
+            "Failed to load modules:",
+            {
+              code: err?.code,
+              message: err?.message,
+              path: `courses/${course.id}/modules`,
+              uid: auth.currentUser?.uid,
+            }
+          );
+          throw err;
+        }
 
         const moduleData = await Promise.all(
           modulesSnapshot.docs.map(
@@ -263,35 +348,26 @@ export default function LearnCourse() {
                 "lessons"
               );
 
-              // NOTE: the lessons security rule reads
-              // resource.data.published for the enrolled-student
-              // and anonymous-visitor branches. Firestore requires
-              // any collection-level query to include a where()
-              // clause that provably satisfies a rule's field
-              // condition for every document it could return —
-              // otherwise the whole query is rejected with
-              // "Missing or insufficient permissions", even for
-              // documents that would have matched. Adding
-              // where("published", "==", true) here makes the
-              // query itself prove the condition, which is what
-              // was failing before. This page is student/learner
-              // facing only (locked behind enrollment), so
-              // filtering to published lessons matches intended
-              // behavior — it does not need to show unpublished
-              // lessons the way a course-editing view would.
-              //
-              // If lessons aren't showing up here, check that the
-              // lesson documents in Firestore actually have
-              // published: true (boolean) set — this query will
-              // correctly return nothing otherwise.
-              const lessonsQuery = query(
-                lessonsRef,
-                where("published", "==", true),
-                orderBy("order", "asc")
-              );
+              const lessonsQuery = query(lessonsRef);
 
-              const lessonsSnapshot =
-                await getDocs(lessonsQuery);
+              let lessonsSnapshot;
+
+              try {
+                lessonsSnapshot = await getDocs(lessonsQuery);
+              } catch (err) {
+                // Tag the error so we know it failed on the
+                // LESSONS collection, and exactly which module.
+                console.error(
+                  "Failed to load lessons:",
+                  {
+                    code: err?.code,
+                    message: err?.message,
+                    path: `courses/${course.id}/modules/${moduleDoc.id}/lessons`,
+                    uid: auth.currentUser?.uid,
+                  }
+                );
+                throw err;
+              }
 
               const lessons =
                 lessonsSnapshot.docs.map(
@@ -299,7 +375,7 @@ export default function LearnCourse() {
                     id: lessonDoc.id,
                     ...lessonDoc.data(),
                   })
-                );
+                ).sort((a, b) => (a.order || 0) - (b.order || 0));
 
               return {
                 ...module,
@@ -339,14 +415,13 @@ export default function LearnCourse() {
           });
         }
       } catch (err) {
-        console.error(
-          "Failed to load course content:",
-          err
-        );
-
+        // The two inner try/catch blocks above already logged
+        // exactly which collection and path failed and why.
         if (!cancelled) {
           setContentError(
-            "Unable to load course content."
+            err?.code === "permission-denied"
+              ? "You don't have permission to view this course's content. If you believe this is a mistake, try enrolling or contact support."
+              : "Unable to load course content."
           );
         }
       } finally {
@@ -493,7 +568,12 @@ export default function LearnCourse() {
     } catch (err) {
       console.error(
         "Failed to complete lesson:",
-        err
+        {
+          code: err?.code,
+          message: err?.message,
+          enrollmentId: enrollment?.id,
+          lessonId: selectedLesson?.id,
+        }
       );
 
       alert(
@@ -1015,16 +1095,44 @@ export default function LearnCourse() {
               {/* VIDEO / CONTENT */}
 
               {selectedLesson.type === "video" ? (
-                <div className="aspect-video w-full bg-black">
+                <div
+                  className="relative aspect-video w-full select-none bg-black"
+                  onContextMenu={(event) => event.preventDefault()}
+                >
+                  {screenProtectionActive && (
+                    <div
+                      className="absolute inset-0 z-20 bg-black"
+                      aria-label="Video temporarily hidden for screen protection"
+                    />
+                  )}
                   {selectedLesson.videoUrl ? (
                     selectedLesson.isPreview || hasAccess ? (
-                      <video
-                        key={selectedLesson.videoUrl}
-                        src={selectedLesson.videoUrl}
-                        controls
-                        playsInline
-                        className="h-full w-full object-contain"
-                      />
+                      getYouTubeEmbedUrl(selectedLesson.videoUrl) ? (
+                        <div
+                          className="h-full w-full select-none"
+                          onContextMenu={(event) => event.preventDefault()}
+                        >
+                          <iframe
+                            key={selectedLesson.videoUrl}
+                            src={getYouTubeEmbedUrl(selectedLesson.videoUrl)}
+                            title={selectedLesson.title || "Course video"}
+                            className="h-full w-full"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                            allow="autoplay; encrypted-media"
+                          />
+                        </div>
+                      ) : (
+                        <video
+                          key={selectedLesson.videoUrl}
+                          src={selectedLesson.videoUrl}
+                          controls
+                          controlsList="nodownload noplaybackrate"
+                          disablePictureInPicture
+                          playsInline
+                          onContextMenu={(event) => event.preventDefault()}
+                          className="h-full w-full select-none object-contain"
+                        />
+                      )
                     ) : (
                       <LockedContent />
                     )
