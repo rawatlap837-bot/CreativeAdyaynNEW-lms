@@ -14,6 +14,7 @@ import {
   BookOpen,
   Globe2,
   Clock3,
+  Timer,
   FileText,
   AlertCircle,
   ShieldCheck,
@@ -51,6 +52,11 @@ const INITIAL_FORM = {
   courseId: "",
   status: "draft",
   pinned: false,
+  // Optional scheduling window. Both stored as datetime-local
+  // strings while the form is open, converted to real Dates only
+  // when the form is submitted.
+  startAt: "",
+  endAt: "",
 };
 
 /* ================================================================
@@ -83,6 +89,133 @@ function formatDate(value) {
   });
 }
 
+/*
+ * Normalizes a Firestore Timestamp, JS Date, ISO string, or
+ * datetime-local string into a plain JS Date (or null).
+ */
+function toJsDate(value) {
+  if (!value) return null;
+
+  if (value?.toDate) {
+    return value.toDate();
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getAnnouncementStartAt(item) {
+  return toJsDate(item.startAt);
+}
+
+function getAnnouncementEndAt(item) {
+  return toJsDate(item.endAt);
+}
+
+// "yyyy-MM-ddThh:mm" — what an <input type="datetime-local"> needs.
+function toDatetimeLocalValue(value) {
+  const date = toJsDate(value);
+
+  if (!date) return "";
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate()
+    )}` + `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
+// The reverse: a datetime-local input's string value back into a
+// real Date, in the browser's local timezone.
+function fromDatetimeLocalValue(value) {
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+// "2d 4h", "3h 12m", "45m 10s", "8s" — whichever two units are
+// most useful at the current distance from now.
+function formatCountdown(ms) {
+  if (ms <= 0) return "0s";
+
+  const totalSeconds = Math.floor(ms / 1000);
+
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+
+  return `${seconds}s`;
+}
+
+/*
+ * Works out where an announcement currently sits relative to its
+ * optional start/end window, given the current time.
+ *
+ *   - "scheduled": startAt is in the future — not visible yet.
+ *   - "live":      currently within its window (or has no window
+ *                   at all, in which case there's nothing to show).
+ *   - "expired":   endAt has already passed.
+ *   - null:        no schedule set on this announcement.
+ */
+function getAnnouncementTiming(item, now) {
+  const startAt = getAnnouncementStartAt(item);
+  const endAt = getAnnouncementEndAt(item);
+
+  if (!startAt && !endAt) {
+    return null;
+  }
+
+  const nowMs = now.getTime();
+
+  if (startAt && startAt.getTime() > nowMs) {
+    return {
+      phase: "scheduled",
+      label: `Live in ${formatCountdown(
+        startAt.getTime() - nowMs
+      )}`,
+      detail: `Goes live ${formatDate(startAt)}`,
+    };
+  }
+
+  if (endAt) {
+    if (endAt.getTime() <= nowMs) {
+      return {
+        phase: "expired",
+        label: "Expired",
+        detail: `Ended ${formatDate(endAt)}`,
+      };
+    }
+
+    return {
+      phase: "live",
+      label: `Ends in ${formatCountdown(
+        endAt.getTime() - nowMs
+      )}`,
+      detail: `Ends ${formatDate(endAt)}`,
+    };
+  }
+
+  return {
+    phase: "live",
+    label: "Live now",
+    detail: `Went live ${formatDate(startAt)}`,
+  };
+}
+
 function getAnnouncementStatusClass(status) {
   switch (status) {
     case "published":
@@ -96,6 +229,22 @@ function getAnnouncementStatusClass(status) {
 
     default:
       return "border-slate-200 bg-slate-100 text-slate-700";
+  }
+}
+
+function getTimingBadgeClass(phase) {
+  switch (phase) {
+    case "scheduled":
+      return "border-indigo-200 bg-indigo-50 text-indigo-700";
+
+    case "live":
+      return "border-teal-200 bg-teal-50 text-teal-700";
+
+    case "expired":
+      return "border-slate-200 bg-slate-100 text-slate-500";
+
+    default:
+      return "border-slate-200 bg-slate-100 text-slate-600";
   }
 }
 
@@ -176,6 +325,18 @@ export default function Announcements() {
 
   const [error, setError] = useState("");
 
+  // Ticks every second so any "Live in 2m 14s" / "Ends in 3h 2m"
+  // badges on the list stay accurate without a page refresh.
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   /* ==============================================================
      CURRENT USER ROLE
   ============================================================== */
@@ -229,7 +390,7 @@ export default function Announcements() {
 
       setError(
         err?.message ||
-          "Unable to determine your account permissions."
+        "Unable to determine your account permissions."
       );
     } finally {
       setRoleLoading(false);
@@ -278,7 +439,7 @@ export default function Announcements() {
 
       setError(
         err?.message ||
-          "Unable to load announcements. Please check your Firestore rules."
+        "Unable to load announcements. Please check your Firestore rules."
       );
     } finally {
       setLoading(false);
@@ -454,12 +615,12 @@ export default function Announcements() {
           const matchesStatus =
             statusFilter === "all" ||
             item.status ===
-              statusFilter;
+            statusFilter;
 
           const matchesAudience =
             audienceFilter === "all" ||
             audience ===
-              audienceFilter;
+            audienceFilter;
 
           return (
             matchesSearch &&
@@ -595,6 +756,14 @@ export default function Announcements() {
       pinned:
         announcement.pinned ===
         true,
+
+      startAt: toDatetimeLocalValue(
+        announcement.startAt
+      ),
+
+      endAt: toDatetimeLocalValue(
+        announcement.endAt
+      ),
     });
 
     setError("");
@@ -688,7 +857,7 @@ export default function Announcements() {
     if (
       userRole === "teacher" &&
       form.audienceType !==
-        "course"
+      "course"
     ) {
       setError(
         "Teachers can only send announcements to their own course students."
@@ -702,7 +871,7 @@ export default function Announcements() {
      */
     if (
       form.audienceType ===
-        "course" &&
+      "course" &&
       !form.courseId
     ) {
       setError(
@@ -718,7 +887,7 @@ export default function Announcements() {
     if (
       userRole === "teacher" &&
       form.audienceType ===
-        "course"
+      "course"
     ) {
       const selectedCourse =
         courses.find(
@@ -730,7 +899,7 @@ export default function Announcements() {
       if (
         !selectedCourse ||
         selectedCourse.instructorId !==
-          user.uid
+        user.uid
       ) {
         setError(
           "You can only create announcements for courses assigned to you."
@@ -764,6 +933,31 @@ export default function Announcements() {
     }
 
     /*
+     * SCHEDULE WINDOW
+     * ----------------
+     * Both ends are optional. If both are set, the end must come
+     * after the start or the window makes no sense.
+     */
+    const startAtDate =
+      fromDatetimeLocalValue(form.startAt);
+
+    const endAtDate =
+      fromDatetimeLocalValue(form.endAt);
+
+    if (
+      startAtDate &&
+      endAtDate &&
+      endAtDate.getTime() <=
+      startAtDate.getTime()
+    ) {
+      setError(
+        "The end time must be after the start time."
+      );
+
+      return;
+    }
+
+    /*
      * IMPORTANT
      * ----------
      * We now use the canonical fields expected
@@ -779,7 +973,7 @@ export default function Announcements() {
 
       courseId:
         form.audienceType ===
-        "course"
+          "course"
           ? form.courseId
           : null,
 
@@ -788,6 +982,10 @@ export default function Announcements() {
 
       pinned:
         form.pinned,
+
+      // Null clears a previously-set schedule when editing.
+      startAt: startAtDate,
+      endAt: endAtDate,
     };
 
     try {
@@ -815,7 +1013,7 @@ export default function Announcements() {
 
       setError(
         err?.message ||
-          "Unable to save announcement. Please try again."
+        "Unable to save announcement. Please try again."
       );
     } finally {
       setSaving(false);
@@ -879,7 +1077,7 @@ export default function Announcements() {
 
       window.alert(
         err?.message ||
-          "Unable to delete announcement."
+        "Unable to delete announcement."
       );
     } finally {
       setDeletingId(null);
@@ -931,7 +1129,7 @@ export default function Announcements() {
 
       window.alert(
         err?.message ||
-          "Unable to update announcement."
+        "Unable to update announcement."
       );
     }
   };
@@ -1339,10 +1537,10 @@ export default function Announcements() {
 
               {userRole ===
                 "admin" && (
-                <option value="global">
-                  Everyone
-                </option>
-              )}
+                  <option value="global">
+                    Everyone
+                  </option>
+                )}
 
               <option value="course">
                 Course Students
@@ -1390,9 +1588,9 @@ export default function Announcements() {
 
                   const canManage =
                     userRole ===
-                      "admin" ||
+                    "admin" ||
                     authorId ===
-                      currentUserId;
+                    currentUserId;
 
                   return (
                     <AnnouncementRow
@@ -1406,6 +1604,7 @@ export default function Announcements() {
                         announcement.courseId,
                         courses
                       )}
+                      now={now}
                       deleting={
                         deletingId ===
                         announcement.id
@@ -1448,7 +1647,7 @@ export default function Announcements() {
 
         {!loading &&
           filteredAnnouncements.length >
-            0 && (
+          0 && (
             <div
               className="
                 mt-3
@@ -1584,6 +1783,7 @@ function StatCard({
 function AnnouncementRow({
   announcement,
   courseName,
+  now,
   deleting,
   canEdit,
   canDelete,
@@ -1601,6 +1801,11 @@ function AnnouncementRow({
     getAnnouncementBody(
       announcement
     );
+
+  const timing = getAnnouncementTiming(
+    announcement,
+    now
+  );
 
   return (
     <div
@@ -1672,8 +1877,8 @@ function AnnouncementRow({
                 sm:px-2.5
                 sm:text-xs
                 ${getAnnouncementStatusClass(
-                  announcement.status
-                )}
+                announcement.status
+              )}
               `}
             >
               {announcement.status ||
@@ -1700,7 +1905,7 @@ function AnnouncementRow({
               "
             >
               {audience ===
-              "course" ? (
+                "course" ? (
                 <BookOpen
                   size={12}
                   className="shrink-0"
@@ -1718,6 +1923,43 @@ function AnnouncementRow({
                 )}
               </span>
             </span>
+
+            {/* SCHEDULE / TIMER */}
+
+            {timing && (
+              <span
+                title={
+                  timing.detail
+                }
+                className={`
+                  inline-flex
+                  max-w-full
+                  items-center
+                  gap-1
+                  rounded-full
+                  border
+                  px-2
+                  py-1
+                  text-[11px]
+                  font-semibold
+                  tabular-nums
+                  sm:px-2.5
+                  sm:text-xs
+                  ${getTimingBadgeClass(
+                  timing.phase
+                )}
+                `}
+              >
+                <Timer
+                  size={12}
+                  className="shrink-0"
+                />
+
+                <span className="truncate">
+                  {timing.label}
+                </span>
+              </span>
+            )}
           </div>
 
           {/* TITLE */}
@@ -1772,8 +2014,8 @@ function AnnouncementRow({
           >
             {audience ===
               "course" && (
-              <span
-                className="
+                <span
+                  className="
                   inline-flex
                   min-w-0
                   max-w-full
@@ -1782,17 +2024,17 @@ function AnnouncementRow({
                   font-medium
                   text-teal-600
                 "
-              >
-                <BookOpen
-                  size={13}
-                  className="shrink-0"
-                />
+                >
+                  <BookOpen
+                    size={13}
+                    className="shrink-0"
+                  />
 
-                <span className="truncate">
-                  {courseName}
+                  <span className="truncate">
+                    {courseName}
+                  </span>
                 </span>
-              </span>
-            )}
+              )}
 
             <span
               className="
@@ -1810,10 +2052,30 @@ function AnnouncementRow({
               <span className="break-words">
                 {formatDate(
                   announcement.publishedAt ||
-                    announcement.createdAt
+                  announcement.createdAt
                 )}
               </span>
             </span>
+
+            {timing && (
+              <span
+                className="
+                  inline-flex
+                  max-w-full
+                  items-center
+                  gap-1.5
+                "
+              >
+                <Timer
+                  size={13}
+                  className="shrink-0"
+                />
+
+                <span className="break-words">
+                  {timing.detail}
+                </span>
+              </span>
+            )}
           </div>
         </div>
 
@@ -1822,8 +2084,8 @@ function AnnouncementRow({
         {(canEdit ||
           canDelete ||
           canPin) && (
-          <div
-            className="
+            <div
+              className="
               flex
               w-full
               shrink-0
@@ -1836,24 +2098,24 @@ function AnnouncementRow({
               lg:border-0
               lg:pt-1
             "
-          >
-            {canPin && (
-              <button
-                type="button"
-                onClick={
-                  onTogglePin
-                }
-                title={
-                  announcement.pinned
-                    ? "Unpin"
-                    : "Pin"
-                }
-                aria-label={
-                  announcement.pinned
-                    ? "Unpin announcement"
-                    : "Pin announcement"
-                }
-                className={`
+            >
+              {canPin && (
+                <button
+                  type="button"
+                  onClick={
+                    onTogglePin
+                  }
+                  title={
+                    announcement.pinned
+                      ? "Unpin"
+                      : "Pin"
+                  }
+                  aria-label={
+                    announcement.pinned
+                      ? "Unpin announcement"
+                      : "Pin announcement"
+                  }
+                  className={`
                   flex
                   h-10
                   w-10
@@ -1863,28 +2125,27 @@ function AnnouncementRow({
                   rounded-lg
                   border
                   transition
-                  ${
-                    announcement.pinned
+                  ${announcement.pinned
                       ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
                       : "border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                  }
+                    }
                 `}
-              >
-                {announcement.pinned ? (
-                  <PinOff size={16} />
-                ) : (
-                  <Pin size={16} />
-                )}
-              </button>
-            )}
+                >
+                  {announcement.pinned ? (
+                    <PinOff size={16} />
+                  ) : (
+                    <Pin size={16} />
+                  )}
+                </button>
+              )}
 
-            {canEdit && (
-              <button
-                type="button"
-                onClick={onEdit}
-                title="Edit"
-                aria-label="Edit announcement"
-                className="
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  title="Edit"
+                  aria-label="Edit announcement"
+                  className="
                   flex
                   h-10
                   w-10
@@ -1901,19 +2162,19 @@ function AnnouncementRow({
                   hover:bg-teal-50
                   hover:text-teal-700
                 "
-              >
-                <Edit3 size={16} />
-              </button>
-            )}
+                >
+                  <Edit3 size={16} />
+                </button>
+              )}
 
-            {canDelete && (
-              <button
-                type="button"
-                onClick={onDelete}
-                disabled={deleting}
-                title="Delete"
-                aria-label="Delete announcement"
-                className="
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={deleting}
+                  title="Delete"
+                  aria-label="Delete announcement"
+                  className="
                   flex
                   h-10
                   w-10
@@ -1932,10 +2193,10 @@ function AnnouncementRow({
                   disabled:cursor-not-allowed
                   disabled:opacity-50
                 "
-              >
-                {deleting ? (
-                  <span
-                    className="
+                >
+                  {deleting ? (
+                    <span
+                      className="
                       h-4
                       w-4
                       animate-spin
@@ -1944,14 +2205,14 @@ function AnnouncementRow({
                       border-slate-300
                       border-t-red-500
                     "
-                  />
-                ) : (
-                  <Trash2 size={16} />
-                )}
-              </button>
-            )}
-          </div>
-        )}
+                    />
+                  ) : (
+                    <Trash2 size={16} />
+                  )}
+                </button>
+              )}
+            </div>
+          )}
       </div>
     </div>
   );
@@ -2260,7 +2521,7 @@ function AnnouncementModal({
             </label>
 
             {userRole ===
-            "admin" ? (
+              "admin" ? (
               <div
                 className="
                   grid
@@ -2369,31 +2630,31 @@ function AnnouncementModal({
 
           {form.audienceType ===
             "course" && (
-            <div className="mt-4">
-              <label
-                className="
+              <div className="mt-4">
+                <label
+                  className="
                   mb-2
                   block
                   text-sm
                   font-semibold
                   text-slate-700
                 "
-              >
-                Select Course
-              </label>
+                >
+                  Select Course
+                </label>
 
-              <select
-                value={form.courseId}
-                onChange={(event) =>
-                  onChange(
-                    "courseId",
-                    event.target.value
-                  )
-                }
-                disabled={
-                  coursesLoading
-                }
-                className="
+                <select
+                  value={form.courseId}
+                  onChange={(event) =>
+                    onChange(
+                      "courseId",
+                      event.target.value
+                    )
+                  }
+                  disabled={
+                    coursesLoading
+                  }
+                  className="
                   min-h-[44px]
                   w-full
                   rounded-xl
@@ -2411,47 +2672,47 @@ function AnnouncementModal({
                   focus:ring-teal-100
                   disabled:opacity-60
                 "
-              >
-                <option value="">
-                  {coursesLoading
-                    ? "Loading courses..."
-                    : courses.length ===
+                >
+                  <option value="">
+                    {coursesLoading
+                      ? "Loading courses..."
+                      : courses.length ===
                         0
-                      ? "No courses available"
-                      : "Select a course"}
-                </option>
+                        ? "No courses available"
+                        : "Select a course"}
+                  </option>
 
-                {courses.map(
-                  (course) => (
-                    <option
-                      key={
-                        course.id
-                      }
-                      value={
-                        course.id
-                      }
-                    >
-                      {course.title}
-                    </option>
-                  )
-                )}
-              </select>
+                  {courses.map(
+                    (course) => (
+                      <option
+                        key={
+                          course.id
+                        }
+                        value={
+                          course.id
+                        }
+                      >
+                        {course.title}
+                      </option>
+                    )
+                  )}
+                </select>
 
-              <p
-                className="
+                <p
+                  className="
                   mt-1.5
                   text-xs
                   leading-5
                   text-slate-400
                 "
-              >
-                {userRole ===
-                "teacher"
-                  ? "Only your published courses are available."
-                  : "Only students enrolled in this course will see this announcement."}
-              </p>
-            </div>
-          )}
+                >
+                  {userRole ===
+                    "teacher"
+                    ? "Only your published courses are available."
+                    : "Only students enrolled in this course will see this announcement."}
+                </p>
+              </div>
+            )}
 
           {/* STATUS */}
 
@@ -2508,6 +2769,145 @@ function AnnouncementModal({
                 }
               />
             </div>
+          </div>
+
+          {/* SCHEDULE (LIVE / EXPIRY WINDOW) */}
+
+          <div className="mt-5">
+            <label
+              className="
+                mb-2
+                flex
+                items-center
+                gap-1.5
+                text-sm
+                font-semibold
+                text-slate-700
+              "
+            >
+              <Timer size={15} />
+              Schedule
+              <span
+                className="
+                  text-xs
+                  font-normal
+                  text-slate-400
+                "
+              >
+                (optional)
+              </span>
+            </label>
+
+            <div
+              className="
+                grid
+                grid-cols-1
+                gap-3
+                sm:grid-cols-2
+              "
+            >
+              <div>
+                <span
+                  className="
+                    mb-1.5
+                    block
+                    text-xs
+                    font-medium
+                    text-slate-500
+                  "
+                >
+                  Goes live at
+                </span>
+
+                <input
+                  type="datetime-local"
+                  value={form.startAt}
+                  onChange={(event) =>
+                    onChange(
+                      "startAt",
+                      event.target.value
+                    )
+                  }
+                  className="
+                    min-h-[44px]
+                    w-full
+                    rounded-xl
+                    border
+                    border-slate-200
+                    bg-slate-50
+                    px-3
+                    py-2.5
+                    text-sm
+                    text-slate-900
+                    outline-none
+                    transition
+                    focus:border-teal-400
+                    focus:bg-white
+                    focus:ring-2
+                    focus:ring-teal-100
+                  "
+                />
+              </div>
+
+              <div>
+                <span
+                  className="
+                    mb-1.5
+                    block
+                    text-xs
+                    font-medium
+                    text-slate-500
+                  "
+                >
+                  Expires at
+                </span>
+
+                <input
+                  type="datetime-local"
+                  value={form.endAt}
+                  onChange={(event) =>
+                    onChange(
+                      "endAt",
+                      event.target.value
+                    )
+                  }
+                  className="
+                    min-h-[44px]
+                    w-full
+                    rounded-xl
+                    border
+                    border-slate-200
+                    bg-slate-50
+                    px-3
+                    py-2.5
+                    text-sm
+                    text-slate-900
+                    outline-none
+                    transition
+                    focus:border-teal-400
+                    focus:bg-white
+                    focus:ring-2
+                    focus:ring-teal-100
+                  "
+                />
+              </div>
+            </div>
+
+            <p
+              className="
+                mt-1.5
+                text-xs
+                leading-5
+                text-slate-400
+              "
+            >
+              Leave "Goes live at" empty to
+              treat this as live as soon as
+              it's published. Leave "Expires
+              at" empty for no expiry. The
+              list shows a live countdown
+              until each date.
+            </p>
           </div>
 
           {/* PIN */}
@@ -2662,7 +3062,7 @@ function AnnouncementModal({
               ) : (
                 <>
                   {form.status ===
-                  "published" ? (
+                    "published" ? (
                     <Send size={16} />
                   ) : (
                     <Save size={16} />
@@ -2707,10 +3107,9 @@ function AudienceOption({
         text-left
         transition
         sm:p-4
-        ${
-          selected
-            ? "border-teal-300 bg-teal-50 ring-1 ring-teal-200"
-            : "border-slate-200 bg-white hover:border-teal-200 hover:bg-slate-50"
+        ${selected
+          ? "border-teal-300 bg-teal-50 ring-1 ring-teal-200"
+          : "border-slate-200 bg-white hover:border-teal-200 hover:bg-slate-50"
         }
       `}
     >
@@ -2723,10 +3122,9 @@ function AudienceOption({
           items-center
           justify-center
           rounded-lg
-          ${
-            selected
-              ? "bg-teal-600 text-white"
-              : "bg-slate-100 text-slate-500"
+          ${selected
+            ? "bg-teal-600 text-white"
+            : "bg-slate-100 text-slate-500"
           }
         `}
       >
@@ -2786,10 +3184,9 @@ function StatusOption({
         text-left
         transition
         sm:p-4
-        ${
-          selected
-            ? "border-teal-300 bg-teal-50 ring-1 ring-teal-200"
-            : "border-slate-200 bg-white hover:border-teal-200 hover:bg-slate-50"
+        ${selected
+          ? "border-teal-300 bg-teal-50 ring-1 ring-teal-200"
+          : "border-slate-200 bg-white hover:border-teal-200 hover:bg-slate-50"
         }
       `}
     >
@@ -2802,10 +3199,9 @@ function StatusOption({
           items-center
           justify-center
           rounded-lg
-          ${
-            selected
-              ? "bg-teal-600 text-white"
-              : "bg-slate-100 text-slate-500"
+          ${selected
+            ? "bg-teal-600 text-white"
+            : "bg-slate-100 text-slate-500"
           }
         `}
       >

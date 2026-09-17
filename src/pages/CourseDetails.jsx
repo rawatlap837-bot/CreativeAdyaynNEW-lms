@@ -6,6 +6,7 @@ import {
   getDocs,
   orderBy,
   query,
+  where,
 } from "firebase/firestore";
 
 import {
@@ -313,6 +314,7 @@ export default function CourseDetails() {
 
               const lessonsQuery = query(
                 lessonsRef,
+                where("published", "==", true),
                 orderBy("order", "asc")
               );
 

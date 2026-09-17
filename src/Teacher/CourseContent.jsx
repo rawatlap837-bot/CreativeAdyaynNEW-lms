@@ -8,6 +8,7 @@ import {
   Check,
   FileText,
   GripVertical,
+  ClipboardList,
   Loader2,
   Pencil,
   PlayCircle,
@@ -157,7 +158,7 @@ export default function CourseContent() {
 
       setError(
         err?.message ||
-          "Unable to load the course content."
+        "Unable to load the course content."
       );
     } finally {
       setLoading(false);
@@ -641,7 +642,7 @@ export default function CourseContent() {
           const progress = Math.round(
             (snapshot.bytesTransferred /
               snapshot.totalBytes) *
-              100
+            100
           );
 
           setUploadProgress(progress);
@@ -1078,7 +1079,7 @@ export default function CourseContent() {
 
       setError(
         err?.message ||
-          "Unable to submit the course."
+        "Unable to submit the course."
       );
     } finally {
       setSubmitting(false);
@@ -1168,6 +1169,20 @@ export default function CourseContent() {
                 type="button"
                 onClick={() =>
                   navigate(
+                    `/teacher/courses/${courseId}/assignments`
+                  )
+                }
+                disabled={saving || submitting}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700 hover:bg-purple-100 disabled:opacity-50 sm:w-auto"
+              >
+                <ClipboardList size={17} />
+                Assignments
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
                     `/teacher/courses/edit/${courseId}`
                   )
                 }
@@ -1181,7 +1196,7 @@ export default function CourseContent() {
               {!isLocked &&
                 (course.status === STATUS.DRAFT ||
                   course.status ===
-                    STATUS.REJECTED) && (
+                  STATUS.REJECTED) && (
                   <button
                     type="button"
                     onClick={submitCourse}
@@ -1376,7 +1391,7 @@ export default function CourseContent() {
                           <span className="text-xs text-slate-400">
                             {module.lessons.length}{" "}
                             {module.lessons.length ===
-                            1
+                              1
                               ? "lesson"
                               : "lessons"}
                           </span>
@@ -1412,8 +1427,8 @@ export default function CourseContent() {
                           title="Move down"
                           disabled={
                             moduleIndex ===
-                              modules.length -
-                                1 || saving
+                            modules.length -
+                            1 || saving
                           }
                           onClick={() =>
                             moveModule(
@@ -1775,159 +1790,159 @@ export default function CourseContent() {
             {/* VIDEO */}
             {lessonForm.type ===
               LESSON_TYPES.VIDEO && (
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Lesson Video
-                </label>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Lesson Video
+                  </label>
 
-                {videoPreviewUrl ? (
-                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-black">
-                    <video
-                      src={videoPreviewUrl}
-                      controls
-                      className="max-h-[300px] w-full"
-                    />
+                  {videoPreviewUrl ? (
+                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-black">
+                      <video
+                        src={videoPreviewUrl}
+                        controls
+                        className="max-h-[300px] w-full"
+                      />
 
-                    <div className="flex items-center justify-between gap-3 bg-white px-4 py-3">
-                      <span className="max-w-[70%] truncate text-xs text-slate-500">
-                        {lessonVideo?.name}
+                      <div className="flex items-center justify-between gap-3 bg-white px-4 py-3">
+                        <span className="max-w-[70%] truncate text-xs text-slate-500">
+                          {lessonVideo?.name}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (
+                              uploadingVideo
+                            ) {
+                              return;
+                            }
+
+                            if (
+                              videoPreviewUrl
+                            ) {
+                              URL.revokeObjectURL(
+                                videoPreviewUrl
+                              );
+                            }
+
+                            setLessonVideo(
+                              null
+                            );
+                            setVideoPreviewUrl(
+                              ""
+                            );
+
+                            if (
+                              videoInputRef.current
+                            ) {
+                              videoInputRef.current.value =
+                                "";
+                            }
+                          }}
+                          disabled={
+                            uploadingVideo
+                          }
+                          className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        videoInputRef.current?.click()
+                      }
+                      disabled={
+                        saving ||
+                        uploadingVideo
+                      }
+                      className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center hover:border-blue-400 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm">
+                        <Upload size={22} />
+                      </div>
+
+                      <span className="mt-3 text-sm font-semibold text-slate-700">
+                        {editingLesson
+                          ? "Replace video"
+                          : "Upload lesson video"}
                       </span>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (
-                            uploadingVideo
-                          ) {
-                            return;
-                          }
+                      <span className="mt-1 text-xs text-slate-400">
+                        MP4, WebM or other browser-supported
+                        video · Max 500MB
+                      </span>
+                    </button>
+                  )}
 
-                          if (
-                            videoPreviewUrl
-                          ) {
-                            URL.revokeObjectURL(
-                              videoPreviewUrl
-                            );
-                          }
-
-                          setLessonVideo(
-                            null
-                          );
-                          setVideoPreviewUrl(
-                            ""
-                          );
-
-                          if (
-                            videoInputRef.current
-                          ) {
-                            videoInputRef.current.value =
-                              "";
-                          }
-                        }}
-                        disabled={
-                          uploadingVideo
-                        }
-                        className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      videoInputRef.current?.click()
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={
+                      handleLessonVideoChange
                     }
+                    className="hidden"
                     disabled={
                       saving ||
                       uploadingVideo
                     }
-                    className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center hover:border-blue-400 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm">
-                      <Upload size={22} />
-                    </div>
+                  />
 
-                    <span className="mt-3 text-sm font-semibold text-slate-700">
-                      {editingLesson
-                        ? "Replace video"
-                        : "Upload lesson video"}
-                    </span>
+                  {editingLesson &&
+                    !videoPreviewUrl &&
+                    lessonForm.videoUrl && (
+                      <div className="mt-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                        <PlayCircle
+                          size={16}
+                          className="text-blue-600"
+                        />
 
-                    <span className="mt-1 text-xs text-slate-400">
-                      MP4, WebM or other browser-supported
-                      video · Max 500MB
-                    </span>
-                  </button>
-                )}
-
-                <input
-                  ref={videoInputRef}
-                  type="file"
-                  accept="video/*"
-                  onChange={
-                    handleLessonVideoChange
-                  }
-                  className="hidden"
-                  disabled={
-                    saving ||
-                    uploadingVideo
-                  }
-                />
-
-                {editingLesson &&
-                  !videoPreviewUrl &&
-                  lessonForm.videoUrl && (
-                    <div className="mt-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                      <PlayCircle
-                        size={16}
-                        className="text-blue-600"
-                      />
-
-                      <span>
-                        Existing video is attached.
-                        Upload a new video to replace
-                        it.
-                      </span>
-                    </div>
-                  )}
-              </div>
-            )}
+                        <span>
+                          Existing video is attached.
+                          Upload a new video to replace
+                          it.
+                        </span>
+                      </div>
+                    )}
+                </div>
+              )}
 
             {/* Preview */}
             {lessonForm.type ===
               LESSON_TYPES.VIDEO && (
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <input
-                  type="checkbox"
-                  checked={
-                    lessonForm.isPreview
-                  }
-                  onChange={(event) =>
-                    updateLessonField(
-                      "isPreview",
-                      event.target.checked
-                    )
-                  }
-                  disabled={
-                    saving || uploadingVideo
-                  }
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
-                />
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <input
+                    type="checkbox"
+                    checked={
+                      lessonForm.isPreview
+                    }
+                    onChange={(event) =>
+                      updateLessonField(
+                        "isPreview",
+                        event.target.checked
+                      )
+                    }
+                    disabled={
+                      saving || uploadingVideo
+                    }
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
+                  />
 
-                <span>
-                  <span className="block text-sm font-semibold text-slate-800">
-                    Make this a preview lesson
-                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-800">
+                      Make this a preview lesson
+                    </span>
 
-                  <span className="mt-1 block text-xs leading-5 text-slate-500">
-                    Allows visitors to preview this
-                    lesson before purchasing the course.
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">
+                      Allows visitors to preview this
+                      lesson before purchasing the course.
+                    </span>
                   </span>
-                </span>
-              </label>
-            )}
+                </label>
+              )}
 
             {/* Progress */}
             {uploadingVideo && (
@@ -2030,11 +2045,10 @@ function LessonRow({
         </div>
 
         <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-            isVideo
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isVideo
               ? "bg-blue-50 text-blue-600"
               : "bg-slate-100 text-slate-600"
-          }`}
+            }`}
         >
           {isVideo ? (
             <PlayCircle size={19} />
@@ -2092,7 +2106,7 @@ function LessonRow({
               title="Move down"
               disabled={
                 lessonIndex ===
-                  lessonCount - 1 || saving
+                lessonCount - 1 || saving
               }
               onClick={onMoveDown}
             >
@@ -2150,9 +2164,8 @@ function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4 backdrop-blur-sm">
       <div
-        className={`max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-2xl ${
-          wide ? "max-w-2xl" : "max-w-lg"
-        }`}
+        className={`max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-2xl ${wide ? "max-w-2xl" : "max-w-lg"
+          }`}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4 sm:px-5">
           <h2 className="text-lg font-semibold text-slate-900">
@@ -2194,19 +2207,17 @@ function LessonTypeCard({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-xl border-2 p-4 text-left transition ${
-        selected
+      className={`rounded-xl border-2 p-4 text-left transition ${selected
           ? "border-blue-600 bg-blue-50"
           : "border-slate-200 hover:border-slate-300"
-      } disabled:cursor-not-allowed disabled:opacity-50`}
+        } disabled:cursor-not-allowed disabled:opacity-50`}
     >
       <div className="flex items-center gap-3">
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-            selected
+          className={`flex h-10 w-10 items-center justify-center rounded-xl ${selected
               ? "bg-blue-100 text-blue-600"
               : "bg-slate-100 text-slate-500"
-          }`}
+            }`}
         >
           {icon}
         </div>
@@ -2302,11 +2313,10 @@ function IconButton({
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className={`flex h-9 w-9 items-center justify-center rounded-lg border bg-white transition disabled:cursor-not-allowed disabled:opacity-40 ${
-        danger
+      className={`flex h-9 w-9 items-center justify-center rounded-lg border bg-white transition disabled:cursor-not-allowed disabled:opacity-40 ${danger
           ? "border-red-200 text-red-500 hover:bg-red-50"
           : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-      }`}
+        }`}
     >
       {children}
     </button>

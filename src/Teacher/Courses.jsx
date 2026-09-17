@@ -60,6 +60,29 @@ function formatDate(value) {
 }
 
 
+// Turns a Firestore Timestamp, Date, ISO string, or millis number
+// into a plain number of milliseconds, so courses can be sorted
+// newest-first regardless of how their date fields are stored.
+function toMillis(value) {
+  if (!value) return 0;
+
+  if (typeof value?.toDate === "function") {
+    return value.toDate().getTime();
+  }
+
+  if (typeof value?.seconds === "number") {
+    // Raw Firestore Timestamp-like object (not yet hydrated).
+    return value.seconds * 1000;
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? 0
+    : date.getTime();
+}
+
+
 function getTypeLabel(type) {
   return type === "long"
     ? "Long / Live Course"
@@ -176,11 +199,10 @@ function TypeBadge({ type }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-        isLive
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${isLive
           ? "bg-violet-50 text-violet-700"
           : "bg-blue-50 text-blue-700"
-      }`}
+        }`}
     >
       {isLive ? (
         <Video size={12} />
@@ -227,7 +249,13 @@ export default function TeacherCourses() {
 
 
   // ==========================================================
-  // FILTER COURSES
+  // FILTER + SORT COURSES
+  //
+  // Newest first — sorted by createdAt (falling back to
+  // updatedAt for older documents that might not have a
+  // createdAt field), so a course you just added always shows
+  // up at the top of the list instead of wherever the backend
+  // happened to return it.
   // ==========================================================
 
   const filteredCourses =
@@ -237,39 +265,51 @@ export default function TeacherCourses() {
           .trim()
           .toLowerCase();
 
-      return courses.filter(
-        (course) => {
-          const matchesSearch =
-            !term ||
-            String(
-              course.title || ""
-            )
-              .toLowerCase()
-              .includes(term) ||
+      return courses
+        .filter(
+          (course) => {
+            const matchesSearch =
+              !term ||
+              String(
+                course.title || ""
+              )
+                .toLowerCase()
+                .includes(term) ||
 
-            String(
-              course.category || ""
-            )
-              .toLowerCase()
-              .includes(term);
+              String(
+                course.category || ""
+              )
+                .toLowerCase()
+                .includes(term);
 
-          const matchesStatus =
-            statusFilter === "all" ||
-            course.status ===
+            const matchesStatus =
+              statusFilter === "all" ||
+              course.status ===
               statusFilter;
 
-          const matchesType =
-            typeFilter === "all" ||
-            course.type ===
+            const matchesType =
+              typeFilter === "all" ||
+              course.type ===
               typeFilter;
 
-          return (
-            matchesSearch &&
-            matchesStatus &&
-            matchesType
-          );
-        }
-      );
+            return (
+              matchesSearch &&
+              matchesStatus &&
+              matchesType
+            );
+          }
+        )
+        .sort(
+          (a, b) =>
+            toMillis(
+              b.createdAt ||
+              b.updatedAt
+            ) -
+            toMillis(
+              a.createdAt ||
+              a.updatedAt
+            )
+        );
     }, [
       courses,
       search,
@@ -343,7 +383,7 @@ export default function TeacherCourses() {
 
       setActionError(
         err?.message ||
-          "Unable to delete course."
+        "Unable to delete course."
       );
     } finally {
       setDeletingId(null);
@@ -382,7 +422,7 @@ export default function TeacherCourses() {
 
       setActionError(
         err?.message ||
-          "Unable to submit course."
+        "Unable to submit course."
       );
     } finally {
       setSubmittingId(null);
@@ -483,19 +523,19 @@ export default function TeacherCourses() {
 
         {(error ||
           actionError) && (
-          <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
 
-            <XCircle
-              size={18}
-              className="shrink-0 mt-0.5"
-            />
+              <XCircle
+                size={18}
+                className="shrink-0 mt-0.5"
+              />
 
-            <span>
-              {actionError ||
-                error}
-            </span>
-          </div>
-        )}
+              <span>
+                {actionError ||
+                  error}
+              </span>
+            </div>
+          )}
 
 
         {/* ==================================================
@@ -746,18 +786,16 @@ function MiniStat({
     <button
       type="button"
       onClick={onClick}
-      className={`text-left rounded-xl border p-4 transition ${
-        active
+      className={`text-left rounded-xl border p-4 transition ${active
           ? "border-slate-900 bg-slate-900 text-white"
           : "border-slate-200 bg-white hover:border-slate-300"
-      }`}
+        }`}
     >
       <p
-        className={`text-xs ${
-          active
+        className={`text-xs ${active
             ? "text-slate-300"
             : "text-slate-500"
-        }`}
+          }`}
       >
         {label}
       </p>
@@ -795,9 +833,9 @@ function CourseRow({
 
   const canSubmit =
     course.status ===
-      "draft" ||
+    "draft" ||
     course.status ===
-      "rejected";
+    "rejected";
 
   const canDelete =
     course.status !==
@@ -899,20 +937,20 @@ function CourseRow({
                 <strong className="text-slate-700 font-medium">
                   {formatDate(
                     course.updatedAt ||
-                      course.createdAt
+                    course.createdAt
                   )}
                 </strong>
               </span>
 
               {course.students !==
                 undefined && (
-                <span>
-                  Students:{" "}
-                  <strong className="text-slate-700 font-medium">
-                    {course.students}
-                  </strong>
-                </span>
-              )}
+                  <span>
+                    Students:{" "}
+                    <strong className="text-slate-700 font-medium">
+                      {course.students}
+                    </strong>
+                  </span>
+                )}
             </div>
 
 
@@ -954,7 +992,7 @@ function CourseRow({
                   course
                 )
               }
-                className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 text-white px-3 py-2 text-xs font-medium hover:bg-slate-800 transition"
+              className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 text-white px-3 py-2 text-xs font-medium hover:bg-slate-800 transition"
             >
               <FileText
                 size={14}
@@ -989,22 +1027,22 @@ function CourseRow({
 
             {course.status ===
               "published" && (
-              <button
-                type="button"
-                onClick={() =>
-                  onView(
-                    course
-                  )
-                }
-                className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 text-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-50 transition"
-              >
-                <Eye
-                  size={14}
-                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    onView(
+                      course
+                    )
+                  }
+                  className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 text-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-50 transition"
+                >
+                  <Eye
+                    size={14}
+                  />
 
-                View Live
-              </button>
-            )}
+                  View Live
+                </button>
+              )}
 
 
             {/* Submit */}

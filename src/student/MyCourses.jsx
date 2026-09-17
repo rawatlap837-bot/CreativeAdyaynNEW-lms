@@ -1025,9 +1025,8 @@ function StudentCourseCard({
               </span>
 
               <ChevronDown
-                className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${
-                  showPayment ? "rotate-180" : ""
-                }`}
+                className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${showPayment ? "rotate-180" : ""
+                  }`}
               />
 
             </button>

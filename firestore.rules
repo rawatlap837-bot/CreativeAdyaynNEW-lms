@@ -20,11 +20,17 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn()
+        && exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        )
         && userDoc().data.role == "admin";
     }
 
     function isTeacher() {
       return isSignedIn()
+        && exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        )
         && (
           userDoc().data.role == "teacher"
           || userDoc().data.role == "instructor"
@@ -33,6 +39,9 @@ service cloud.firestore {
 
     function isStudent() {
       return isSignedIn()
+        && exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        )
         && userDoc().data.role == "student";
     }
 
@@ -98,19 +107,6 @@ service cloud.firestore {
     // ============================================================
 
     match /courses/{courseId} {
-
-      // NOTE: read/update/delete check resource.data.instructorId
-      // directly instead of calling isCourseOwner(courseId), which
-      // re-fetches this same document via get(). That self-referential
-      // get() is what was causing "Missing or insufficient permissions"
-      // on the teacher's own-courses list query
-      // (where("instructorId","==",uid)) in Attendance.jsx — resource.data
-      // is already available for free while this rule evaluates, so no
-      // extra read is needed. isCourseOwner() itself is untouched and
-      // still used by every other collection below (modules, lessons,
-      // attendanceSessions, schedule, tasks, liveClasses, payments,
-      // discussions), which genuinely need to look up a *different*
-      // document's parent course.
 
       allow read: if
         isAdmin()
@@ -200,6 +196,13 @@ service cloud.firestore {
             /databases/$(database)/documents/courses/$(courseId)
           ).data.status == "published"
           && resource.data.published == true
+        )
+        || (
+          isSignedIn()
+          && get(
+            /databases/$(database)/documents/courses/$(courseId)
+          ).data.status == "published"
+          && resource.data.published == true
         );
 
       allow create: if
@@ -216,85 +219,300 @@ service cloud.firestore {
     }
 
 
-// ============================================================
-// ENROLLMENTS
-// Document ID: {uid}_{courseId}
-// ============================================================
+    // ============================================================
+    // ENROLLMENTS
+    // Document ID: {uid}_{courseId}
+    // ============================================================
 
-match /enrollments/{enrollmentId} {
+    match /enrollments/{enrollmentId} {
 
-  // Lets getEnrollment() return null when a student has not
-  // enrolled yet, instead of returning permission-denied.
-  allow get: if
-    isAdmin()
-    || (
-      isStudent()
-      && enrollmentId.matches("^" + request.auth.uid + "_.*")
-    )
-    || (
-      isTeacher()
-      && resource.data.courseId is string
-      && isCourseOwner(resource.data.courseId)
-    );
+      allow get: if
+        isAdmin()
+        || (
+          isStudent()
+          && enrollmentId.matches("^" + request.auth.uid + "_.*")
+        )
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        );
 
-  // Used by getMyEnrollments(), which queries:
-  // where("uid", "==", currentUser.uid)
-  allow list: if
-    isAdmin()
-    || (
-      isStudent()
-      && resource.data.uid == request.auth.uid
-    )
-    || (
-      isTeacher()
-      && resource.data.courseId is string
-      && isCourseOwner(resource.data.courseId)
-    );
+      allow list: if
+        isAdmin()
+        || (
+          isStudent()
+          && resource.data.uid == request.auth.uid
+        )
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        );
 
-  // Used by enrollStudent()
-  allow create: if
-    isAdmin()
-    || (
-      isStudent()
-      && enrollmentId ==
-        request.auth.uid + "_" + request.resource.data.courseId
-      && request.resource.data.uid == request.auth.uid
-      && request.resource.data.studentId == request.auth.uid
-      && request.resource.data.courseId is string
-      && request.resource.data.status == "active"
-      && request.resource.data.paymentStatus in ["free", "paid"]
-      && request.resource.data.paymentId is string
-      && request.resource.data.progress == 0
-    );
+      allow create: if
+        isAdmin()
+        || (
+          isStudent()
+          && enrollmentId ==
+            request.auth.uid + "_" + request.resource.data.courseId
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.studentId == request.auth.uid
+          && request.resource.data.courseId is string
+          && request.resource.data.status == "active"
+          && request.resource.data.paymentStatus in ["free", "paid"]
+          && request.resource.data.paymentId is string
+          && request.resource.data.progress == 0
+        );
 
-  // Students can update only their learning progress.
-  allow update: if
-    isAdmin()
-    || (
-      isStudent()
-      && resource.data.uid == request.auth.uid
-      && request.resource.data.uid == resource.data.uid
-      && request.resource.data.studentId == resource.data.studentId
-      && request.resource.data.courseId == resource.data.courseId
-      && request.resource.data.status == resource.data.status
-      && request.resource.data.paymentStatus ==
-        resource.data.paymentStatus
-      && request.resource.data.paymentId ==
-        resource.data.paymentId
-      && request.resource.data
-        .diff(resource.data)
-        .affectedKeys()
-        .hasOnly([
-          "completedLessons",
-          "progress",
-          "lastLessonId",
-          "lastAccessedAt",
-          "updatedAt"
-        ])
-    );
+      allow update: if
+        isAdmin()
+        || (
+          isStudent()
+          && resource.data.uid == request.auth.uid
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.studentId == resource.data.studentId
+          && request.resource.data.courseId == resource.data.courseId
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.paymentStatus ==
+            resource.data.paymentStatus
+          && request.resource.data.paymentId ==
+            resource.data.paymentId
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              "completedLessons",
+              "progress",
+              "lastLessonId",
+              "lastAccessedAt",
+              "updatedAt"
+            ])
+        );
 
-  allow delete: if isAdmin();
-}
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================================
+    // ASSIGNMENTS
+    // ============================================================
+
+    match /assignments/{assignmentId} {
+
+      // Admins can read everything.
+      // Teachers can read assignments belonging to their own courses.
+      // Students can read only published assignments from courses
+      // in which they are actively enrolled.
+      allow read: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && isCourseOwner(resource.data.courseId)
+        )
+        || (
+          isStudent()
+          && resource.data.courseId is string
+          && resource.data.status == "published"
+          && isEnrolled(resource.data.courseId)
+        );
+
+      // Teachers create assignments only for their own courses.
+      allow create: if
+        isAdmin()
+        || (
+          isTeacher()
+          && request.resource.data.courseId is string
+          && request.resource.data.teacherId == request.auth.uid
+          && isCourseOwner(request.resource.data.courseId)
+        );
+
+      // Teachers can edit only their own course assignments.
+      // Course and teacher ownership cannot be transferred.
+      allow update: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && resource.data.teacherId == request.auth.uid
+          && isCourseOwner(resource.data.courseId)
+          && request.resource.data.courseId == resource.data.courseId
+          && request.resource.data.teacherId == resource.data.teacherId
+        );
+
+      allow delete: if
+        isAdmin()
+        || (
+          isTeacher()
+          && resource.data.courseId is string
+          && resource.data.teacherId == request.auth.uid
+          && isCourseOwner(resource.data.courseId)
+        );
+    }
+
+
+    // ============================================================
+    // ASSIGNMENT SUBMISSIONS
+    //
+    // Path:
+    // /assignments/{assignmentId}/submissions/{studentId}
+    //
+    // The student's UID is used as the submission document ID.
+    // ============================================================
+
+    match /assignments/{assignmentId}/submissions/{studentId} {
+
+      // ----------------------------------------------------------
+      // READ
+      // ----------------------------------------------------------
+
+      allow read: if
+        isAdmin()
+        || (
+          isTeacher()
+          && exists(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          )
+          && get(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          ).data.courseId is string
+          && isCourseOwner(
+            get(
+              /databases/$(database)/documents/assignments/$(assignmentId)
+            ).data.courseId
+          )
+        )
+        || (
+          isStudent()
+          && studentId == request.auth.uid
+        );
+
+
+      // ----------------------------------------------------------
+      // CREATE
+      // ----------------------------------------------------------
+
+      // Teacher/admin creation is allowed for administrative use.
+      // Students can create only their own submission for an
+      // assignment belonging to an actively enrolled course.
+      allow create: if
+        isAdmin()
+        || (
+          isTeacher()
+          && exists(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          )
+          && get(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          ).data.courseId is string
+          && isCourseOwner(
+            get(
+              /databases/$(database)/documents/assignments/$(assignmentId)
+            ).data.courseId
+          )
+        )
+        || (
+          isStudent()
+          && studentId == request.auth.uid
+          && exists(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          )
+          && get(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          ).data.courseId is string
+          && get(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          ).data.status == "published"
+          && isEnrolled(
+            get(
+              /databases/$(database)/documents/assignments/$(assignmentId)
+            ).data.courseId
+          )
+          && request.resource.data.studentId == request.auth.uid
+          && (
+            !("grade" in request.resource.data)
+            || request.resource.data.grade == null
+          )
+          && (
+            !("feedback" in request.resource.data)
+            || request.resource.data.feedback == ""
+            || request.resource.data.feedback == null
+          )
+          && (
+            !("gradedAt" in request.resource.data)
+            || request.resource.data.gradedAt == null
+          )
+          && (
+            !("gradedBy" in request.resource.data)
+            || request.resource.data.gradedBy == null
+          )
+        );
+
+
+      // ----------------------------------------------------------
+      // UPDATE
+      // ----------------------------------------------------------
+
+      // Teachers can grade/edit submissions for their own courses.
+      //
+      // Students can update only their own submission and cannot
+      // modify grade, feedback, gradedAt, or gradedBy.
+      allow update: if
+        isAdmin()
+        || (
+          isTeacher()
+          && exists(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          )
+          && get(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          ).data.courseId is string
+          && isCourseOwner(
+            get(
+              /databases/$(database)/documents/assignments/$(assignmentId)
+            ).data.courseId
+          )
+          && request.resource.data.studentId == resource.data.studentId
+        )
+        || (
+          isStudent()
+          && studentId == request.auth.uid
+          && request.resource.data.studentId == resource.data.studentId
+          && request.resource.data.grade == resource.data.grade
+          && request.resource.data.feedback == resource.data.feedback
+          && request.resource.data.gradedAt == resource.data.gradedAt
+          && request.resource.data.gradedBy == resource.data.gradedBy
+        );
+
+
+      // ----------------------------------------------------------
+      // DELETE
+      // ----------------------------------------------------------
+
+      allow delete: if
+        isAdmin()
+        || (
+          isTeacher()
+          && exists(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          )
+          && get(
+            /databases/$(database)/documents/assignments/$(assignmentId)
+          ).data.courseId is string
+          && isCourseOwner(
+            get(
+              /databases/$(database)/documents/assignments/$(assignmentId)
+            ).data.courseId
+          )
+        )
+        || (
+          isStudent()
+          && studentId == request.auth.uid
+        );
+    }
+
+
     // ============================================================
     // ATTENDANCE SESSIONS
     // ============================================================
@@ -399,7 +617,7 @@ match /enrollments/{enrollmentId} {
 
 
     // ============================================================
-    // SCHEDULE (course-scoped — created/managed by teachers per course)
+    // SCHEDULE
     // ============================================================
 
     match /schedule/{scheduleId} {
@@ -448,18 +666,7 @@ match /enrollments/{enrollmentId} {
 
 
     // ============================================================
-    // SCHEDULE EVENTS (personal per-student calendar)
-    //
-    // This is a DIFFERENT collection from /schedule above.
-    // Dashboard.jsx's "This week" panel queries:
-    //   collection(db, "scheduleEvents")
-    //     .where("uid", "==", currentUser.uid)
-    //     .where("date", ">=", weekStart)
-    //     .where("date", "<=", weekEnd)
-    // i.e. a personal, non-course-scoped event list — there was no
-    // rule at all for this collection name before, so every read
-    // fell through to the default-deny catch-all at the bottom of
-    // this file.
+    // SCHEDULE EVENTS
     // ============================================================
 
     match /scheduleEvents/{eventId} {
@@ -517,15 +724,6 @@ match /enrollments/{enrollmentId} {
 
     // ============================================================
     // TASKS
-    //
-    // Two shapes coexist here:
-    //  - Course assignments set by a teacher: { courseId, teacherId, ... }
-    //  - Personal per-student to-dos, which is what Dashboard.jsx's
-    //    "Today's tasks" panel actually reads/writes:
-    //      collection(db, "tasks").where("uid","==",uid).where("date", ...)
-    //    and toggleTask() calls updateDoc(doc(db,"tasks",id), { progress }).
-    //    The original rule only recognised the course-assignment shape,
-    //    so every personal task read/update was denied.
     // ============================================================
 
     match /tasks/{taskId} {
@@ -570,8 +768,6 @@ match /enrollments/{enrollmentId} {
           && request.resource.data.courseId == resource.data.courseId
         )
         || (
-          // Students may only ever touch their own personal task's
-          // progress fields — never reassign it to someone else.
           isStudent()
           && resource.data.uid == request.auth.uid
           && request.resource.data.uid == resource.data.uid
@@ -594,14 +790,6 @@ match /enrollments/{enrollmentId} {
 
     // ============================================================
     // LIVE CLASSES
-    //
-    // Same dual-shape situation as tasks/scheduleEvents above.
-    // Dashboard.jsx's "Live class" card queries:
-    //   collection(db, "liveClasses")
-    //     .where("uid","==",uid)
-    //     .where("startTime",">=",now)
-    // and setLiveClassStatus() updates only the "status" field
-    // (join / request reschedule) on the student's own doc.
     // ============================================================
 
     match /liveClasses/{liveClassId} {
@@ -642,8 +830,6 @@ match /enrollments/{enrollmentId} {
           && request.resource.data.courseId == resource.data.courseId
         )
         || (
-          // A student may only flip their own doc's "status" field
-          // (e.g. "joined" / "rescheduled") — nothing else.
           isStudent()
           && resource.data.uid == request.auth.uid
           && request.resource.data

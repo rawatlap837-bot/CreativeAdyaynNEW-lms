@@ -525,12 +525,22 @@ function CourseCard({
   const [showAllFeatures, setShowAllFeatures] =
     useState(false);
 
-  // Mobile-only: the "what's included" list (and everything under it)
-  // stays collapsed behind a dropdown so a card with a long feature list
-  // doesn't blow past the phone's first screen. On sm: and up this has
-  // no effect — the full list is always shown there, same as before.
+  // Mobile-only: everything below the short description (feature list
+  // AND the mode / student-count / start-date row) stays collapsed
+  // behind a single "Course details" dropdown, so a growing catalogue
+  // of courses stays scannable on a phone — visitors see enough
+  // (image, title, short blurb) to judge interest, then expand for
+  // specifics. On sm: and up nothing changes — everything is always
+  // shown, same as before.
   const [detailsOpen, setDetailsOpen] =
     useState(false);
+
+  // If a course happens to have no feature list at all, there's nothing
+  // for the toggle to gate, so the meta row just stays visible on
+  // mobile too rather than being permanently hidden behind a button
+  // that never appears.
+  const hasCollapsibleDetails =
+    allFeatures.length > 0;
 
   const visibleFeatures = showAllFeatures
     ? allFeatures
@@ -708,9 +718,10 @@ function CourseCard({
             </p>
           )}
 
-        {/* On mobile this whole block — the full feature list — hides
-            behind a "What's included" toggle so the card stays short.
-            From sm: upward it's always expanded, exactly as before. */}
+        {/* On mobile this whole block — features + the mode/students/
+            start-date row further down — hides behind this single
+            "Course details" toggle so the card stays short. From sm:
+            upward it's always expanded, exactly as before. */}
         {allFeatures.length > 0 && (
           <div className="mt-4 border-t border-violet-50 pt-4">
             <button
@@ -726,8 +737,8 @@ function CourseCard({
                 />
 
                 {detailsOpen
-                  ? "Hide what's included"
-                  : `What's included (${allFeatures.length})`}
+                  ? "Hide course details"
+                  : `Course details (${allFeatures.length})`}
               </span>
 
               <ChevronDown
@@ -769,7 +780,7 @@ function CourseCard({
               )}
 
               {/* Desktop-only "+N more benefits" toggle — on mobile the
-                  outer "What's included" button above already reveals
+                  outer "Course details" button above already reveals
                   every feature in one tap, so this stays hidden there. */}
               {extraFeatureCount > 0 && (
                 <li>
@@ -821,32 +832,51 @@ function CourseCard({
         )}
 
         <div className="mt-5 flex flex-col gap-2.5 border-t border-violet-50 pt-4">
-          <div className="flex items-center justify-between gap-3">
-            {course.mode && (
-              <span className="text-xs font-medium leading-snug text-slate-400">
-                {course.mode}
-              </span>
-            )}
+          {/* Mode / student-count / start-date: collapsed into the same
+              mobile toggle as the feature list above (via detailsOpen),
+              so it doesn't add extra height to a compact card. Always
+              visible from sm: upward, unchanged from before. Courses
+              with no feature list at all (hasCollapsibleDetails false)
+              just show this row plainly, since there's no toggle to
+              gate it with in that case. */}
+          <div
+            className={[
+              "flex-col gap-2.5",
+              hasCollapsibleDetails
+                ? detailsOpen
+                  ? "flex"
+                  : "hidden"
+                : "flex",
+              "sm:flex",
+            ].join(" ")}
+          >
+            <div className="flex items-center justify-between gap-3">
+              {course.mode && (
+                <span className="text-xs font-medium leading-snug text-slate-400">
+                  {course.mode}
+                </span>
+              )}
 
-            {course.studentCount > 0 && (
-              <span className="inline-flex items-center gap-1 text-xs text-slate-400">
-                <Users className="h-3.5 w-3.5" />
+              {course.studentCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                  <Users className="h-3.5 w-3.5" />
 
-                {Number(
-                  course.studentCount
-                ).toLocaleString("en-IN")}
+                  {Number(
+                    course.studentCount
+                  ).toLocaleString("en-IN")}
+                </span>
+              )}
+            </div>
+
+            {course.startDate && (
+              <span className="text-xs text-slate-400">
+                Starts{" "}
+                {formatDate(
+                  course.startDate
+                )}
               </span>
             )}
           </div>
-
-          {course.startDate && (
-            <span className="text-xs text-slate-400">
-              Starts{" "}
-              {formatDate(
-                course.startDate
-              )}
-            </span>
-          )}
 
           <CourseLink
             {...courseLinkProps}

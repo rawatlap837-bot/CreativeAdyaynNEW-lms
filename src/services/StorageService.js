@@ -83,6 +83,10 @@ function uploadFile(
 
       const fileName = createFileName(file);
 
+      /*
+       * Every uploaded file is stored inside
+       * the logged-in user's UID folder.
+       */
       const storagePath = `${path}/${user.uid}/${fileName}`;
 
       const storageRef = ref(storage, storagePath);
@@ -106,10 +110,10 @@ function uploadFile(
           const progress =
             snapshot.totalBytes > 0
               ? Math.round(
-                  (snapshot.bytesTransferred /
-                    snapshot.totalBytes) *
-                    100
-                )
+                (snapshot.bytesTransferred /
+                  snapshot.totalBytes) *
+                100
+              )
               : 0;
 
           if (typeof onProgress === "function") {
@@ -122,7 +126,10 @@ function uploadFile(
         ------------------------------------------ */
 
         (error) => {
-          console.error("Firebase Storage upload error:", error);
+          console.error(
+            "Firebase Storage upload error:",
+            error
+          );
 
           switch (error.code) {
             case "storage/unauthorized":
@@ -135,7 +142,9 @@ function uploadFile(
 
             case "storage/canceled":
               reject(
-                new Error("The upload was cancelled.")
+                new Error(
+                  "The upload was cancelled."
+                )
               );
               break;
 
@@ -151,6 +160,14 @@ function uploadFile(
               reject(
                 new Error(
                   "The upload failed because the file checksum was invalid."
+                )
+              );
+              break;
+
+            case "storage/retry-limit-exceeded":
+              reject(
+                new Error(
+                  "The upload failed because the retry limit was exceeded."
                 )
               );
               break;
@@ -171,7 +188,9 @@ function uploadFile(
         async () => {
           try {
             const downloadURL =
-              await getDownloadURL(uploadTask.snapshot.ref);
+              await getDownloadURL(
+                uploadTask.snapshot.ref
+              );
 
             if (typeof onProgress === "function") {
               onProgress(100);
@@ -311,6 +330,57 @@ export async function uploadLessonResource(
       "application/vnd.ms-powerpoint",
       "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       "text/plain",
+    ],
+    100,
+    onProgress
+  );
+}
+
+/* --------------------------------------------------
+   ASSIGNMENT SUBMISSION
+-------------------------------------------------- */
+
+export async function uploadAssignmentSubmission(
+  file,
+  assignmentId,
+  onProgress
+) {
+  if (!assignmentId) {
+    throw new Error("Assignment ID is required.");
+  }
+
+  return uploadFile(
+    file,
+    `assignments/${assignmentId}/submissions`,
+    [
+      /* Documents */
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+      /* Presentations */
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+
+      /* Spreadsheets */
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+      /* Text */
+      "text/plain",
+
+      /* Images */
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+
+      /* ZIP */
+      "application/zip",
+
+      /* Videos */
+      "video/mp4",
+      "video/webm",
+      "video/quicktime",
     ],
     100,
     onProgress

@@ -46,7 +46,6 @@ import {
 
 import { db } from "../firebase/Firebase";
 
-
 // ============================================================
 // HELPERS
 // ============================================================
@@ -63,7 +62,6 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-
 function formatDate(value) {
   const date = toDate(value);
 
@@ -75,7 +73,6 @@ function formatDate(value) {
     year: "numeric",
   });
 }
-
 
 function formatPrice(course) {
   const currency = course.currency || "INR";
@@ -100,7 +97,6 @@ function formatPrice(course) {
   }
 }
 
-
 function getTypeLabel(type) {
   if (type === "long") {
     return "Long / Live";
@@ -108,7 +104,6 @@ function getTypeLabel(type) {
 
   return "Short Course";
 }
-
 
 function getStatusStyle(status) {
   const styles = {
@@ -146,7 +141,6 @@ function getStatusStyle(status) {
   );
 }
 
-
 function StatusBadge({ status }) {
   const style = getStatusStyle(status);
 
@@ -162,7 +156,6 @@ function StatusBadge({ status }) {
     </span>
   );
 }
-
 
 function TypeBadge({ type }) {
   return (
@@ -189,7 +182,6 @@ function TypeBadge({ type }) {
     </span>
   );
 }
-
 
 // ============================================================
 // MAIN COMPONENT
@@ -229,6 +221,7 @@ export default function Courses() {
 
   const [confirmAction, setConfirmAction] =
     useState(null);
+
   // shape: { type: "publish" | "unpublish", course }
 
   const [busyAction, setBusyAction] =
@@ -236,7 +229,6 @@ export default function Courses() {
 
   const [actionError, setActionError] =
     useState("");
-
 
   // ==========================================================
   // LOAD COURSES
@@ -272,7 +264,6 @@ export default function Courses() {
       unsubscribe();
     };
   }, []);
-
 
   // ==========================================================
   // LOAD INSTRUCTORS
@@ -326,7 +317,6 @@ export default function Courses() {
     };
   }, []);
 
-
   // ==========================================================
   // FILTER OPTIONS
   // ==========================================================
@@ -348,15 +338,45 @@ export default function Courses() {
     }));
   }, [courses, instructors]);
 
-
   // ==========================================================
-  // FILTERED COURSES
+  // FILTERED + SORTED COURSES
+  // NEWEST COURSES FIRST
   // ==========================================================
 
   const filteredCourses = useMemo(() => {
     const term = search.trim().toLowerCase();
 
-    return courses.filter((course) => {
+    // Create a copy so the original courses array
+    // from Firebase is never mutated.
+    const sortedCourses = [...courses].sort(
+      (a, b) => {
+        const getTimestamp = (course) => {
+          // Created date is the primary sorting value.
+          // Updated date is used only when createdAt
+          // is not available.
+          const date =
+            toDate(course.createdAt) ||
+            toDate(course.updatedAt);
+
+          return date ? date.getTime() : 0;
+        };
+
+        const dateA = getTimestamp(a);
+        const dateB = getTimestamp(b);
+
+        // Newest courses first
+        if (dateA !== dateB) {
+          return dateB - dateA;
+        }
+
+        // Fallback when dates are identical or missing
+        return String(b.id || "").localeCompare(
+          String(a.id || "")
+        );
+      }
+    );
+
+    return sortedCourses.filter((course) => {
       const instructor =
         instructors[course.instructorId];
 
@@ -403,7 +423,6 @@ export default function Courses() {
     typeFilter,
     instructorFilter,
   ]);
-
 
   // ==========================================================
   // STATS
@@ -455,7 +474,6 @@ export default function Courses() {
     };
   }, [courses]);
 
-
   // ==========================================================
   // ACTION WRAPPER
   // ==========================================================
@@ -481,7 +499,6 @@ export default function Courses() {
     }
   }
 
-
   // ==========================================================
   // APPROVE
   // ==========================================================
@@ -498,15 +515,16 @@ export default function Courses() {
     );
   }
 
-
   // ==========================================================
   // PUBLISH
   // ==========================================================
 
   function handlePublish(course) {
-    setConfirmAction({ type: "publish", course });
+    setConfirmAction({
+      type: "publish",
+      course,
+    });
   }
-
 
   // ==========================================================
   // REJECT
@@ -538,15 +556,16 @@ export default function Courses() {
     );
   }
 
-
   // ==========================================================
   // UNPUBLISH
   // ==========================================================
 
   function handleUnpublish(course) {
-    setConfirmAction({ type: "unpublish", course });
+    setConfirmAction({
+      type: "unpublish",
+      course,
+    });
   }
-
 
   // ==========================================================
   // CONFIRM PUBLISH / UNPUBLISH
@@ -556,22 +575,29 @@ export default function Courses() {
     if (!confirmAction) return;
 
     const { type, course } = confirmAction;
+
     setConfirmAction(null);
 
     if (type === "publish") {
-      await runAction(`publish-${course.id}`, async () => {
-        await adminPublishCourse(course.id);
-        setSelectedCourse(null);
-      });
+      await runAction(
+        `publish-${course.id}`,
+        async () => {
+          await adminPublishCourse(course.id);
+
+          setSelectedCourse(null);
+        }
+      );
     }
 
     if (type === "unpublish") {
-      await runAction(`unpublish-${course.id}`, async () => {
-        await adminUnpublishCourse(course.id);
-      });
+      await runAction(
+        `unpublish-${course.id}`,
+        async () => {
+          await adminUnpublishCourse(course.id);
+        }
+      );
     }
   }
-
 
   // ==========================================================
   // DELETE
@@ -594,7 +620,6 @@ export default function Courses() {
     );
   }
 
-
   // ==========================================================
   // FEATURED
   // ==========================================================
@@ -616,7 +641,6 @@ export default function Courses() {
     );
   }
 
-
   // ==========================================================
   // RESET FILTERS
   // ==========================================================
@@ -627,7 +651,6 @@ export default function Courses() {
     setTypeFilter("all");
     setInstructorFilter("all");
   }
-
 
   // ==========================================================
   // RENDER
@@ -687,7 +710,6 @@ export default function Courses() {
           </div>
         </div>
 
-
         {/* ==================================================
             ACTION ERROR
         ================================================== */}
@@ -712,15 +734,8 @@ export default function Courses() {
           </div>
         )}
 
-
         {/* ==================================================
             STATS
-            NOTE: widened from xl:grid-cols-8 to xl:grid-cols-4
-            (grid-cols-2 on mobile, grid-cols-4 from sm up) so
-            each card has enough width for its full label. If
-            labels still show truncated ("T...", "S..."), the
-            `truncate` class lives inside the StatCard component
-            itself (AdminUI.jsx) and needs to change there too.
         ================================================== */}
 
         <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
@@ -773,7 +788,6 @@ export default function Courses() {
           />
         </div>
 
-
         {/* ==================================================
             FILTERS
         ================================================== */}
@@ -791,7 +805,6 @@ export default function Courses() {
                 Search & Filters
               </span>
             </div>
-
 
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-5">
 
@@ -818,7 +831,6 @@ export default function Courses() {
                   }}
                 />
               </div>
-
 
               {/* Status */}
 
@@ -859,7 +871,6 @@ export default function Courses() {
                 </option>
               </select>
 
-
               {/* Type */}
 
               <select
@@ -886,7 +897,6 @@ export default function Courses() {
                   Long / Live
                 </option>
               </select>
-
 
               {/* Instructor */}
 
@@ -918,7 +928,6 @@ export default function Courses() {
                 )}
               </select>
             </div>
-
 
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p
@@ -955,7 +964,6 @@ export default function Courses() {
             </div>
           </div>
         </Card>
-
 
         {/* ==================================================
             COURSE LIST
@@ -1060,7 +1068,6 @@ export default function Courses() {
                   })}
                 </div>
 
-
                 {/* ==================================================
                     DESKTOP TABLE
                 ================================================== */}
@@ -1110,7 +1117,6 @@ export default function Courses() {
                       </tr>
                     </thead>
 
-
                     <tbody>
                       {filteredCourses.map(
                         (course) => {
@@ -1133,7 +1139,6 @@ export default function Courses() {
                                   AT.line,
                               }}
                             >
-
                               {/* Course */}
 
                               <td className="px-5 py-4">
@@ -1141,7 +1146,6 @@ export default function Courses() {
                                   course={course}
                                 />
                               </td>
-
 
                               {/* Type */}
 
@@ -1153,7 +1157,6 @@ export default function Courses() {
                                 />
                               </td>
 
-
                               {/* Instructor */}
 
                               <td className="px-4 py-4">
@@ -1164,7 +1167,6 @@ export default function Courses() {
                                 />
                               </td>
 
-
                               {/* Price */}
 
                               <td className="px-4 py-4">
@@ -1174,7 +1176,6 @@ export default function Courses() {
                                   )}
                                 </span>
                               </td>
-
 
                               {/* Students */}
 
@@ -1188,7 +1189,6 @@ export default function Courses() {
                                 </span>
                               </td>
 
-
                               {/* Status */}
 
                               <td className="px-4 py-4">
@@ -1198,7 +1198,6 @@ export default function Courses() {
                                   }
                                 />
                               </td>
-
 
                               {/* Updated */}
 
@@ -1216,7 +1215,6 @@ export default function Courses() {
                                   )}
                                 </span>
                               </td>
-
 
                               {/* Actions */}
 
@@ -1282,7 +1280,6 @@ export default function Courses() {
         </div>
       </div>
 
-
       {/* ======================================================
           VIEW COURSE MODAL
       ====================================================== */}
@@ -1308,12 +1305,10 @@ export default function Courses() {
               />
             )}
 
-
             <h2 className="break-words text-lg font-semibold sm:text-xl">
               {selectedCourse.title ||
                 "Untitled Course"}
             </h2>
-
 
             <div className="mt-2 flex flex-wrap gap-2">
               <TypeBadge
@@ -1345,7 +1340,6 @@ export default function Courses() {
                 </span>
               )}
             </div>
-
 
             {/* Information */}
 
@@ -1416,7 +1410,6 @@ export default function Courses() {
               />
             </div>
 
-
             {/* Description */}
 
             {selectedCourse.shortDescription && (
@@ -1438,7 +1431,6 @@ export default function Courses() {
               </div>
             )}
 
-
             {selectedCourse.description && (
               <div className="mt-4">
                 <h3 className="mb-1 text-sm font-semibold">
@@ -1457,7 +1449,6 @@ export default function Courses() {
                 </p>
               </div>
             )}
-
 
             {/* Rejection */}
 
@@ -1493,7 +1484,6 @@ export default function Courses() {
               </div>
             )}
 
-
             {/* Dates */}
 
             <div className="mt-5 grid grid-cols-1 gap-2.5 border-t pt-4 sm:grid-cols-2 sm:gap-3">
@@ -1511,7 +1501,6 @@ export default function Courses() {
                 )}
               />
             </div>
-
 
             {/* Admin Actions */}
 
@@ -1597,7 +1586,6 @@ export default function Courses() {
         </Modal>
       )}
 
-
       {/* ======================================================
           REJECT MODAL
       ====================================================== */}
@@ -1675,7 +1663,6 @@ export default function Courses() {
         </Modal>
       )}
 
-
       {/* ======================================================
           PUBLISH / UNPUBLISH CONFIRMATION
       ====================================================== */}
@@ -1683,17 +1670,21 @@ export default function Courses() {
       {confirmAction && (
         <Modal
           title={
-            confirmAction.type === "publish"
+            confirmAction.type ===
+              "publish"
               ? "Publish Course"
               : "Unpublish Course"
           }
-          onClose={() => setConfirmAction(null)}
+          onClose={() =>
+            setConfirmAction(null)
+          }
         >
           <div
             className="mb-4 flex items-start gap-3 rounded-xl p-3"
             style={{
               background:
-                confirmAction.type === "publish"
+                confirmAction.type ===
+                  "publish"
                   ? AT.successSoft
                   : AT.warnSoft,
             }}
@@ -1702,7 +1693,8 @@ export default function Courses() {
               size={18}
               className="mt-0.5 shrink-0"
               color={
-                confirmAction.type === "publish"
+                confirmAction.type ===
+                  "publish"
                   ? AT.success
                   : AT.warn
               }
@@ -1712,33 +1704,59 @@ export default function Courses() {
               className="text-sm leading-6"
               style={{
                 color:
-                  confirmAction.type === "publish"
+                  confirmAction.type ===
+                    "publish"
                     ? AT.success
                     : AT.warn,
               }}
             >
-              {confirmAction.type === "publish" ? (
+              {confirmAction.type ===
+                "publish" ? (
                 <>
-                  Publish <strong>{confirmAction.course.title}</strong> directly?
-                  This skips the pending-review step and makes it visible to
-                  students immediately.
+                  Publish{" "}
+                  <strong>
+                    {
+                      confirmAction
+                        .course.title
+                    }
+                  </strong>{" "}
+                  directly? This skips the
+                  pending-review step and
+                  makes it visible to students
+                  immediately.
                 </>
               ) : (
                 <>
-                  Unpublish <strong>{confirmAction.course.title}</strong>? This
-                  will remove the course from the public LMS.
+                  Unpublish{" "}
+                  <strong>
+                    {
+                      confirmAction
+                        .course.title
+                    }
+                  </strong>
+                  ? This will remove the
+                  course from the public LMS.
                 </>
               )}
             </p>
           </div>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <GhostButton onClick={() => setConfirmAction(null)}>
+            <GhostButton
+              onClick={() =>
+                setConfirmAction(null)
+              }
+            >
               Cancel
             </GhostButton>
 
-            <PrimaryButton onClick={handleConfirmAction}>
-              {confirmAction.type === "publish" ? (
+            <PrimaryButton
+              onClick={
+                handleConfirmAction
+              }
+            >
+              {confirmAction.type ===
+                "publish" ? (
                 <>
                   <Check size={15} />
                   Publish
@@ -1753,7 +1771,6 @@ export default function Courses() {
           </div>
         </Modal>
       )}
-
 
       {/* ======================================================
           DELETE CONFIRMATION
@@ -1774,7 +1791,6 @@ export default function Courses() {
     </div>
   );
 }
-
 
 // ============================================================
 // COURSE IDENTITY
@@ -1843,7 +1859,6 @@ function CourseIdentity({ course }) {
   );
 }
 
-
 // ============================================================
 // INSTRUCTOR CELL
 // ============================================================
@@ -1886,7 +1901,6 @@ function InstructorCell({ instructor }) {
   );
 }
 
-
 // ============================================================
 // COURSE ACTIONS
 // ============================================================
@@ -1918,8 +1932,7 @@ function CourseActions({
         <Eye size={16} />
       </button>
 
-
-      {/* Publish (draft courses only) */}
+      {/* Publish */}
 
       {course.status === "draft" && (
         <button
@@ -1939,7 +1952,6 @@ function CourseActions({
           <Check size={16} />
         </button>
       )}
-
 
       {/* Approve */}
 
@@ -1962,7 +1974,6 @@ function CourseActions({
         </button>
       )}
 
-
       {/* Reject */}
 
       {course.status === "pending" && (
@@ -1979,7 +1990,6 @@ function CourseActions({
           <X size={16} />
         </button>
       )}
-
 
       {/* Featured */}
 
@@ -2017,7 +2027,6 @@ function CourseActions({
         </button>
       )}
 
-
       {/* Unpublish */}
 
       {course.status === "published" && (
@@ -2037,7 +2046,6 @@ function CourseActions({
         </button>
       )}
 
-
       {/* Delete */}
 
       <button
@@ -2053,7 +2061,6 @@ function CourseActions({
     </div>
   );
 }
-
 
 // ============================================================
 // MOBILE COURSE CARD
@@ -2108,7 +2115,6 @@ function MobileCourseCard({
           )}
         </div>
 
-
         <div className="min-w-0 flex-1">
 
           <div className="flex items-start justify-between gap-2">
@@ -2149,7 +2155,6 @@ function MobileCourseCard({
         </div>
       </div>
 
-
       {/* Course details */}
 
       <div
@@ -2188,7 +2193,6 @@ function MobileCourseCard({
         />
       </div>
 
-
       {/* Actions */}
 
       <div className="flex items-center justify-between gap-2 p-3">
@@ -2204,7 +2208,6 @@ function MobileCourseCard({
           <Eye size={14} />
           View
         </button>
-
 
         <div className="flex items-center gap-1.5">
 
@@ -2226,7 +2229,6 @@ function MobileCourseCard({
               <Check size={16} />
             </button>
           )}
-
 
           {course.status === "pending" && (
             <>
@@ -2261,7 +2263,6 @@ function MobileCourseCard({
               </button>
             </>
           )}
-
 
           {course.status === "published" && (
             <>
@@ -2316,7 +2317,6 @@ function MobileCourseCard({
             </>
           )}
 
-
           <button
             onClick={onDelete}
             title="Delete"
@@ -2335,16 +2335,13 @@ function MobileCourseCard({
   );
 }
 
-
 // ============================================================
 // MOBILE INFO
 // ============================================================
 
 function MobileInfo({ label, value }) {
   return (
-    <div
-      className="min-w-0 bg-white px-3 py-2.5"
-    >
+    <div className="min-w-0 bg-white px-3 py-2.5">
       <p
         className="text-[10px] uppercase tracking-wide"
         style={{
@@ -2360,7 +2357,6 @@ function MobileInfo({ label, value }) {
     </div>
   );
 }
-
 
 // ============================================================
 // INFO ITEM

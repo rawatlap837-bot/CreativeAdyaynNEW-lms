@@ -88,10 +88,6 @@ const AdminCourses = lazy(() =>
   import("./Admin/Courses.jsx")
 );
 
-const Lessons = lazy(() =>
-  import("./Admin/Lessons.jsx")
-);
-
 const AdminPayments = lazy(() =>
   import("./Admin/Payments.jsx")
 );
@@ -134,6 +130,14 @@ const EditCourse = lazy(() =>
 
 const CourseContent = lazy(() =>
   import("./Teacher/CourseContent.jsx")
+);
+
+/* ============================================================
+   TEACHER ASSIGNMENTS
+   ============================================================ */
+
+const TeacherAssignments = lazy(() =>
+  import("./Teacher/Assignments.jsx")
 );
 
 const LessonEditor = lazy(() =>
@@ -195,11 +199,13 @@ function LoadingScreen() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <div className="flex flex-col items-center gap-3">
+
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
 
         <p className="text-sm text-slate-500">
           Loading...
         </p>
+
       </div>
     </div>
   );
@@ -212,12 +218,15 @@ function LoadingScreen() {
 function App() {
   return (
     <Suspense fallback={<LoadingScreen />}>
+
       <Routes>
+
         {/* ======================================================
             PUBLIC WEBSITE + STUDENT AREA
         ====================================================== */}
 
         <Route element={<PublicLayout />}>
+
           {/* ====================================================
               PUBLIC WEBSITE
           ==================================================== */}
@@ -258,6 +267,7 @@ function App() {
           />
 
           {/* Forgot password page */}
+
           <Route
             path="/forgot-password"
             element={<ForgotPassword />}
@@ -342,6 +352,7 @@ function App() {
               />
             }
           />
+
         </Route>
 
         {/* ======================================================
@@ -349,10 +360,12 @@ function App() {
         ====================================================== */}
 
         <Route element={<RequireTeacher />}>
+
           <Route
             path="/Teacher"
             element={<TeacherLayout />}
           >
+
             <Route
               index
               element={<TeacherDashboard />}
@@ -378,16 +391,35 @@ function App() {
               element={<EditCourse />}
             />
 
+            {/* ==================================================
+                COURSE CONTENT
+            ================================================== */}
+
             <Route
               path="courses/:courseId/content"
               element={<CourseContent />}
             />
 
+            {/* ==================================================
+                ASSIGNMENTS
+            ================================================== */}
+
+            <Route
+              path="courses/:courseId/assignments"
+              element={<TeacherAssignments />}
+            />
+
+            {/* ==================================================
+                LESSON EDITOR
+            ================================================== */}
+
             <Route
               path="courses/:courseId/content/:moduleId/lesson/:lessonId"
               element={<LessonEditor />}
             />
+
           </Route>
+
         </Route>
 
         {/* ======================================================
@@ -395,10 +427,12 @@ function App() {
         ====================================================== */}
 
         <Route element={<RequireAdmin />}>
+
           <Route
             path="/admin"
             element={<AdminLayout />}
           >
+
             <Route
               index
               element={<AdminDashboard />}
@@ -412,11 +446,6 @@ function App() {
             <Route
               path="courses"
               element={<AdminCourses />}
-            />
-
-            <Route
-              path="lessons"
-              element={<Lessons />}
             />
 
             <Route
@@ -438,7 +467,9 @@ function App() {
               path="announcements"
               element={<Announcements />}
             />
+
           </Route>
+
         </Route>
 
         {/* ======================================================
@@ -454,7 +485,9 @@ function App() {
             />
           }
         />
+
       </Routes>
+
     </Suspense>
   );
 }

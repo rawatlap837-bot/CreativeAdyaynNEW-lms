@@ -6,6 +6,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import Attendance from "./Attendance";
 import Certificates from "./Certificates.jsx";
 import MyCourses from "./MyCourses.jsx";
+import Assignments from "./Assignments.jsx";
 
 import {
   collection,
@@ -134,6 +135,11 @@ const DASHBOARD_TABS = [
     key: "courses",
     label: "My Courses",
     icon: BookOpen,
+  },
+  {
+    key: "assignments",
+    label: "Assignments",
+    icon: GraduationCap,
   },
   {
     key: "certificates",
@@ -296,8 +302,7 @@ function timeAgo(date) {
   );
 
   if (hrs < 24) {
-    return `${hrs} hr${hrs > 1 ? "s" : ""
-      } ago`;
+    return `${hrs} hr${hrs > 1 ? "s" : ""} ago`;
   }
 
   const days = Math.round(
@@ -618,9 +623,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (!uid) {
       setAnnouncements([]);
-      setAnnouncementsLoading(
-        false
-      );
+      setAnnouncementsLoading(false);
+      setAnnouncementsError(false);
       return;
     }
 
@@ -628,13 +632,8 @@ export default function Dashboard() {
 
     const loadAnnouncements =
       async () => {
-        setAnnouncementsLoading(
-          true
-        );
-
-        setAnnouncementsError(
-          false
-        );
+        setAnnouncementsLoading(true);
+        setAnnouncementsError(false);
 
         try {
           const result =
@@ -661,7 +660,6 @@ export default function Dashboard() {
               )
               .sort(
                 (a, b) => {
-                  /* Pinned announcements first */
                   if (
                     a.pinned &&
                     !b.pinned
@@ -676,7 +674,6 @@ export default function Dashboard() {
                     return 1;
                   }
 
-                  /* Newest first */
                   const aTime =
                     a.date?.getTime() ||
                     0;
@@ -702,15 +699,11 @@ export default function Dashboard() {
 
           if (!cancelled) {
             setAnnouncements([]);
-            setAnnouncementsError(
-              true
-            );
+            setAnnouncementsError(true);
           }
         } finally {
           if (!cancelled) {
-            setAnnouncementsLoading(
-              false
-            );
+            setAnnouncementsLoading(false);
           }
         }
       };
@@ -742,8 +735,15 @@ export default function Dashboard() {
         db,
         "notifications"
       ),
-      where("recipientId", "==", uid),
-      orderBy("createdAt", "desc"),
+      where(
+        "recipientId",
+        "==",
+        uid
+      ),
+      orderBy(
+        "createdAt",
+        "desc"
+      ),
       limit(10)
     );
 
@@ -822,10 +822,25 @@ export default function Dashboard() {
     } = startEndOfToday();
 
     const q = query(
-      collection(db, "tasks"),
-      where("uid", "==", uid),
-      where("date", ">=", Timestamp.fromDate(start)),
-      where("date", "<=", Timestamp.fromDate(end))
+      collection(
+        db,
+        "tasks"
+      ),
+      where(
+        "uid",
+        "==",
+        uid
+      ),
+      where(
+        "date",
+        ">=",
+        Timestamp.fromDate(start)
+      ),
+      where(
+        "date",
+        "<=",
+        Timestamp.fromDate(end)
+      )
     );
 
     const unsubscribe =
@@ -903,11 +918,29 @@ export default function Dashboard() {
     );
 
     const q = query(
-      collection(db, "scheduleEvents"),
-      where("uid", "==", uid),
-      where("date", ">=", Timestamp.fromDate(start)),
-      where("date", "<=", Timestamp.fromDate(end)),
-      orderBy("date", "asc")
+      collection(
+        db,
+        "scheduleEvents"
+      ),
+      where(
+        "uid",
+        "==",
+        uid
+      ),
+      where(
+        "date",
+        ">=",
+        Timestamp.fromDate(start)
+      ),
+      where(
+        "date",
+        "<=",
+        Timestamp.fromDate(end)
+      ),
+      orderBy(
+        "date",
+        "asc"
+      )
     );
 
     const unsubscribe =
@@ -1045,9 +1078,7 @@ export default function Dashboard() {
         (snapshot) => {
           if (snapshot.empty) {
             setLiveClass(null);
-            setLiveClassLoading(
-              false
-            );
+            setLiveClassLoading(false);
             setLiveClassError(false);
             return;
           }
@@ -1096,9 +1127,7 @@ export default function Dashboard() {
               )}`,
           });
 
-          setLiveClassLoading(
-            false
-          );
+          setLiveClassLoading(false);
           setLiveClassError(false);
         },
         (error) => {
@@ -1360,7 +1389,8 @@ export default function Dashboard() {
         ================================================= */}
 
         <div className="mb-5">
-          <div className="grid grid-cols-3 gap-1.5 sm:inline-flex sm:w-auto sm:gap-2">
+          <div className="grid grid-cols-2 gap-1.5 sm:inline-flex sm:w-auto sm:gap-2 lg:grid-cols-none">
+
             {DASHBOARD_TABS.map(
               ({
                 key,
@@ -1406,6 +1436,7 @@ export default function Dashboard() {
                 );
               }
             )}
+
           </div>
         </div>
 
@@ -1416,6 +1447,14 @@ export default function Dashboard() {
         {activeTab ===
           "certificates" ? (
           <Certificates />
+
+          /* =================================================
+             ASSIGNMENTS
+          ================================================= */
+
+        ) : activeTab ===
+          "assignments" ? (
+          <Assignments />
 
           /* =================================================
              MY COURSES
@@ -1568,6 +1607,7 @@ export default function Dashboard() {
                     </motion.button>
                   )
                 )}
+
               </div>
             </div>
 
@@ -1596,7 +1636,6 @@ export default function Dashboard() {
               custom={4}
               className={`mt-4 rounded-3xl bg-white p-5 ${cardShadow}`}
             >
-              {/* HEADER */}
 
               <div className="mb-4 flex items-center justify-between gap-3">
 
@@ -1622,6 +1661,7 @@ export default function Dashboard() {
                       Creative Adhyayan
                     </p>
                   </div>
+
                 </div>
 
                 {announcements.length >
@@ -1641,9 +1681,8 @@ export default function Dashboard() {
                         : "View all"}
                     </button>
                   )}
-              </div>
 
-              {/* LOADING */}
+              </div>
 
               {announcementsLoading ? (
                 <div className="space-y-2">
@@ -1658,11 +1697,8 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                /* ERROR */
-
               ) : announcementsError ? (
                 <div className="rounded-2xl bg-red-50 px-4 py-6 text-center">
-
                   <Megaphone className="mx-auto h-6 w-6 text-red-400" />
 
                   <p className="mt-2 text-xs font-bold text-red-600">
@@ -1675,12 +1711,9 @@ export default function Dashboard() {
                   </p>
                 </div>
 
-                /* EMPTY */
-
               ) : announcements.length ===
                 0 ? (
                 <div className="rounded-2xl bg-[#F7F5FC] px-4 py-8 text-center">
-
                   <Megaphone className="mx-auto h-6 w-6 text-[#B4ABCB]" />
 
                   <p className="mt-2 text-xs font-bold text-[#6B5F87]">
@@ -1692,8 +1725,6 @@ export default function Dashboard() {
                     institution will appear here.
                   </p>
                 </div>
-
-                /* ANNOUNCEMENTS */
 
               ) : (
                 <div className="space-y-2">
@@ -1709,12 +1740,10 @@ export default function Dashboard() {
 
                         <div className="flex items-start gap-3">
 
-                          {/* ICON */}
-
                           <div
                             className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${announcement.pinned
-                              ? "bg-amber-100 text-amber-600"
-                              : "bg-emerald-100 text-emerald-600"
+                                ? "bg-amber-100 text-amber-600"
+                                : "bg-emerald-100 text-emerald-600"
                               }`}
                           >
                             {announcement.pinned ? (
@@ -1726,8 +1755,6 @@ export default function Dashboard() {
                               <GraduationCap className="h-3.5 w-3.5" />
                             )}
                           </div>
-
-                          {/* CONTENT */}
 
                           <div className="min-w-0 flex-1">
 
@@ -1742,8 +1769,6 @@ export default function Dashboard() {
                                 </h4>
 
                                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
-
-                                  {/* AUDIENCE */}
 
                                   <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[9px] font-bold text-emerald-600">
 
@@ -1762,8 +1787,6 @@ export default function Dashboard() {
 
                                   </span>
 
-                                  {/* PINNED */}
-
                                   {announcement.pinned && (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-600">
                                       <Pin className="h-2.5 w-2.5" />
@@ -1772,9 +1795,8 @@ export default function Dashboard() {
                                   )}
 
                                 </div>
-                              </div>
 
-                              {/* DATE */}
+                              </div>
 
                               {announcement.date && (
                                 <span className="shrink-0 text-[9px] font-medium text-[#B4ABCB]">
@@ -1786,15 +1808,11 @@ export default function Dashboard() {
 
                             </div>
 
-                            {/* MESSAGE */}
-
                             <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-[#766B91]">
                               {
                                 announcement.message
                               }
                             </p>
-
-                            {/* AUTHOR */}
 
                             {announcement.authorName && (
                               <p className="mt-2 text-[9px] font-semibold text-[#A79BC4]">
@@ -1806,13 +1824,16 @@ export default function Dashboard() {
                             )}
 
                           </div>
+
                         </div>
+
                       </div>
                     )
                   )}
 
                 </div>
               )}
+
             </motion.div>
 
             {/* =================================================
@@ -1821,9 +1842,7 @@ export default function Dashboard() {
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
 
-              {/* =================================================
-                  NOTIFICATIONS
-              ================================================= */}
+              {/* NOTIFICATIONS */}
 
               <motion.div
                 variants={fadeUp}
@@ -1867,21 +1886,26 @@ export default function Dashboard() {
                       )
                     )}
                   </div>
+
                 ) : notifError ? (
                   <div className="flex flex-col items-center gap-1.5 py-6 text-center">
                     <AlertTriangle className="h-4 w-4 text-red-400" />
+
                     <p className="text-xs font-bold text-red-500">
                       Couldn't load notifications.
                     </p>
+
                     <p className="text-[10px] text-red-400">
                       Try refreshing the page.
                     </p>
                   </div>
+
                 ) : notifications.length ===
                   0 ? (
                   <p className="py-6 text-center text-xs text-[#A79BC4]">
                     You're all caught up.
                   </p>
+
                 ) : (
                   <ul className="space-y-2">
 
@@ -1938,9 +1962,7 @@ export default function Dashboard() {
 
               </motion.div>
 
-              {/* =================================================
-                  SCHEDULE
-              ================================================= */}
+              {/* SCHEDULE */}
 
               <motion.div
                 ref={
@@ -1990,13 +2012,16 @@ export default function Dashboard() {
                     </button>
 
                   </div>
+
                 </div>
 
                 {weekOffset !== 0 && (
                   <p className="mb-2 text-[10px] font-semibold text-[#B4ABCB]">
+
                     {weekOffset > 0
                       ? `${weekOffset} week(s) ahead`
                       : `${-weekOffset} week(s) back`}
+
                     {" · "}
 
                     <button
@@ -2010,6 +2035,7 @@ export default function Dashboard() {
                     >
                       back to this week
                     </button>
+
                   </p>
                 )}
 
@@ -2040,6 +2066,7 @@ export default function Dashboard() {
                               : "#8A82A6",
                         }}
                       >
+
                         {day[0]}
 
                         {(
@@ -2058,6 +2085,7 @@ export default function Dashboard() {
                               }}
                             />
                           )}
+
                       </button>
                     )
                   )}
@@ -2078,13 +2106,18 @@ export default function Dashboard() {
                         )
                       )}
                     </div>
+
                   ) : scheduleError ? (
                     <div className="flex flex-col items-center gap-1.5 py-4 text-center">
+
                       <AlertTriangle className="h-4 w-4 text-red-400" />
+
                       <p className="text-xs font-bold text-red-500">
                         Couldn't load your schedule.
                       </p>
+
                     </div>
+
                   ) : (
                     (
                       agendaByDay[
@@ -2139,6 +2172,7 @@ export default function Dashboard() {
                   )}
 
                 </div>
+
               </motion.div>
 
             </div>
@@ -2149,9 +2183,7 @@ export default function Dashboard() {
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
 
-              {/* =================================================
-                  TASKS
-              ================================================= */}
+              {/* TASKS */}
 
               <motion.div
                 variants={fadeUp}
@@ -2187,18 +2219,24 @@ export default function Dashboard() {
                       )
                     )}
                   </div>
+
                 ) : tasksError ? (
                   <div className="flex flex-col items-center gap-1.5 py-6 text-center">
+
                     <AlertTriangle className="h-4 w-4 text-red-400" />
+
                     <p className="text-xs font-bold text-red-500">
                       Couldn't load today's tasks.
                     </p>
+
                   </div>
+
                 ) : tasks.length ===
                   0 ? (
                   <p className="py-6 text-center text-xs text-[#A79BC4]">
                     No tasks for today.
                   </p>
+
                 ) : (
                   <ul className="space-y-3">
 
@@ -2257,8 +2295,8 @@ export default function Dashboard() {
 
                                 <p
                                   className={`truncate text-xs font-bold ${done
-                                    ? "text-[#B4ABCB] line-through"
-                                    : "text-[#1B0E3D]"
+                                      ? "text-[#B4ABCB] line-through"
+                                      : "text-[#1B0E3D]"
                                     }`}
                                 >
                                   {
@@ -2297,6 +2335,7 @@ export default function Dashboard() {
                               </div>
 
                             </div>
+
                           </li>
                         );
                       }
@@ -2307,9 +2346,7 @@ export default function Dashboard() {
 
               </motion.div>
 
-              {/* =================================================
-                  PREMIUM
-              ================================================= */}
+              {/* PREMIUM */}
 
               <motion.div
                 variants={fadeUp}
@@ -2365,9 +2402,7 @@ export default function Dashboard() {
 
               </motion.div>
 
-              {/* =================================================
-                  LIVE CLASS
-              ================================================= */}
+              {/* LIVE CLASS */}
 
               <motion.div
                 ref={
@@ -2387,23 +2422,34 @@ export default function Dashboard() {
 
                 {liveClassLoading ? (
                   <div className="mt-3 space-y-2">
+
                     <Skeleton className="h-3 w-2/3" />
+
                     <Skeleton className="h-3 w-1/2" />
+
                     <Skeleton className="mt-3 h-8 w-full rounded-full" />
+
                   </div>
+
                 ) : liveClassError ? (
                   <div className="mt-3 flex flex-col items-center gap-1.5 text-center">
+
                     <AlertTriangle className="h-4 w-4 text-red-400" />
+
                     <p className="text-xs font-bold text-red-500">
                       Couldn't load your live class.
                     </p>
+
                   </div>
+
                 ) : !liveClass ? (
                   <p className="mt-3 text-center text-xs text-[#A79BC4]">
                     No upcoming live class.
                   </p>
+
                 ) : (
                   <>
+
                     <p className="mt-2 text-xs font-bold text-[#1B0E3D]">
                       {
                         liveClass.title
@@ -2420,11 +2466,13 @@ export default function Dashboard() {
 
                     {liveClass.location && (
                       <p className="mt-0.5 flex items-center gap-1 text-[10px] text-[#8A82A6]">
+
                         <MapPin className="h-3 w-3" />
 
                         {
                           liveClass.location
                         }
+
                       </p>
                     )}
 
@@ -2433,11 +2481,13 @@ export default function Dashboard() {
                       <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] font-bold text-emerald-600">
                         You're in! See you there.
                       </p>
+
                     ) : liveClass.status ===
                       "rescheduled" ? (
                       <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-center text-[11px] font-bold text-amber-700">
                         Reschedule requested.
                       </p>
+
                     ) : (
                       <div className="mt-4 flex gap-2">
 
@@ -2472,6 +2522,7 @@ export default function Dashboard() {
 
                       </div>
                     )}
+
                   </>
                 )}
 
@@ -2481,6 +2532,7 @@ export default function Dashboard() {
 
           </div>
         )}
+
       </div>
     </div>
   );

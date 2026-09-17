@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   Users,
   BookOpen,
-  PlayCircle,
   Wallet,
   BarChart3,
   LogOut,
@@ -51,11 +50,6 @@ const NAV = [
     to: "/admin/courses",
     label: "Courses",
     icon: BookOpen,
-  },
-  {
-    to: "/admin/lessons",
-    label: "Lessons",
-    icon: PlayCircle,
   },
   {
     to: "/admin/payments",
@@ -1047,8 +1041,8 @@ const AdminLayout = () => {
 
       <aside
         className={`w-64 shrink-0 flex-col ${mobileNavOpen
-            ? "flex fixed inset-y-0 left-0 z-40"
-            : "hidden"
+          ? "flex fixed inset-y-0 left-0 z-40"
+          : "hidden"
           } md:flex md:static`}
         style={{
           background: AT.chrome,
