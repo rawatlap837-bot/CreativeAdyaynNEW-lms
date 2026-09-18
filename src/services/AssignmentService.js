@@ -13,7 +13,7 @@ import {
     serverTimestamp,
 } from "firebase/firestore";
 
-import { db } from "../firebase/Firebase";
+import { auth, db } from "../firebase/Firebase";
 
 // ============================================================
 // ASSIGNMENT SERVICE
@@ -463,13 +463,38 @@ export const getMyAssignments = async (courseIds = []) => {
 
             const snapshot = await getDocs(q);
 
-            snapshot.docs.forEach((assignmentDoc) => {
-                assignments.push({
-                    id: assignmentDoc.id,
-                    courseName,
-                    ...assignmentDoc.data(),
-                });
-            });
+            const courseAssignments = snapshot.docs.map((assignmentDoc) => ({
+                id: assignmentDoc.id,
+                courseName,
+                ...assignmentDoc.data(),
+            }));
+
+            const visibleAssignments = await Promise.all(
+                courseAssignments.map(async (assignment) => {
+                    if (!assignment.targetBatchId) return assignment;
+
+                    try {
+                        const batchSnapshot = await getDoc(
+                            doc(db, "batches", assignment.targetBatchId)
+                        );
+
+                        const studentIds = batchSnapshot.exists()
+                            ? batchSnapshot.data().studentIds
+                            : [];
+
+                        return Array.isArray(studentIds) &&
+                            studentIds.includes(auth.currentUser?.uid)
+                            ? assignment
+                            : null;
+                    } catch {
+                        return null;
+                    }
+                })
+            );
+
+            assignments.push(
+                ...visibleAssignments.filter(Boolean)
+            );
         }
 
         // Remove accidental duplicates.

@@ -10,6 +10,7 @@ const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+const RAW_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`;
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
@@ -139,4 +140,92 @@ export const AVATAR = { width: 128, height: 128, crop: "thumb", gravity: "face" 
 export function blurUrl(publicId) {
   if (!publicId) return "";
   return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/w_32,e_blur:400,q_30,f_auto/${publicId}`;
+}
+
+export function uploadAssignmentResource(
+  file,
+  { folder = "lms/assignments/resources", onProgress, signal } = {}
+) {
+  const allowedTypes = [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ];
+
+  if (!file) return Promise.reject(new Error("Choose a PDF or image first."));
+  if (!allowedTypes.includes(file.type)) {
+    return Promise.reject(new Error("Use only PDF, JPG, PNG, or WebP files."));
+  }
+  if (file.size > 25 * 1024 * 1024) {
+    return Promise.reject(new Error("The attachment must be 25 MB or smaller."));
+  }
+
+  if (file.type.startsWith("image/")) {
+    return uploadImage(file, { folder, onProgress, signal }).then((result) => ({
+      url: result.url,
+      publicId: result.publicId,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    }));
+  }
+
+  if (!CLOUD_NAME || !UPLOAD_PRESET) {
+    return Promise.reject(
+      new Error("Cloudinary isn't configured. Check your .env file.")
+    );
+  }
+
+  const form = new FormData();
+  form.append("file", file);
+  form.append("upload_preset", UPLOAD_PRESET);
+  form.append("folder", folder);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", RAW_UPLOAD_URL);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      let body;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        reject(new Error("Cloudinary returned an unreadable response."));
+        return;
+      }
+
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new Error(body?.error?.message || "PDF upload failed."));
+        return;
+      }
+
+      resolve({
+        url: body.secure_url,
+        publicId: body.public_id,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      });
+    };
+
+    xhr.onerror = () => reject(new Error("Network error during PDF upload."));
+    xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
+
+    if (signal) {
+      if (signal.aborted) {
+        xhr.abort();
+        return;
+      }
+      signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    }
+
+    xhr.send(form);
+  });
 }

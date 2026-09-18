@@ -19,6 +19,7 @@ import {
     AlertTriangle,
     Info,
     XCircle,
+    Paperclip,
 } from "lucide-react";
 
 import {
@@ -34,6 +35,8 @@ import {
 } from "../services/AssignmentService.js";
 
 import { auth } from "../firebase/Firebase.js";
+import { getBatchesForTeacher } from "../services/BatchService.js";
+import { uploadAssignmentResource } from "../lib/Cloudinary.js";
 
 
 /* ============================================================
@@ -253,12 +256,15 @@ export default function TeacherAssignments() {
     const user = auth.currentUser;
 
     const [assignments, setAssignments] = useState([]);
+    const [courseBatches, setCourseBatches] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const [showForm, setShowForm] = useState(false);
     const [editingAssignment, setEditingAssignment] = useState(null);
 
     const [saving, setSaving] = useState(false);
+    const [attachmentFile, setAttachmentFile] = useState(null);
+    const [attachmentProgress, setAttachmentProgress] = useState(0);
     const [actionLoading, setActionLoading] = useState("");
 
     const [selectedAssignment, setSelectedAssignment] = useState(null);
@@ -277,6 +283,7 @@ export default function TeacherAssignments() {
         dueDate: "",
         totalMarks: 100,
         status: "draft",
+        targetBatchId: "",
     });
 
     // Toast + confirm-modal state
@@ -376,6 +383,36 @@ export default function TeacherAssignments() {
         loadAssignments();
     }, [courseId, user?.uid]);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadCourseBatches() {
+            if (!user?.uid || !courseId) {
+                setCourseBatches([]);
+                return;
+            }
+
+            try {
+                const batches = await getBatchesForTeacher(user.uid);
+
+                if (!cancelled) {
+                    setCourseBatches(
+                        batches.filter((batch) => batch.courseId === courseId)
+                    );
+                }
+            } catch (error) {
+                console.error("Failed to load assignment batches:", error);
+                if (!cancelled) setCourseBatches([]);
+            }
+        }
+
+        loadCourseBatches();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [courseId, user?.uid]);
+
 
     /* ============================================================
        FORM
@@ -391,7 +428,10 @@ export default function TeacherAssignments() {
             dueDate: "",
             totalMarks: 100,
             status: "draft",
+            targetBatchId: "",
         });
+        setAttachmentFile(null);
+        setAttachmentProgress(0);
 
         setShowForm(true);
     };
@@ -430,7 +470,10 @@ export default function TeacherAssignments() {
             dueDate,
             totalMarks: assignment.totalMarks || 100,
             status: assignment.status || "draft",
+            targetBatchId: assignment.targetBatchId || "",
         });
+        setAttachmentFile(null);
+        setAttachmentProgress(0);
 
         setShowForm(true);
     };
@@ -485,7 +528,26 @@ export default function TeacherAssignments() {
                     ? new Date(form.dueDate)
                     : null,
                 totalMarks: Number(form.totalMarks) || 100,
+                targetBatchId: form.targetBatchId || null,
+                targetBatchName:
+                    courseBatches.find(
+                        (batch) => batch.id === form.targetBatchId
+                    )?.name || null,
             };
+
+            if (attachmentFile) {
+                const uploadedAttachment = await uploadAssignmentResource(
+                    attachmentFile,
+                    {
+                        folder: `lms/assignments/${courseId}/resources`,
+                        onProgress: setAttachmentProgress,
+                    }
+                );
+
+                assignmentData.attachment = uploadedAttachment;
+            } else if (editingAssignment?.attachment) {
+                assignmentData.attachment = editingAssignment.attachment;
+            }
 
             if (editingAssignment) {
                 await updateAssignment(
@@ -1126,6 +1188,60 @@ export default function TeacherAssignments() {
                                 />
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                                    Assign to
+                                </label>
+
+                                <select
+                                    name="targetBatchId"
+                                    value={form.targetBatchId}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                >
+                                    <option value="">
+                                        All students in this course
+                                    </option>
+                                    {courseBatches.map((batch) => (
+                                        <option key={batch.id} value={batch.id}>
+                                            Batch: {batch.name}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <p className="mt-1.5 text-xs text-slate-500">
+                                    Students outside the selected batch will not see this assignment.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                                    Attachment (photo or PDF)
+                                </label>
+                                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600 hover:border-purple-400 hover:bg-purple-50/40">
+                                    <Paperclip className="h-5 w-5 shrink-0 text-purple-600" />
+                                    <span className="min-w-0 flex-1 truncate">
+                                        {attachmentFile?.name ||
+                                            editingAssignment?.attachment?.name ||
+                                            "Choose JPG, PNG, WEBP, or PDF (max 25 MB)"}
+                                    </span>
+                                    <input
+                                        type="file"
+                                        accept="application/pdf,image/jpeg,image/png,image/webp"
+                                        onChange={(event) => {
+                                            setAttachmentFile(event.target.files?.[0] || null);
+                                            setAttachmentProgress(0);
+                                        }}
+                                        className="sr-only"
+                                    />
+                                </label>
+                                {attachmentProgress > 0 && attachmentProgress < 100 && (
+                                    <p className="mt-1.5 text-xs text-purple-600">
+                                        Uploading attachment: {attachmentProgress}%
+                                    </p>
+                                )}
+                            </div>
+
 
                             {/* DATE + MARKS */}
 
@@ -1466,7 +1582,6 @@ export default function TeacherAssignments() {
                                     required
                                 />
                             </div>
-
 
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">

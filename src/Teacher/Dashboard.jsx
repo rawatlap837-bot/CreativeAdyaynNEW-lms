@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   BookOpen,
   ClipboardCheck,
+  Users,
   PlusCircle,
   ArrowRight,
   Megaphone,
@@ -39,6 +40,11 @@ const TeacherDashboard = () => {
       id: "attendance",
       label: "Attendance",
       icon: ClipboardCheck,
+    },
+    {
+      id: "batches",
+      label: "Batches",
+      icon: Users,
     },
   ];
 
@@ -125,6 +131,11 @@ const TeacherDashboard = () => {
 
     if (id === "attendance") {
       navigate("/teacher/attendance");
+      return;
+    }
+
+    if (id === "batches") {
+      navigate("/teacher/batches");
       return;
     }
 

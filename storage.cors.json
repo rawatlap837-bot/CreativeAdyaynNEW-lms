@@ -1,0 +1,13 @@
+[
+  {
+    "origin": [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "https://creative-adyayn.web.app",
+      "https://creative-adyayn.firebaseapp.com"
+    ],
+    "method": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    "responseHeader": ["Content-Type", "Content-Length", "Content-Range", "ETag", "Accept-Ranges"],
+    "maxAgeSeconds": 3600
+  }
+]

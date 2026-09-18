@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   ClipboardCheck,
   BookOpen,
+  Users,
   PlusCircle,
   LogOut,
   Menu,
@@ -239,6 +240,11 @@ const TeacherLayout = () => {
       path: "/teacher/courses",
       icon: BookOpen,
     },
+    {
+      name: "Batches",
+      path: "/teacher/batches",
+      icon: Users,
+    },
   ];
 
   // =====================================================
@@ -256,6 +262,14 @@ const TeacherLayout = () => {
 
     if (location.pathname === "/teacher/courses") {
       return "My Courses";
+    }
+
+    if (location.pathname === "/teacher/batches") {
+      return "Batches";
+    }
+
+    if (location.pathname.includes("/teacher/batches/")) {
+      return "Batch Details";
     }
 
     if (location.pathname.includes("/teacher/courses/create")) {

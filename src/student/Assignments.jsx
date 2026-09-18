@@ -821,6 +821,42 @@ export default function Assignments({
                                                 </div>
                                             )}
 
+                                            {assignment.attachment?.url && (
+                                                <div className="mb-6">
+                                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                                        <h3 className="text-sm font-semibold text-gray-900">
+                                                            Assignment file
+                                                        </h3>
+                                                        <a
+                                                            href={assignment.attachment.url}
+                                                            download={assignment.attachment.name || true}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+                                                        >
+                                                            Download
+                                                        </a>
+                                                    </div>
+
+                                                    {assignment.attachment.type?.startsWith("image/") ? (
+                                                        <img
+                                                            src={assignment.attachment.url}
+                                                            alt={assignment.attachment.name || "Assignment attachment"}
+                                                            className="max-h-80 w-full rounded-xl border border-gray-200 object-contain bg-gray-50 p-2"
+                                                        />
+                                                    ) : (
+                                                        <a
+                                                            href={assignment.attachment.url}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="block rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+                                                        >
+                                                            {assignment.attachment.name || "Open assignment PDF"}
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             {/* GRADE */}
 
                                             {submission &&

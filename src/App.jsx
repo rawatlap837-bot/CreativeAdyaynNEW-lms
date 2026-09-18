@@ -120,6 +120,14 @@ const TeacherAttendance = lazy(() =>
   import("./Teacher/Attendance.jsx")
 );
 
+const TeacherBatchList = lazy(() =>
+  import("./Teacher/BatchList.jsx")
+);
+
+const TeacherBatchDetail = lazy(() =>
+  import("./Teacher/BatchDetail.jsx")
+);
+
 const CreateCourse = lazy(() =>
   import("./Teacher/CreateCourse.jsx")
 );
@@ -379,6 +387,16 @@ function App() {
             <Route
               path="attendance"
               element={<TeacherAttendance />}
+            />
+
+            <Route
+              path="batches"
+              element={<TeacherBatchList />}
+            />
+
+            <Route
+              path="batches/:batchId"
+              element={<TeacherBatchDetail />}
             />
 
             <Route
