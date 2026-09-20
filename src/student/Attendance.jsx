@@ -11,14 +11,14 @@ import {
   LockKeyhole,
 } from "lucide-react";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 import {
   collection,
   getDocs,
   query,
   where,
-} from "firebase/firestore";
+} from "../lib/database";
 
 import {
   getMySessionAttendance,

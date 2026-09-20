@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 
-import { auth } from "../firebase/Firebase";
+import { auth } from "../lib/backend";
 
 import {
   createCourse,
@@ -1089,7 +1089,7 @@ export default function CreateCourse() {
 
               <div className="rounded-xl bg-white p-4">
                 <div className="text-sm font-semibold text-slate-950">
-                  3. Submit for approval
+                  3. Publish your course
                 </div>
 
                 <p className="mt-1 text-xs leading-5 text-slate-500">

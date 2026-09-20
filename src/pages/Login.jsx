@@ -1,21 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import Cubes from "../Animiations/Cubes";
-import { auth, db } from "../firebase/Firebase"; // make sure Firebase.js exports `db` (getFirestore(app))
-import { doc, getDoc } from "firebase/firestore";
-import { ensureUserDoc } from "../services/UserProfile";
-import {
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
-  browserLocalPersistence,
-  browserSessionPersistence,
-  setPersistence,
-  onAuthStateChanged,
-  signOut,
-  deleteUser,
-} from "firebase/auth";
+import { supabase } from "../lib/supabase";
 import {
   Mail,
   Lock,
@@ -25,8 +12,6 @@ import {
   Loader2,
   GraduationCap,
 } from "lucide-react";
-
-const GOOGLE_SIGNIN_TIMEOUT_MS = 45000;
 
 function DotGrid({ className = "", dot = "fill-white/25" }) {
   return (
@@ -45,39 +30,24 @@ const CUBE_GRID_SIZE = 8;
 // The only real mobile failure case for Google sign-in is an in-app
 // browser (Instagram/Facebook/WhatsApp's built-in webview) — Google
 // actively blocks OAuth there for security reasons, and no client code
-// can work around it. Everywhere else — real mobile Chrome, Safari,
-// Samsung Internet, desktop — signInWithPopup works fine, so we no
-// longer need a separate redirect code path at all.
+// can work around it.
 function isInAppBrowser() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
   return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat/i.test(ua);
 }
 
-function firebaseAuthErrorMessage(error) {
-  switch (error?.code) {
-    case "auth/invalid-email":
-      return "That email address doesn't look right.";
-    case "auth/user-disabled":
-      return "This account has been disabled. Contact support if that's unexpected.";
-    case "auth/user-not-found":
-    case "auth/wrong-password":
-    case "auth/invalid-credential":
-      return "Incorrect email or password.";
-    case "auth/too-many-requests":
-      return "Too many attempts. Please wait a moment and try again.";
-    case "auth/popup-closed-by-user":
-    case "auth/cancelled-popup-request":
-      return "";
-    case "auth/popup-blocked":
-      return "Your browser blocked the sign-in popup. Please try again.";
-    case "auth/network-request-failed":
-      return "Network error. Check your connection and try again.";
-    case "auth/unauthorized-domain":
-      return "This domain isn't authorized for sign-in yet. Contact support.";
-    default:
-      return "Something went wrong. Please try again.";
+function supabaseAuthErrorMessage(error) {
+  const msg = (error?.message || "").toLowerCase();
+  if (msg.includes("invalid login credentials")) return "Incorrect email or password.";
+  if (msg.includes("email not confirmed")) return "Please confirm your email before logging in.";
+  if (msg.includes("user not found")) return "Incorrect email or password.";
+  if (msg.includes("too many requests") || msg.includes("rate limit")) {
+    return "Too many attempts. Please wait a moment and try again.";
   }
+  if (msg.includes("network")) return "Network error. Check your connection and try again.";
+  if (msg.includes("popup") && msg.includes("closed")) return "";
+  return error?.message || "Something went wrong. Please try again.";
 }
 
 function scrollToTop() {
@@ -85,41 +55,29 @@ function scrollToTop() {
 }
 
 // Looks up the signed-in user's role and returns the route they should
-// land on. Fails safe: any missing doc, missing field, or read error
+// land on. Fails safe: any missing row, missing field, or read error
 // resolves to the student dashboard, never the admin one.
-async function resolvePostLoginRoute(user) {
+async function resolvePostLoginRoute(userId) {
   try {
-    const snap = await getDoc(
-      doc(db, "users", user.uid)
-    );
+    const { data, error } = await supabase
+      .from("lms_profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
 
-    if (!snap.exists()) {
+    if (error || !data) {
       return "/dashboard";
     }
 
-    const role = snap.data()?.role;
-
-    // ADMIN
-    if (role === "admin") {
-      return "/admin";
-    }
-
-    // TEACHER
-    if (role === "teacher") {
-      return "/teacher/courses";
-    }
-
-    // STUDENT
+    if (data.role === "admin") return "/admin";
+    if (data.role === "teacher") return "/teacher/courses";
     return "/dashboard";
   } catch (error) {
-    console.error(
-      "Failed to resolve user role:",
-      error
-    );
-
+    console.error("Failed to resolve user role:", error);
     return "/dashboard";
   }
 }
+
 export default function LoginForm() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -129,41 +87,25 @@ export default function LoginForm() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const cubesRef = useRef(null);
   const navigate = useNavigate();
-  // Suppresses the "already signed in" auto-redirect below while we're
-  // mid-flight validating a Google sign-in (see handleGoogleSignIn) — a
-  // brand-new Google account gets deleted a moment after it's created,
-  // and we don't want a flash of /dashboard in between.
+  const location = useLocation();
   const suppressAutoRedirect = useRef(false);
-  // Guards the Google sign-in safety-net timeout (see
-  // GOOGLE_SIGNIN_TIMEOUT_MS above) so it can't fire after the flow has
-  // already finished normally.
-  const googleSignInTimeoutRef = useRef(null);
 
   // Already signed in (e.g. hit the back button, or opened /login from a
   // bookmark) — send them straight into their LMS instead of showing the
   // form again.
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user;
       if (user && !suppressAutoRedirect.current) {
-        resolvePostLoginRoute(user).then((dest) => navigate(dest, { replace: true }));
+        resolvePostLoginRoute(user.id).then((dest) => navigate(dest, { replace: true }));
       }
     });
-    return unsub;
   }, [navigate]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
-  }, []);
-
-  // Clean up the safety-net timeout if the component unmounts mid-flight.
-  useEffect(() => {
-    return () => {
-      if (googleSignInTimeoutRef.current) {
-        clearTimeout(googleSignInTimeoutRef.current);
-      }
-    };
   }, []);
 
   const pulseCubesFor = (fieldName, value) => {
@@ -195,14 +137,29 @@ export default function LoginForm() {
     setStatus("submitting");
     cubesRef.current?.ripple(2.5, 2.5);
     try {
-      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
-      const { user } = await signInWithEmailAndPassword(auth, form.email, form.password);
-      const dest = await resolvePostLoginRoute(user);
+      // "Remember me" -> Supabase persists sessions to localStorage by
+      // default (survives browser close). If unchecked, we clear the
+      // session on tab close by storing a flag and relying on
+      // sessionStorage instead — simplest correct approach is to just
+      // sign out on window unload when remember is false.
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
+      if (error) throw error;
+
+      if (!remember) {
+        window.addEventListener("beforeunload", () => {
+          supabase.auth.signOut();
+        });
+      }
+
+      const dest = await resolvePostLoginRoute(data.user.id);
       setStatus("idle");
       navigate(dest);
     } catch (err) {
       setStatus("error");
-      setErrorMsg(firebaseAuthErrorMessage(err));
+      setErrorMsg(supabaseAuthErrorMessage(err));
     }
   };
 
@@ -211,9 +168,6 @@ export default function LoginForm() {
     setErrorMsg("");
 
     if (isInAppBrowser()) {
-      // Google blocks OAuth inside in-app webviews (Instagram/FB/WhatsApp
-      // etc) regardless of anything we do here — the only real fix is to
-      // tell the person to open the site in their actual browser.
       setStatus("error");
       setErrorMsg(
         "Google sign-in doesn't work inside this app's built-in browser. Please open this page in Chrome or Safari instead."
@@ -222,54 +176,26 @@ export default function LoginForm() {
     }
 
     setGoogleLoading(true);
-    const provider = new GoogleAuthProvider();
     suppressAutoRedirect.current = true;
 
-    // Safety net for the COOP / window.closed issue described above: if
-    // signInWithPopup's promise never settles (because the browser
-    // blocked Firebase's popup-closed detection), stop showing "Signing
-    // in…" forever and let the person try again instead.
-    googleSignInTimeoutRef.current = setTimeout(() => {
-      setGoogleLoading(false);
-      suppressAutoRedirect.current = false;
-      setStatus("error");
-      setErrorMsg("Sign-in didn't complete. If you closed the Google window, please try again.");
-    }, GOOGLE_SIGNIN_TIMEOUT_MS);
-
     try {
-      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
-      const { user } = await signInWithPopup(auth, provider);
-
-      // signInWithPopup silently CREATES an account for an email Google
-      // hasn't seen here before — that's fine on the Register page, but on
-      // Login it would let a brand-new email "log in" without ever
-      // registering. Detect that case (creation time === this sign-in
-      // time) and undo it.
-      const isBrandNewAccount = user.metadata.creationTime === user.metadata.lastSignInTime;
-      if (isBrandNewAccount) {
-        try {
-          await deleteUser(user);
-        } catch {
-          await signOut(auth);
-        }
-        setStatus("error");
-        setErrorMsg("No account found for that Google email. Please register first.");
-        return;
-      }
-
-      await ensureUserDoc(user);
-      const dest = await resolvePostLoginRoute(user);
-      navigate(dest);
+      // signInWithOAuth redirects the whole page to Google, then back to
+      // redirectTo — Supabase does not support a popup flow the way
+      // Firebase's signInWithPopup did, so there's no post-redirect code
+      // to run here. The redirect target page below handles routing.
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+      // Browser navigates away here; nothing else runs in this component.
     } catch (err) {
-      const message = firebaseAuthErrorMessage(err);
+      const message = supabaseAuthErrorMessage(err);
       if (message) {
         setStatus("error");
         setErrorMsg(message);
-      }
-    } finally {
-      if (googleSignInTimeoutRef.current) {
-        clearTimeout(googleSignInTimeoutRef.current);
-        googleSignInTimeoutRef.current = null;
       }
       setGoogleLoading(false);
       suppressAutoRedirect.current = false;
@@ -336,7 +262,8 @@ export default function LoginForm() {
               </a>
             </p>
 
-            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+            {location.state?.justRegistered && <p role="status" className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">Check your email and confirm your account before signing in.</p>}
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
               <div>
                 <label htmlFor="email" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                   Email
@@ -448,7 +375,7 @@ export default function LoginForm() {
                   <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.62l4 3.09C6.22 6.86 8.87 4.75 12 4.75Z" />
                 </svg>
               )}
-              {googleLoading ? "Signing in…" : "Continue with Google"}
+              {googleLoading ? "Redirecting…" : "Continue with Google"}
             </button>
 
             <p className="mt-8 text-center text-xs text-[#A79BC4]">
@@ -467,20 +394,15 @@ export default function LoginForm() {
 /*
  * SETTING SOMEONE UP AS ADMIN
  * ────────────────────────────
- * 1. In Firestore, the doc at users/{their-uid} needs { role: "admin" }.
- *    Do this from the Firebase console or a trusted backend script —
- *    NEVER expose an endpoint that lets a logged-in client set their own
- *    role field.
- * 2. Lock it down with a security rule so clients can read their own role
- *    but only an admin (or your backend) can write it, e.g.:
- *
- *      match /users/{userId} {
- *        allow read: if request.auth.uid == userId;
- *        allow write: if request.auth.uid == userId
- *                     && request.resource.data.role == resource.data.role;
- *      }
- *
- * 3. Route guard: wrap AdminLayout in a RequireAdmin component so someone
- *    can't just type /admin into the URL bar and get in without the role
- *    check.
+ * 1. In Supabase, the row at public.profiles where id = their-auth-uid
+ *    needs role = 'admin'. Do this from the Supabase Table Editor or SQL
+ *    Editor — NEVER expose an endpoint that lets a logged-in client set
+ *    their own role column.
+ * 2. This is already locked down by the RLS policy in supabase_schema.sql:
+ *    "users update own profile" only allows updating your OWN row, and
+ *    there's no policy permitting a client to change `role` at all — do
+ *    it via the dashboard (service role) instead.
+ * 3. Route guard: wrap AdminLayout in a RequireAdmin component (checks
+ *    profiles.role === 'admin') so someone can't just type /admin into
+ *    the URL bar and get in without the role check.
  */

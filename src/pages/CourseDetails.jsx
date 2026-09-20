@@ -1,3 +1,5 @@
+import { supabase } from "../lib/supabase";
+import { createPaymentOrder, verifyPayment } from "../services/Payments";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -7,7 +9,7 @@ import {
   orderBy,
   query,
   where,
-} from "firebase/firestore";
+} from "../lib/database";
 
 import {
   AlertCircle,
@@ -25,9 +27,9 @@ import {
   Video,
 } from "lucide-react";
 
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "../lib/auth";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 import {
   getPublishedCourseByIdOrSlug,
@@ -80,7 +82,7 @@ const RAZORPAY_SCRIPT_URL =
   "https://checkout.razorpay.com/v1/checkout.js";
 
 /* Public Razorpay key only. Never put your Razorpay key secret in this file. */
-const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
+
 
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -295,47 +297,14 @@ export default function CourseDetails() {
         const modulesSnapshot =
           await getDocs(modulesQuery);
 
-        const moduleData = await Promise.all(
-          modulesSnapshot.docs.map(
-            async (moduleDoc) => {
-              const module = {
-                id: moduleDoc.id,
-                ...moduleDoc.data(),
-              };
-
-              const lessonsRef = collection(
-                db,
-                "courses",
-                course.id,
-                "modules",
-                moduleDoc.id,
-                "lessons"
-              );
-
-              const lessonsQuery = query(
-                lessonsRef,
-                where("published", "==", true),
-                orderBy("order", "asc")
-              );
-
-              const lessonsSnapshot =
-                await getDocs(lessonsQuery);
-
-              const lessons =
-                lessonsSnapshot.docs.map(
-                  (lessonDoc) => ({
-                    id: lessonDoc.id,
-                    ...lessonDoc.data(),
-                  })
-                );
-
-              return {
-                ...module,
-                lessons,
-              };
-            }
-          )
-        );
+        const { data: outline, error: outlineError } = await supabase.rpc("lms_course_outline", { course: course.id });
+        if (outlineError) throw outlineError;
+        const moduleData = modulesSnapshot.docs.map((moduleDoc) => ({
+          id: moduleDoc.id,
+          ...moduleDoc.data(),
+          lessons: (outline || []).filter((lesson) => lesson.module_id === moduleDoc.id)
+            .map((lesson) => ({ ...lesson, order: lesson.sort_order, isPreview: lesson.is_preview })),
+        }));
 
         if (cancelled) {
           return;
@@ -547,9 +516,8 @@ export default function CourseDetails() {
     /* -------------------------------------------------------
        PAID COURSE — FIREBASE-ONLY CLIENT FLOW
 
-       This has no localhost/Express/Firebase Functions call.
-       Razorpay returns the payment ID to the browser, then the
-       existing Firestore enrollment service records the enrollment.
+       The Edge Function creates the order using the stored course price.
+       Enrollment is activated only after signature and capture verification.
     ------------------------------------------------------- */
 
     if (!isFree) {
@@ -564,26 +532,13 @@ export default function CourseDetails() {
           );
         }
 
-        if (!RAZORPAY_KEY_ID) {
-          throw new Error(
-            "Razorpay key is missing. Add VITE_RAZORPAY_KEY_ID to your .env file."
-          );
-        }
-
-        const payableAmount = Number(
-          course.discountPrice ?? course.price ?? 0
-        );
-
-        if (!Number.isFinite(payableAmount) || payableAmount <= 0) {
-          throw new Error(
-            "Invalid course price. Please contact the institute."
-          );
-        }
+        const order = await createPaymentOrder(course.id);
 
         const razorpay = new window.Razorpay({
-          key: RAZORPAY_KEY_ID,
-          amount: Math.round(payableAmount * 100),
-          currency: "INR",
+          key: order.keyId,
+          order_id: order.orderId,
+          amount: order.amount,
+          currency: order.currency,
           name: "Creative Adhyayan",
           description: course.title,
 
@@ -618,11 +573,7 @@ export default function CourseDetails() {
                 "Payment received. Enrolling you in the course..."
               );
 
-              const newEnrollment = await enrollStudent({
-                courseId: course.id,
-                paymentStatus: "paid",
-                paymentId: response.razorpay_payment_id,
-              });
+              const newEnrollment = await verifyPayment({ courseId: course.id, ...response });
 
               setEnrollment(newEnrollment);
               setEnrollmentMessage(

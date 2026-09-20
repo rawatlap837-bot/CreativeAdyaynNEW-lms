@@ -3,10 +3,9 @@ import {
   getDownloadURL,
   ref,
   uploadBytesResumable,
-} from "firebase/storage";
+} from "../lib/storage";
 
-import { auth, storage } from "../firebase/Firebase";
-import { uploadImage } from "../lib/Cloudinary";
+import { auth, storage } from "../lib/backend";
 
 /* --------------------------------------------------
    AUTH
@@ -26,7 +25,7 @@ function requireUser() {
    FILE VALIDATION
 -------------------------------------------------- */
 
-function validateFile(file, allowedTypes = [], maxSizeMB = 100) {
+function validateFile(file, allowedTypes = [], maxSizeMB = 50) {
   if (!file) {
     throw new Error("Please select a file.");
   }
@@ -73,7 +72,7 @@ function uploadFile(
   file,
   path,
   allowedTypes = [],
-  maxSizeMB = 100,
+  maxSizeMB = 50,
   onProgress
 ) {
   return new Promise((resolve, reject) => {
@@ -256,7 +255,7 @@ export async function uploadLessonVideo(
       "video/quicktime",
       "video/x-matroska",
     ],
-    2048,
+    50,
     onProgress
   );
 }
@@ -332,7 +331,7 @@ export async function uploadLessonResource(
       "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       "text/plain",
     ],
-    100,
+    50,
     onProgress
   );
 }
@@ -352,29 +351,6 @@ export async function uploadAssignmentSubmission(
 ) {
   if (!assignmentId) {
     throw new Error("Assignment ID is required.");
-  }
-
-  const imageTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/avif",
-  ];
-
-  if (imageTypes.includes(file?.type)) {
-    const user = requireUser();
-    const result = await uploadImage(file, {
-      folder: `lms/assignments/${assignmentId}/submissions/${user.uid}`,
-      onProgress,
-    });
-
-    return {
-      url: result.url,
-      path: result.publicId,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-    };
   }
 
   return uploadFile(
@@ -410,7 +386,7 @@ export async function uploadAssignmentSubmission(
       "video/webm",
       "video/quicktime",
     ],
-    100,
+    50,
     onProgress
   );
 }

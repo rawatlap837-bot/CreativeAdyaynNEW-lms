@@ -16,8 +16,8 @@ import {
   X,
 } from "lucide-react";
 
-import { auth, db } from "../firebase/Firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../lib/backend";
+import { doc, getDoc } from "../lib/database";
 
 import {
   getCourseContent,

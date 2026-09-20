@@ -2,17 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Cubes from "../Animiations/Cubes";
-import { auth } from "../firebase/Firebase";
-import { ensureUserDoc } from "../services/UserProfile";
-import {
-  createUserWithEmailAndPassword,
-  updateProfile,
-  GoogleAuthProvider,
-  signInWithPopup,
-  browserLocalPersistence,
-  setPersistence,
-  onAuthStateChanged,
-} from "firebase/auth";
+import { supabase } from "../lib/supabase";
 import {
   Mail,
   Lock,
@@ -28,11 +18,10 @@ import {
 /**
  * Register — Creative Adhyayan
  *
- * Same mobile Google sign-in handling as LoginForm — keep the two in
- * sync. See the note in LoginForm.jsx about the requirements for the
- * redirect flow to actually work in production (SPA fallback rewrite on
- * your host, authorized domains in Firebase, authorized origins/redirect
- * URIs in Google Cloud).
+ * Same Google sign-in handling as LoginForm — keep the two in sync.
+ * Supabase's OAuth is redirect-based (not a popup), so the actual
+ * post-Google routing happens in /auth/callback (AuthCallback.jsx),
+ * not in this component.
  */
 
 function DotGrid({ className = "", dot = "fill-white/25" }) {
@@ -49,38 +38,27 @@ function DotGrid({ className = "", dot = "fill-white/25" }) {
 
 const CUBE_GRID_SIZE = 8;
 
-// Same detection logic as Login — keep these in sync. signInWithPopup
-// works fine in real mobile browsers now; the only genuine failure case
-// is an in-app webview (Instagram/FB/WhatsApp), which Google blocks
-// regardless of client code.
 function isInAppBrowser() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
   return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat/i.test(ua);
 }
 
-function firebaseAuthErrorMessage(error) {
-  switch (error?.code) {
-    case "auth/email-already-in-use":
-      return "An account already exists with this email.";
-    case "auth/invalid-email":
-      return "That email address doesn't look right.";
-    case "auth/weak-password":
-      return "Choose a password with at least 6 characters.";
-    case "auth/too-many-requests":
-      return "Too many attempts. Please wait a moment and try again.";
-    case "auth/popup-closed-by-user":
-    case "auth/cancelled-popup-request":
-      return "";
-    case "auth/popup-blocked":
-      return "Your browser blocked the sign-in popup. Please try again.";
-    case "auth/network-request-failed":
-      return "Network error. Check your connection and try again.";
-    case "auth/unauthorized-domain":
-      return "This domain isn't authorized for sign-in yet. Contact support.";
-    default:
-      return "Something went wrong. Please try again.";
+function supabaseAuthErrorMessage(error) {
+  const msg = (error?.message || "").toLowerCase();
+  if (msg.includes("already registered") || msg.includes("already exists")) {
+    return "An account already exists with this email.";
   }
+  if (msg.includes("password") && msg.includes("least")) {
+    return "Choose a stronger password (at least 6 characters).";
+  }
+  if (msg.includes("invalid") && msg.includes("email")) return "That email address doesn't look right.";
+  if (msg.includes("too many requests") || msg.includes("rate limit")) {
+    return "Too many attempts. Please wait a moment and try again.";
+  }
+  if (msg.includes("network")) return "Network error. Check your connection and try again.";
+  if (msg.includes("popup") && msg.includes("closed")) return "";
+  return error?.message || "Something went wrong. Please try again.";
 }
 
 function passwordStrength(password) {
@@ -109,10 +87,9 @@ export default function RegisterForm() {
   // Already signed in — send them straight into their LMS instead of
   // showing the registration form again.
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) navigate("/dashboard", { replace: true });
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate("/dashboard", { replace: true });
     });
-    return unsub;
   }, [navigate]);
 
   useEffect(() => {
@@ -120,7 +97,6 @@ export default function RegisterForm() {
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
   }, []);
-
 
   const strength = passwordStrength(form.password);
 
@@ -163,17 +139,34 @@ export default function RegisterForm() {
     setStatus("submitting");
     cubesRef.current?.ripple(3.5, 3.5);
     try {
-      await setPersistence(auth, browserLocalPersistence);
-      const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
-      if (form.name.trim()) {
-        await updateProfile(cred.user, { displayName: form.name.trim() });
+      // profiles.name/email/role get filled in automatically by the
+      // handle_new_user trigger (see supabase_schema.sql) — we pass name
+      // through raw_user_meta_data so that trigger can read it.
+      const { data, error } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: { name: form.name.trim() },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+
+      // If your Supabase project has "Confirm email" turned on,
+      // data.session will be null here — the person isn't logged in yet
+      // until they click the confirmation link. Handle both cases.
+      if (!data.session) {
+        setStatus("idle");
+        setErrorMsg("");
+        navigate("/login", { state: { justRegistered: true } });
+        return;
       }
-      await ensureUserDoc(cred.user, { name: form.name.trim() });
+
       setStatus("idle");
       navigate("/dashboard");
     } catch (err) {
       setStatus("error");
-      setErrorMsg(firebaseAuthErrorMessage(err));
+      setErrorMsg(supabaseAuthErrorMessage(err));
     }
   };
 
@@ -189,20 +182,22 @@ export default function RegisterForm() {
     }
 
     setGoogleLoading(true);
-    const provider = new GoogleAuthProvider();
 
     try {
-      await setPersistence(auth, browserLocalPersistence);
-      const { user } = await signInWithPopup(auth, provider);
-      await ensureUserDoc(user);
-      navigate("/dashboard");
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+      // Browser navigates away here; nothing else runs in this component.
     } catch (err) {
-      const message = firebaseAuthErrorMessage(err);
+      const message = supabaseAuthErrorMessage(err);
       if (message) {
         setStatus("error");
         setErrorMsg(message);
       }
-    } finally {
       setGoogleLoading(false);
     }
   };
@@ -445,7 +440,7 @@ export default function RegisterForm() {
                   <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.62l4 3.09C6.22 6.86 8.87 4.75 12 4.75Z" />
                 </svg>
               )}
-              {googleLoading ? "Signing up…" : "Continue with Google"}
+              {googleLoading ? "Redirecting…" : "Continue with Google"}
             </button>
 
             <p className="mt-8 text-center text-xs text-[#A79BC4]">

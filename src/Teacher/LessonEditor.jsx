@@ -18,10 +18,10 @@ import {
   getDoc,
   serverTimestamp,
   updateDoc,
-} from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+} from "../lib/database";
+import { onAuthStateChanged } from "../lib/auth";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 import {
   updateLesson,

@@ -11,8 +11,8 @@ import {
   UserCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "../firebase/Firebase";
+import { onAuthStateChanged, signOut } from "../lib/auth";
+import { auth } from "../lib/backend";
 import CA2Logo from "../assets/Images/CA2.png";
 
 const TeacherLayout = () => {

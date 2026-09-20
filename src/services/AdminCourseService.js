@@ -12,15 +12,15 @@ import {
   updateDoc,
   writeBatch,
   where,
-} from "firebase/firestore";
+} from "../lib/database";
 
 import {
   deleteObject,
   listAll,
   ref,
-} from "firebase/storage";
+} from "../lib/storage";
 
-import { auth, db, storage } from "../firebase/Firebase";
+import { auth, db, storage } from "../lib/backend";
 
 import {
   createNotification,

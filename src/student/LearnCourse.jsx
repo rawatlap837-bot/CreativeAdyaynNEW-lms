@@ -6,7 +6,7 @@ import {
   getDocs,
   orderBy,
   query,
-} from "firebase/firestore";
+} from "../lib/database";
 
 import {
   AlertCircle,
@@ -25,7 +25,7 @@ import {
   X,
 } from "lucide-react";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 import {
   getEnrollment,
@@ -201,7 +201,7 @@ export default function LearnCourse() {
         ------------------------------------------------ */
 
         const courseRef = await import(
-          "firebase/firestore"
+          "../lib/database"
         ).then(({ doc, getDoc }) =>
           getDoc(doc(db, "courses", courseId))
         );

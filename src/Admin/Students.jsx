@@ -22,9 +22,10 @@ import {
   updateDoc,
   deleteDoc,
   doc,
-} from "firebase/firestore";
+} from "../lib/database";
 
-import { db } from "../firebase/Firebase";
+import { db } from "../lib/backend";
+import { useOnlinePresence } from "../hooks/usePresence";
 
 import {
   AT,
@@ -91,10 +92,6 @@ function formatDate(value) {
 function isSuccessfulPayment(payment) {
   const status = String(payment?.status || "").toLowerCase();
 
-  /*
-   * If status does not exist, preserve compatibility with
-   * your existing payment records.
-   */
   if (!status) return true;
 
   return [
@@ -168,6 +165,14 @@ export default function Students() {
   const [payments, setPayments] = useState([]);
   const [courses, setCourses] = useState([]);
 
+  /*
+   * Live presence, keyed by uid — now sourced from Supabase Realtime
+   * Presence via useOnlinePresence(), which returns a Set of currently
+   * online user IDs. Separate from `status` (account active/blocked/
+   * suspended) below, which is a totally different concept.
+   */
+  const onlineIds = useOnlinePresence();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -189,14 +194,6 @@ export default function Students() {
     setError(null);
 
     const unsubscribers = [];
-
-    /*
-     * ---------------------------------------------------------------
-     * USERS
-     * ---------------------------------------------------------------
-     *
-     * This is the main source of truth for authenticated users.
-     */
 
     unsubscribers.push(
       onSnapshot(
@@ -222,15 +219,6 @@ export default function Students() {
       )
     );
 
-    /*
-     * ---------------------------------------------------------------
-     * LEGACY STUDENTS
-     * ---------------------------------------------------------------
-     *
-     * Kept because your current LMS already has a students
-     * collection.
-     */
-
     unsubscribers.push(
       onSnapshot(
         collection(db, COLLECTIONS.students),
@@ -248,12 +236,6 @@ export default function Students() {
         }
       )
     );
-
-    /*
-     * ---------------------------------------------------------------
-     * ENROLLMENTS
-     * ---------------------------------------------------------------
-     */
 
     unsubscribers.push(
       onSnapshot(
@@ -273,12 +255,6 @@ export default function Students() {
       )
     );
 
-    /*
-     * ---------------------------------------------------------------
-     * PAYMENTS
-     * ---------------------------------------------------------------
-     */
-
     unsubscribers.push(
       onSnapshot(
         collection(db, COLLECTIONS.payments),
@@ -296,12 +272,6 @@ export default function Students() {
         }
       )
     );
-
-    /*
-     * ---------------------------------------------------------------
-     * COURSES
-     * ---------------------------------------------------------------
-     */
 
     unsubscribers.push(
       onSnapshot(
@@ -335,10 +305,6 @@ export default function Students() {
   const students = useMemo(() => {
     const map = new Map();
 
-    /*
-     * First use authenticated users.
-     */
-
     users.forEach((user) => {
       map.set(user.id, {
         id: user.id,
@@ -347,12 +313,6 @@ export default function Students() {
         source: "users",
       });
     });
-
-    /*
-     * Then merge legacy students.
-     *
-     * Existing authenticated user data remains primary.
-     */
 
     legacyStudents.forEach((student) => {
       const existing = map.get(student.id);
@@ -374,10 +334,6 @@ export default function Students() {
         });
       }
     });
-
-    /*
-     * Attach real enrollments/payments/courses.
-     */
 
     return Array.from(map.values()).map((student) => {
       const uid = student.uid || student.id;
@@ -451,6 +407,12 @@ export default function Students() {
 
         paymentCount:
           successfulPayments.length,
+
+        /*
+         * Live presence — is this student on their dashboard right
+         * now? Now sourced from Supabase Realtime Presence.
+         */
+        isOnline: onlineIds.has(uid),
       };
     });
   }, [
@@ -459,6 +421,7 @@ export default function Students() {
     enrollments,
     payments,
     courses,
+    onlineIds,
   ]);
 
   /* ================================================================
@@ -508,9 +471,7 @@ export default function Students() {
     const total = students.length;
 
     const active = students.filter(
-      (student) =>
-        String(student.status || "active")
-          .toLowerCase() === "active"
+      (student) => student.isOnline
     ).length;
 
     const blocked = students.filter(
@@ -523,7 +484,7 @@ export default function Students() {
 
     const enrolled = students.filter(
       (student) =>
-        student.activeCourseCount > 0
+        student.courseCount > 0
     ).length;
 
     return {
@@ -551,10 +512,6 @@ export default function Students() {
         : "active";
 
     try {
-      /*
-       * Update authenticated user profile.
-       */
-
       if (student.source === "users") {
         await updateDoc(
           doc(db, COLLECTIONS.users, student.id),
@@ -564,28 +521,6 @@ export default function Students() {
         );
       }
 
-      /*
-       * Keep legacy student record synchronized
-       * when one exists.
-       */
-
-      const legacyExists =
-        legacyStudents.some(
-          (item) => item.id === student.id
-        );
-
-      if (legacyExists) {
-        await updateDoc(
-          doc(
-            db,
-            COLLECTIONS.students,
-            student.id
-          ),
-          {
-            status: nextStatus,
-          }
-        );
-      }
     } catch (err) {
       console.error("[toggleStatus]", err);
       setError(err.message);
@@ -611,34 +546,10 @@ export default function Students() {
         status: form.status || "active",
       };
 
-      /*
-       * Authenticated profile.
-       */
-
       if (users.some((user) => user.id === form.id)) {
         await updateDoc(
           doc(db, COLLECTIONS.users, form.id),
           update
-        );
-      }
-
-      /*
-       * Legacy profile.
-       */
-
-      if (
-        legacyStudents.some(
-          (student) => student.id === form.id
-        )
-      ) {
-        await updateDoc(
-          doc(db, COLLECTIONS.students, form.id),
-          {
-            name: update.name,
-            email: update.email,
-            phone: update.phone,
-            status: update.status,
-          }
         );
       }
 
@@ -659,15 +570,6 @@ export default function Students() {
     setError(null);
 
     try {
-      /*
-       * Delete profile document.
-       *
-       * IMPORTANT:
-       * This does NOT delete Firebase Authentication.
-       * Authentication deletion requires Admin SDK /
-       * Cloud Function.
-       */
-
       if (
         users.some(
           (user) => user.id === student.id
@@ -682,26 +584,6 @@ export default function Students() {
         );
       }
 
-      /*
-       * Delete legacy student record if present.
-       */
-
-      if (
-        legacyStudents.some(
-          (item) => item.id === student.id
-        )
-      ) {
-        await deleteDoc(
-          doc(
-            db,
-            COLLECTIONS.students,
-            student.id
-          )
-        );
-      }
-
-      setConfirmDelete(null);
-      setViewing(null);
     } catch (err) {
       console.error("[removeStudent]", err);
       setError(err.message);
@@ -723,10 +605,6 @@ export default function Students() {
   return (
     <div className="w-full min-w-0 overflow-x-hidden">
       <Card title={null} action={null}>
-        {/* ========================================================
-            ERROR
-        ======================================================== */}
-
         {error && (
           <div
             className="mx-3 mt-3 flex items-start gap-3 rounded-lg px-3 py-2.5 text-xs sm:mx-4 sm:text-sm"
@@ -750,10 +628,6 @@ export default function Students() {
           </div>
         )}
 
-        {/* ========================================================
-            QUICK STATS
-        ======================================================== */}
-
         <div className="grid grid-cols-2 gap-3 border-b p-3 sm:grid-cols-4 sm:p-4">
           <MiniStat
             label="Total students"
@@ -763,6 +637,7 @@ export default function Students() {
 
           <MiniStat
             label="Active"
+            hint="Live on dashboard now"
             value={stats.active}
             icon={UserCheck}
           />
@@ -779,10 +654,6 @@ export default function Students() {
             icon={BookOpen}
           />
         </div>
-
-        {/* ========================================================
-            TOOLBAR
-        ======================================================== */}
 
         <div
           className="flex flex-col gap-3 border-b p-3 sm:flex-row sm:items-center sm:p-4"
@@ -836,10 +707,6 @@ export default function Students() {
           </button>
         </div>
 
-        {/* ========================================================
-            RESULT INFO
-        ======================================================== */}
-
         <div className="px-3 py-2.5 text-xs sm:px-4">
           <span style={{ color: AT.sub }}>
             Showing{" "}
@@ -853,10 +720,6 @@ export default function Students() {
             students
           </span>
         </div>
-
-        {/* ========================================================
-            MOBILE
-        ======================================================== */}
 
         <div className="block sm:hidden">
           {loading ? (
@@ -908,10 +771,6 @@ export default function Students() {
             />
           )}
         </div>
-
-        {/* ========================================================
-            DESKTOP TABLE
-        ======================================================== */}
 
         <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[900px] text-sm">
@@ -994,10 +853,6 @@ export default function Students() {
             )}
         </div>
 
-        {/* ========================================================
-            EDIT
-        ======================================================== */}
-
         {editing && (
           <StudentEditModal
             student={editing}
@@ -1008,10 +863,6 @@ export default function Students() {
             onSave={saveStudent}
           />
         )}
-
-        {/* ========================================================
-            DETAILS
-        ======================================================== */}
 
         {viewing && (
           <StudentDetail
@@ -1028,10 +879,6 @@ export default function Students() {
             }
           />
         )}
-
-        {/* ========================================================
-            DELETE
-        ======================================================== */}
 
         {confirmDelete && (
           <ConfirmDeleteModal
@@ -1057,6 +904,7 @@ function MiniStat({
   label,
   value,
   icon: Icon,
+  hint,
 }) {
   return (
     <div
@@ -1094,6 +942,17 @@ function MiniStat({
       >
         {value.toLocaleString()}
       </p>
+
+      {hint && (
+        <p
+          className="mt-0.5 truncate text-[10px]"
+          style={{
+            color: AT.sub,
+          }}
+        >
+          {hint}
+        </p>
+      )}
     </div>
   );
 }
@@ -1117,8 +976,6 @@ function DesktopStudentRow({
       }}
       onClick={onView}
     >
-      {/* Student */}
-
       <td className="max-w-[300px] px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <Avatar student={student} />
@@ -1144,8 +1001,6 @@ function DesktopStudentRow({
           </div>
         </div>
       </td>
-
-      {/* Courses */}
 
       <td className="px-4 py-3">
         <div className="max-w-[230px]">
@@ -1175,8 +1030,6 @@ function DesktopStudentRow({
         </div>
       </td>
 
-      {/* Paid */}
-
       <td className="px-4 py-3">
         <p
           className="font-medium"
@@ -1203,8 +1056,6 @@ function DesktopStudentRow({
         </p>
       </td>
 
-      {/* Status */}
-
       <td className="px-4 py-3">
         <Pill
           tone={
@@ -1212,8 +1063,6 @@ function DesktopStudentRow({
           }
         />
       </td>
-
-      {/* Joined */}
 
       <td className="px-4 py-3">
         <span
@@ -1229,8 +1078,6 @@ function DesktopStudentRow({
           )}
         </span>
       </td>
-
-      {/* Actions */}
 
       <td className="px-4 py-3">
         <div
@@ -1414,17 +1261,34 @@ function MobileStudentCard({
 
 function Avatar({ student }) {
   return (
-    <div
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-      style={{
-        background: AT.accentSoft,
-        color: AT.accentDeep,
-      }}
-    >
-      {getStudentName(student)
-        .trim()
-        .charAt(0)
-        .toUpperCase() || "S"}
+    <div className="relative shrink-0">
+      <div
+        className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold"
+        style={{
+          background: AT.accentSoft,
+          color: AT.accentDeep,
+        }}
+      >
+        {getStudentName(student)
+          .trim()
+          .charAt(0)
+          .toUpperCase() || "S"}
+      </div>
+
+      <span
+        className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2"
+        style={{
+          borderColor: "#fff",
+          background: student.isOnline
+            ? "#22c55e"
+            : "#cbd5e1",
+        }}
+        title={
+          student.isOnline
+            ? "Online now"
+            : "Offline"
+        }
+      />
     </div>
   );
 }
@@ -1659,8 +1523,6 @@ function StudentDetail({
       onClose={onClose}
     >
       <div className="space-y-4">
-        {/* Profile */}
-
         <div
           className="rounded-xl border p-4"
           style={{
@@ -1705,8 +1567,6 @@ function StudentDetail({
             />
           </div>
         </div>
-
-        {/* Basic information */}
 
         <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
           <DetailRow
@@ -1756,8 +1616,6 @@ function StudentDetail({
             value={student.paymentCount}
           />
         </div>
-
-        {/* Courses */}
 
         <section>
           <div className="mb-2 flex items-center gap-2">
@@ -1837,8 +1695,6 @@ function StudentDetail({
             </div>
           )}
         </section>
-
-        {/* Payments */}
 
         <section>
           <div className="mb-2 flex items-center justify-between gap-3">
@@ -1962,8 +1818,6 @@ function StudentDetail({
             </div>
           )}
         </section>
-
-        {/* Footer */}
 
         <div
           className="flex flex-col-reverse gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between"

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { onAuthStateChanged, updateProfile, sendPasswordResetEmail, signOut } from "firebase/auth";
-import { doc, onSnapshot, setDoc, collection, query, where, onSnapshot as onSnap } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { auth, db, storage } from "../firebase/Firebase";
+import { onAuthStateChanged, updateProfile, sendPasswordResetEmail, signOut } from "../lib/auth";
+import { doc, onSnapshot, setDoc, collection, query, where, onSnapshot as onSnap } from "../lib/database";
+import { ref, uploadBytes, getDownloadURL } from "../lib/storage";
+import { auth, db, storage } from "../lib/backend";
 import { Camera, Pencil, Check, X, Award, BookOpen, Calendar, KeyRound, LogOut, Loader2 } from "lucide-react";
 import { Skeleton } from "../components/Skeleton"; // adjust path
 

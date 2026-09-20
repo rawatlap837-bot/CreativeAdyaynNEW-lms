@@ -11,7 +11,7 @@ import {
     X,
 } from "lucide-react";
 
-import { auth } from "../firebase/Firebase";
+import { auth } from "../lib/backend";
 
 import {
     getMyAssignments,

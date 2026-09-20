@@ -1,16 +1,11 @@
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { readFileSync } from "fs";
-
-const serviceAccount = JSON.parse(
-  readFileSync("./creative-adyayn-firebase-adminsdk-fbsvc-fb1d751799.json", "utf8")
-);
-
-initializeApp({
-  credential: cert(serviceAccount),
-});
-
-const db = getFirestore();
+import { createClient } from "@supabase/supabase-js";
+import { config } from "dotenv";
+config({ path: ".env.local", quiet: true });
+const url = process.env.VITE_SUPABASE_URL;
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const instructorId = process.env.SEED_INSTRUCTOR_ID;
+if (!url || !key || !instructorId) throw new Error("Set VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SEED_INSTRUCTOR_ID locally before seeding. Never prefix the service key with VITE_.");
+const db = createClient(url, key, { auth: { persistSession: false } });
 
 /* ==================================================================== */
 /*  LONG COURSES  (from SiteData.js -> COURSES_BY_CATEGORY)              */
@@ -401,50 +396,21 @@ function slugify(title) {
 /*  UPLOAD LOGIC                                                         */
 /* ==================================================================== */
 
-async function uploadLongCourses() {
-  console.log("\n--- Uploading long courses to 'courses' collection ---");
-  const batch = db.batch();
-
-  for (const [category, courses] of Object.entries(COURSES_BY_CATEGORY)) {
-    for (const course of courses) {
-      const ref = db.collection("courses").doc(course.id);
-      batch.set(ref, { ...course, category });
-      console.log(`Queued: ${course.title} (${category})`);
-    }
+async function seed() {
+  const { data: instructor, error } = await db.from("lms_profiles").select("id,role").eq("id", instructorId).single();
+  if (error || !["teacher", "admin"].includes(instructor?.role)) throw new Error("Choose an existing teacher or administrator as SEED_INSTRUCTOR_ID.");
+  const rows = [];
+  function add(course, type, category) {
+    const id = `seed-${type}-${slugify(course.title)}`;
+    rows.push({ id, slug: id, title: course.title, type, category, instructor_id: instructorId,
+      description: course.description || "", duration: course.duration || "", price: Number(course.price) || 0,
+      status: "draft", metadata: { ...course, category },
+    });
   }
-
-  await batch.commit();
-  console.log("✅ Long courses uploaded successfully");
+  for (const [category, courses] of Object.entries(COURSES_BY_CATEGORY)) for (const course of courses) add(course, "long", category);
+  for (const category of SHORT_COURSE_GROUPS) for (const course of category.courses) add(course, "short", category.label);
+  const { error: insertError } = await db.from("lms_courses").upsert(rows, { onConflict: "id", ignoreDuplicates: true });
+  if (insertError) throw insertError;
+  console.log(`Seed checked ${rows.length} courses. New courses are drafts; existing courses were preserved.`);
 }
-
-async function uploadShortCourses() {
-  console.log("\n--- Uploading short courses to 'shortCourses' collection ---");
-  const batch = db.batch();
-
-  for (const group of SHORT_COURSE_GROUPS) {
-    for (const course of group.courses) {
-      const id = slugify(course.title);
-      const ref = db.collection("shortCourses").doc(id);
-      batch.set(ref, {
-        ...course,
-        groupId: group.id,
-        groupLabel: group.label,
-      });
-      console.log(`Queued: ${course.title} (${group.label})`);
-    }
-  }
-
-  await batch.commit();
-  console.log("✅ Short courses uploaded successfully");
-}
-
-async function upload() {
-  await uploadLongCourses();
-  await uploadShortCourses();
-  console.log("\n🎉 All courses (long + short) uploaded successfully");
-}
-
-upload().catch((err) => {
-  console.error("❌ Upload failed:", err);
-  process.exit(1);
-});
+seed().catch((error) => { console.error(error.message); process.exitCode = 1; });

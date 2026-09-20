@@ -10,9 +10,9 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
-} from "firebase/firestore";
+} from "../lib/database";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 /* ============================================================
    COLLECTIONS

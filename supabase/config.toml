@@ -1,0 +1,8 @@
+project_id = "creative-adhyayan-lms"
+
+[functions.lms-payments]
+verify_jwt = true
+
+[functions.lms-payment-webhook]
+# Razorpay sends an HMAC signature, not a Supabase user JWT.
+verify_jwt = false

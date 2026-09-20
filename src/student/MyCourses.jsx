@@ -20,14 +20,14 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "../lib/auth";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 import {
   doc,
   getDoc,
-} from "firebase/firestore";
+} from "../lib/database";
 
 import { getMyEnrollments } from "../services/EnrollmentService";
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "../lib/auth";
 
 import Attendance from "./Attendance";
 import Certificates from "./Certificates.jsx";
@@ -19,9 +19,10 @@ import {
   updateDoc,
   deleteDoc,
   Timestamp,
-} from "firebase/firestore";
+} from "../lib/database";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
+import usePresence from "../hooks/usePresence";
 
 import {
   Plus,
@@ -411,6 +412,12 @@ function normalizeAnnouncement(item) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+
+  // Marks this student "online" in Realtime Database for as long as
+  // the dashboard is mounted; Firebase's onDisconnect flips them back
+  // to "offline" automatically when the tab closes or connection drops.
+  // Free on the Spark plan — see src/hooks/usePresence.js.
+  usePresence();
 
   const [
     searchParams,

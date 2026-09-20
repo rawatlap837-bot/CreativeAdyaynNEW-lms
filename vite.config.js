@@ -8,7 +8,8 @@ export default defineConfig({
     react(),
 
     visualizer({
-      open: true,
+      open: false,
+      filename: "dist/stats.html",
       gzipSize: true,
     }),
   ],

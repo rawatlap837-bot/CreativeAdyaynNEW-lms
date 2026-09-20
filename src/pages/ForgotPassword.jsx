@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "../firebase/Firebase";
+import { sendPasswordResetEmail } from "../lib/auth";
+import { auth } from "../lib/backend";
 import { Mail, ArrowLeft, Loader2 } from "lucide-react";
 
 export default function ForgotPassword() {

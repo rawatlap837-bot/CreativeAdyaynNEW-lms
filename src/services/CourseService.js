@@ -1,37 +1,17 @@
-import { useEffect, useRef, useState } from "react";
-
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-  writeBatch,
-} from "firebase/firestore";
-
-import {
-  deleteObject,
-  ref,
-} from "firebase/storage";
-
-import {
-  auth,
-  db,
-  storage,
-} from "../firebase/Firebase";
-
-import { uploadImage } from "../lib/Cloudinary";
+import { collection, query, where, onSnapshot } from "../lib/database";
+import { auth, db } from "../lib/backend";
+import { onAuthStateChanged } from "../lib/auth";
+import { useEffect, useState } from "react";
+import { fromRow } from "../lib/records";
+import { deleteObject, ref } from "../lib/storage";
+import { supabase } from "../lib/supabase";
+import { uploadImage } from "../lib/Media";
 
 /* ============================================================
-   COLLECTION
+   TABLE
 ============================================================ */
 
+export const COURSES_TABLE = "lms_courses";
 export const COURSES_COLLECTION = "courses";
 
 /* ============================================================
@@ -68,19 +48,9 @@ export function slugify(title = "") {
     .replace(/(^-|-$)/g, "");
 }
 
-function courseFromDoc(snapshot) {
-  return {
-    id: snapshot.id,
-    ...snapshot.data(),
-  };
-}
-
 function sortCourses(a, b) {
-  const orderA =
-    typeof a.order === "number" ? a.order : 999999;
-
-  const orderB =
-    typeof b.order === "number" ? b.order : 999999;
+  const orderA = typeof a.course_order === "number" ? a.course_order : 999999;
+  const orderB = typeof b.course_order === "number" ? b.course_order : 999999;
 
   if (orderA !== orderB) {
     return orderA - orderB;
@@ -89,35 +59,33 @@ function sortCourses(a, b) {
   return (a.title || "").localeCompare(b.title || "");
 }
 
-function requireAuthUser() {
-  const user = auth.currentUser;
+async function requireAuthUser() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error(
-      "You must be logged in to perform this action."
-    );
+    throw new Error("You must be logged in to perform this action.");
   }
 
   return user;
 }
 
 /*
-  Turns raw Firebase errors into something safe to show
-  in the UI, without leaking internal error codes/messages
-  to end users. Permission errors are the most common case
-  when a listener is attached for a user/role that the
-  Firestore rules don't allow to read that data.
+  Turns raw Postgres/PostgREST errors into something safe to show
+  in the UI, without leaking internal error codes/messages to end
+  users. "42501" / RLS-denied is the most common case when a query
+  runs for a user/role that a policy doesn't allow to read that row.
 */
-function friendlyFirestoreError(error, fallbackMessage) {
-  if (error?.code === "permission-denied") {
+function friendlyDbError(error, fallbackMessage) {
+  if (!error) return fallbackMessage;
+  if (error.code === "42501" || /row-level security/i.test(error.message || "")) {
     return "You don't have permission to view this data.";
   }
-
-  if (error?.code === "unavailable") {
+  if (error.message?.toLowerCase().includes("network")) {
     return "Connection issue — please check your internet and try again.";
   }
-
-  return error?.message || fallbackMessage;
+  return error.message || fallbackMessage;
 }
 
 /* ============================================================
@@ -125,33 +93,27 @@ function friendlyFirestoreError(error, fallbackMessage) {
 ============================================================ */
 
 async function requireCourseOwner(courseId) {
-  const user = requireAuthUser();
+  const user = await requireAuthUser();
 
   if (!courseId) {
     throw new Error("Course ID is required.");
   }
 
-  const courseRef = doc(db, COURSES_COLLECTION, courseId);
+  const { data: course, error } = await supabase
+    .from(COURSES_TABLE)
+    .select("*")
+    .eq("id", courseId)
+    .maybeSingle();
 
-  const courseSnapshot = await getDoc(courseRef);
-
-  if (!courseSnapshot.exists()) {
+  if (error || !course) {
     throw new Error("Course not found.");
   }
 
-  const course = courseSnapshot.data();
-
-  if (course.instructorId !== user.uid) {
-    throw new Error(
-      "You do not have permission to manage this course."
-    );
+  if (course.instructor_id !== user.id) {
+    throw new Error("You do not have permission to manage this course.");
   }
 
-  return {
-    user,
-    courseRef,
-    course,
-  };
+  return { user, course };
 }
 
 /* ============================================================
@@ -173,153 +135,74 @@ export function groupByCategory(courses = []) {
     coursesByCategory[category].push(course);
   }
 
-  return {
-    categories,
-    coursesByCategory,
-  };
+  return { categories, coursesByCategory };
 }
 
 /* ============================================================
    TEACHER — GET MY COURSES (one-off fetch)
 ============================================================ */
 
-export async function getMyCourses(
-  teacherId = auth.currentUser?.uid
-) {
-  if (!teacherId) {
-    throw new Error("Teacher ID is required.");
-  }
+export async function getMyCourses(teacherId) {
+  const user = await requireAuthUser();
+  const id = teacherId || user.id;
 
-  requireAuthUser();
+  const { data, error } = await supabase
+    .from(COURSES_TABLE)
+    .select("*")
+    .eq("instructor_id", id);
 
-  const q = query(
-    collection(db, COURSES_COLLECTION),
-    where("instructorId", "==", teacherId)
-  );
+  if (error) throw new Error(friendlyDbError(error, "Unable to load your courses."));
 
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs.map(courseFromDoc).sort(sortCourses);
+  return (data || []).map((row) => fromRow("courses", row)).sort(sortCourses);
 }
 
 /* ============================================================
    TEACHER — LIVE COURSES (realtime)
 
-   IMPORTANT: pass `enabled: false` for any session that is
-   not actually an instructor session (e.g. a student viewing
-   their own dashboard). Firing this listener for a user whose
-   Firestore rules don't grant them instructor-level reads will
-   always resolve to a permission-denied error — that is a
-   rules/role mismatch, not something this hook can work around,
-   so the caller should simply not attach the listener at all.
+   IMPORTANT: pass `enabled: false` for any session that is not
+   actually an instructor session (e.g. a student viewing their
+   own dashboard). Firing this for a user whose RLS policy
+   doesn't grant them instructor-level reads will just come back
+   empty — that's a role mismatch, not something this hook works
+   around, so the caller should simply not attach it at all.
+
+   Requires the `courses` table to be added to the "supabase_realtime"
+   publication (Database -> Replication in the Supabase dashboard) —
+   it's off by default for new tables.
 ============================================================ */
 
-export function useMyCourses(
-  teacherId = auth.currentUser?.uid,
-  { enabled = true } = {}
-) {
-  const [state, setState] = useState({
-    courses: [],
-    loading: true,
-    error: null,
-  });
-
-  const isMountedRef = useRef(true);
-
+export function useMyCourses(teacherIdParam, { enabled = true } = {}) {
+  const [state, setState] = useState({ courses: [], loading: true, error: null });
+  const [currentId, setCurrentId] = useState(auth.currentUser?.uid);
+  useEffect(() => onAuthStateChanged(auth, (user) => setCurrentId(user?.uid)), []);
+  const teacherId = teacherIdParam || currentId;
   useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!enabled) {
-      setState({
-        courses: [],
-        loading: false,
-        error: null,
-      });
-
+    if (!enabled || !teacherId) {
+      setState({ courses: [], loading: false, error: null });
       return;
     }
-
-    if (!teacherId) {
-      setState({
-        courses: [],
-        loading: false,
-        error: "Teacher is not logged in.",
-      });
-
-      return;
-    }
-
-    setState({
-      courses: [],
-      loading: true,
-      error: null,
-    });
-
-    const q = query(
-      collection(db, COURSES_COLLECTION),
-      where("instructorId", "==", teacherId)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        if (!isMountedRef.current) return;
-
-        const courses = snapshot.docs
-          .map(courseFromDoc)
-          .sort(sortCourses);
-
-        setState({
-          courses,
-          loading: false,
-          error: null,
-        });
-      },
-      (error) => {
-        if (!isMountedRef.current) return;
-
-        console.error("Teacher courses listener error:", error);
-
-        setState({
-          courses: [],
-          loading: false,
-          error: friendlyFirestoreError(
-            error,
-            "Unable to load teacher courses."
-          ),
-        });
-      }
-    );
-
-    return () => unsubscribe();
+    setState({ courses: [], loading: true, error: null });
+    return onSnapshot(query(collection(db, "courses"), where("instructorId", "==", teacherId)),
+      (snapshot) => setState({ courses: snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort(sortCourses), loading: false, error: null }),
+      (error) => setState({ courses: [], loading: false, error: friendlyDbError(error, "Unable to load your courses.") }));
   }, [teacherId, enabled]);
-
   return state;
 }
-
-/* ============================================================
-   GET COURSE BY ID
-============================================================ */
 
 export async function getCourseById(courseId) {
   if (!courseId) {
     throw new Error("Course ID is required.");
   }
 
-  const courseRef = doc(db, COURSES_COLLECTION, courseId);
+  const { data, error } = await supabase
+    .from(COURSES_TABLE)
+    .select("*")
+    .eq("id", courseId)
+    .maybeSingle();
 
-  const snapshot = await getDoc(courseRef);
+  if (error) throw new Error(friendlyDbError(error, "Unable to load course."));
 
-  if (!snapshot.exists()) {
-    return null;
-  }
-
-  return courseFromDoc(snapshot);
+  return fromRow("courses", data);
 }
 
 /* ============================================================
@@ -328,136 +211,60 @@ export async function getCourseById(courseId) {
   IMPORTANT:
 
   Teacher creates:
-
-      draft
-        ↓
-      teacher adds content
-        ↓
-      submit for approval
-        ↓
-      pending
-        ↓
-      admin approves
-        ↓
-      published
+      draft → teacher adds content → submit for approval →
+      pending → admin approves → published
 ============================================================ */
 
 export async function createCourse(courseData = {}) {
-  const user = requireAuthUser();
-
-  /* ----------------------------------------------------------
-     VALIDATION
-  ---------------------------------------------------------- */
+  const user = await requireAuthUser();
 
   const title = courseData.title?.trim();
-
   if (!title) {
     throw new Error("Course title is required.");
   }
 
-  if (
-    courseData.type !== COURSE_TYPES.SHORT &&
-    courseData.type !== COURSE_TYPES.LONG
-  ) {
+  if (courseData.type !== COURSE_TYPES.SHORT && courseData.type !== COURSE_TYPES.LONG) {
     throw new Error("Course type must be short or long.");
   }
 
-  /* ----------------------------------------------------------
-     CREATE NEW FIRESTORE DOCUMENT
-  ---------------------------------------------------------- */
-
-  const courseRef = doc(collection(db, COURSES_COLLECTION));
-
-  /* ----------------------------------------------------------
-     COURSE DATA
-  ---------------------------------------------------------- */
-
   const course = {
-    /* BASIC INFORMATION */
-
     title,
-
     slug: courseData.slug?.trim() || slugify(title),
-
     description: courseData.description?.trim() || "",
-
-    shortDescription: courseData.shortDescription?.trim() || "",
-
+    short_description: courseData.shortDescription?.trim() || "",
     category: courseData.category?.trim() || "",
-
     level: courseData.level?.trim() || "",
-
     duration: courseData.duration?.trim() || "",
-
-    /* COURSE TYPE */
-
     type: courseData.type,
-
-    /* OWNER */
-
-    instructorId: user.uid,
-
-    instructorName:
-      courseData.instructorName?.trim() || user.displayName || "",
-
-    /* MEDIA
-       thumbnailPath holds a Cloudinary publicId (see
-       uploadCourseThumbnail below), NOT a Firebase Storage
-       path. bannerPath / previewVideoPath are still Firebase
-       Storage paths until those are migrated too. */
-
-    thumbnailUrl: courseData.thumbnailUrl || "",
-
-    thumbnailPath: courseData.thumbnailPath || "",
-
-    bannerUrl: courseData.bannerUrl || "",
-
-    bannerPath: courseData.bannerPath || "",
-
-    previewVideoUrl: courseData.previewVideoUrl || "",
-
-    previewVideoPath: courseData.previewVideoPath || "",
-
-    /* PRICING */
-
+    instructor_id: user.id,
+    instructor_name: courseData.instructorName?.trim() || user.user_metadata?.name || "",
+    thumbnail_url: courseData.thumbnailUrl || "",
+    thumbnail_path: courseData.thumbnailPath || "",
+    banner_url: courseData.bannerUrl || "",
+    banner_path: courseData.bannerPath || "",
+    preview_video_url: courseData.previewVideoUrl || "",
+    preview_video_path: courseData.previewVideoPath || "",
     price: Number(courseData.price) || 0,
-
-    discountPrice: Number(courseData.discountPrice) || 0,
-
+    discount_price: Number(courseData.discountPrice) || 0,
     currency: courseData.currency || "INR",
-
-    /* STATUS */
-
     status: COURSE_STATUS.DRAFT,
-
-    /* ADMIN CONTROLLED */
-
     featured: false,
-
-    order: 0,
-
-    /* TIMESTAMPS */
-
-    createdAt: serverTimestamp(),
-
-    updatedAt: serverTimestamp(),
-
-    publishedAt: null,
-
-    /* REJECTION */
-
-    rejectionReason: "",
-
-    /* COUNTERS */
-
-    studentCount: 0,
-
-    enrollmentCount: 0,
+    course_order: 0,
+    published_at: null,
+    rejection_reason: "",
+    student_count: 0,
+    enrollment_count: 0,
   };
 
-  await setDoc(courseRef, course);
+  const { data, error } = await supabase
+    .from(COURSES_TABLE)
+    .insert(course)
+    .select()
+    .single();
 
-  return getCourseById(courseRef.id);
+  if (error) throw new Error(friendlyDbError(error, "Unable to create course."));
+
+  return fromRow("courses", data);
 }
 
 /* ============================================================
@@ -465,255 +272,134 @@ export async function createCourse(courseData = {}) {
 ============================================================ */
 
 export async function updateCourse(courseId, courseData = {}) {
-  const { courseRef, course: existingCourse } =
-    await requireCourseOwner(courseId);
-
-  /* ----------------------------------------------------------
-     LOCK PENDING
-  ---------------------------------------------------------- */
+  const { course: existingCourse } = await requireCourseOwner(courseId);
 
   if (existingCourse.status === COURSE_STATUS.PENDING) {
-    throw new Error(
-      "This course is waiting for admin approval and cannot be edited right now."
-    );
+    throw new Error("This course is waiting for admin approval and cannot be edited right now.");
   }
-
-  /* ----------------------------------------------------------
-     LOCK ARCHIVED
-  ---------------------------------------------------------- */
-
   if (existingCourse.status === COURSE_STATUS.ARCHIVED) {
     throw new Error("Archived courses cannot be edited.");
   }
 
   const updates = {};
 
-  /* ----------------------------------------------------------
-     TITLE
-  ---------------------------------------------------------- */
-
   if (courseData.title !== undefined) {
     const title = courseData.title.trim();
-
-    if (!title) {
-      throw new Error("Course title cannot be empty.");
-    }
-
+    if (!title) throw new Error("Course title cannot be empty.");
     updates.title = title;
-
     updates.slug = courseData.slug?.trim() || slugify(title);
   }
 
-  /* ----------------------------------------------------------
-     BASIC EDITABLE FIELDS
-  ---------------------------------------------------------- */
+  // camelCase form field -> snake_case column name
+  const editableFieldMap = {
+    description: "description",
+    shortDescription: "short_description",
+    category: "category",
+    level: "level",
+    duration: "duration",
+    thumbnailUrl: "thumbnail_url",
+    thumbnailPath: "thumbnail_path",
+    bannerUrl: "banner_url",
+    bannerPath: "banner_path",
+    previewVideoUrl: "preview_video_url",
+    previewVideoPath: "preview_video_path",
+    currency: "currency",
+  };
 
-  const editableFields = [
-    "description",
-    "shortDescription",
-    "category",
-    "level",
-    "duration",
-    "thumbnailUrl",
-    "thumbnailPath",
-    "bannerUrl",
-    "bannerPath",
-    "previewVideoUrl",
-    "previewVideoPath",
-    "currency",
-  ];
-
-  for (const field of editableFields) {
+  for (const [field, column] of Object.entries(editableFieldMap)) {
     if (courseData[field] !== undefined) {
-      updates[field] = courseData[field];
+      updates[column] = courseData[field];
     }
   }
-
-  /* ----------------------------------------------------------
-     PRICING
-  ---------------------------------------------------------- */
 
   if (courseData.price !== undefined) {
     updates.price = Number(courseData.price) || 0;
   }
-
   if (courseData.discountPrice !== undefined) {
-    updates.discountPrice = Number(courseData.discountPrice) || 0;
+    updates.discount_price = Number(courseData.discountPrice) || 0;
   }
 
-  /* ----------------------------------------------------------
-     COURSE TYPE
-  ---------------------------------------------------------- */
-
   if (courseData.type !== undefined) {
-    if (
-      courseData.type !== COURSE_TYPES.SHORT &&
-      courseData.type !== COURSE_TYPES.LONG
-    ) {
+    if (courseData.type !== COURSE_TYPES.SHORT && courseData.type !== COURSE_TYPES.LONG) {
       throw new Error("Invalid course type.");
     }
-
     updates.type = courseData.type;
   }
 
-  /* ----------------------------------------------------------
-     NEVER ALLOW TEACHER TO MODIFY ADMIN FIELDS
-  ---------------------------------------------------------- */
-
-  delete updates.instructorId;
+  // Never allow a teacher to modify admin-controlled fields directly —
+  // RLS already blocks it server-side, this is just a client-side guard
+  // so a bug here fails loudly instead of silently trying and getting
+  // rejected.
+  delete updates.instructor_id;
   delete updates.featured;
-  delete updates.order;
-  delete updates.publishedAt;
-  delete updates.createdAt;
+  delete updates.course_order;
+  delete updates.published_at;
+  delete updates.created_at;
   delete updates.status;
 
-  /* ----------------------------------------------------------
-     MAJOR CHANGE DETECTION
-  ---------------------------------------------------------- */
-
-  const titleChanged =
-    courseData.title !== undefined &&
-    courseData.title.trim() !== existingCourse.title;
-
-  const priceChanged =
-    courseData.price !== undefined &&
-    Number(courseData.price) !== Number(existingCourse.price || 0);
-
+  const titleChanged = courseData.title !== undefined && courseData.title.trim() !== existingCourse.title;
+  const priceChanged = courseData.price !== undefined && Number(courseData.price) !== Number(existingCourse.price || 0);
   const discountChanged =
     courseData.discountPrice !== undefined &&
-    Number(courseData.discountPrice) !==
-    Number(existingCourse.discountPrice || 0);
-
-  const typeChanged =
-    courseData.type !== undefined &&
-    courseData.type !== existingCourse.type;
-
-  const majorChange =
-    titleChanged || priceChanged || discountChanged || typeChanged;
-
-  /* ----------------------------------------------------------
-     PUBLISHED → PENDING
-  ---------------------------------------------------------- */
+    Number(courseData.discountPrice) !== Number(existingCourse.discount_price || 0);
+  const typeChanged = courseData.type !== undefined && courseData.type !== existingCourse.type;
+  const majorChange = titleChanged || priceChanged || discountChanged || typeChanged;
 
   if (existingCourse.status === COURSE_STATUS.PUBLISHED && majorChange) {
     updates.status = COURSE_STATUS.PENDING;
-
-    updates.publishedAt = null;
-
-    updates.rejectionReason = "";
+    updates.published_at = null;
+    updates.rejection_reason = "";
   }
-
-  /* ----------------------------------------------------------
-     REJECTED → DRAFT
-  ---------------------------------------------------------- */
 
   if (existingCourse.status === COURSE_STATUS.REJECTED) {
     updates.status = COURSE_STATUS.DRAFT;
-
-    updates.rejectionReason = "";
+    updates.rejection_reason = "";
   }
 
-  /* ----------------------------------------------------------
-     UPDATED TIMESTAMP
-  ---------------------------------------------------------- */
+  updates.updated_at = new Date().toISOString();
 
-  updates.updatedAt = serverTimestamp();
+  const { error } = await supabase.from(COURSES_TABLE).update(updates).eq("id", courseId);
 
-  await updateDoc(courseRef, updates);
+  if (error) throw new Error(friendlyDbError(error, "Unable to update course."));
 
   return getCourseById(courseId);
 }
 
 /* ============================================================
    DELETE COURSE
+
+   Modules, lessons, enrollments, payments, assignments, and
+   certificates tied to this course all cascade-delete
+   automatically via the "on delete cascade" foreign keys in the
+   schema — Postgres handles that in one transaction, so there's
+   no manual walk-the-subcollections step here like Firestore
+   needed. We only need to clean up Storage files manually.
 ============================================================ */
 
 export async function deleteCourse(courseId) {
-  const { courseRef, course } = await requireCourseOwner(courseId);
+  const { course } = await requireCourseOwner(courseId);
 
-  /* ----------------------------------------------------------
-     DELETE DIRECT STORAGE FILES
-
-     NOTE: thumbnailPath is NOT included here. It's a Cloudinary
-     publicId now, not a Firebase Storage path, and it gets
-     cleaned up server-side by the onCourseDeleted Cloud Function
-     (functions/cloudinaryCleanup.js) once this document is
-     deleted below — that function has the API secret this
-     client can't safely hold. bannerPath / previewVideoPath are
-     still Firebase Storage and are cleaned up here directly.
-  ---------------------------------------------------------- */
-
-  const directStoragePaths = [
-    course.bannerPath,
-    course.previewVideoPath,
-  ].filter(Boolean);
+  const directStoragePaths = [course.thumbnail_path, course.banner_path, course.preview_video_path].filter(Boolean);
 
   for (const path of directStoragePaths) {
     await safeDeleteStorageFile(path);
   }
 
-  /* ----------------------------------------------------------
-     GET MODULES
-  ---------------------------------------------------------- */
+  // Also clean up any lesson video/resource files before the cascade
+  // delete removes the rows (paths would otherwise be unrecoverable).
+  const { data: lessons } = await supabase
+    .from("lms_lessons")
+    .select("video_path, resource_path")
+    .eq("course_id", courseId);
 
-  const modulesRef = collection(
-    db,
-    COURSES_COLLECTION,
-    courseId,
-    "modules"
-  );
-
-  const modulesSnapshot = await getDocs(modulesRef);
-
-  /* ----------------------------------------------------------
-     DELETE MODULES + LESSONS
-  ---------------------------------------------------------- */
-
-  for (const moduleSnapshot of modulesSnapshot.docs) {
-    const moduleId = moduleSnapshot.id;
-
-    const lessonsRef = collection(
-      db,
-      COURSES_COLLECTION,
-      courseId,
-      "modules",
-      moduleId,
-      "lessons"
-    );
-
-    const lessonsSnapshot = await getDocs(lessonsRef);
-
-    if (!lessonsSnapshot.empty) {
-      const batch = writeBatch(db);
-
-      for (const lessonSnapshot of lessonsSnapshot.docs) {
-        const lesson = lessonSnapshot.data();
-
-        if (lesson.videoPath) {
-          await safeDeleteStorageFile(lesson.videoPath);
-        }
-
-        if (lesson.resourcePath) {
-          await safeDeleteStorageFile(lesson.resourcePath);
-        }
-
-        batch.delete(lessonSnapshot.ref);
-      }
-
-      await batch.commit();
-    }
-
-    await deleteDoc(moduleSnapshot.ref);
+  for (const lesson of lessons || []) {
+    if (lesson.video_path) await safeDeleteStorageFile(lesson.video_path);
+    if (lesson.resource_path) await safeDeleteStorageFile(lesson.resource_path);
   }
 
-  /* ----------------------------------------------------------
-     DELETE COURSE
+  const { error } = await supabase.from(COURSES_TABLE).delete().eq("id", courseId);
 
-     This triggers the onCourseDeleted Cloud Function, which
-     removes the Cloudinary thumbnail using thumbnailPath.
-  ---------------------------------------------------------- */
-
-  await deleteDoc(courseRef);
+  if (error) throw new Error(friendlyDbError(error, "Unable to delete course."));
 
   return true;
 }
@@ -723,33 +409,30 @@ export async function deleteCourse(courseId) {
 ============================================================ */
 
 export async function submitForApproval(courseId) {
-  const { courseRef, course } = await requireCourseOwner(courseId);
+  const { course } = await requireCourseOwner(courseId);
 
   if (course.status === COURSE_STATUS.PENDING) {
     throw new Error("This course is already waiting for approval.");
   }
-
   if (course.status === COURSE_STATUS.PUBLISHED) {
     throw new Error("This course is already published.");
   }
-
   if (course.status === COURSE_STATUS.ARCHIVED) {
     throw new Error("Archived courses cannot be submitted.");
   }
-
   if (!course.title?.trim()) {
     throw new Error("Course title is required.");
   }
-
   if (!course.type) {
     throw new Error("Course type is required.");
   }
 
-  await updateDoc(courseRef, {
-    status: COURSE_STATUS.PENDING,
-    rejectionReason: "",
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from(COURSES_TABLE)
+    .update({ status: COURSE_STATUS.PENDING, rejection_reason: "", updated_at: new Date().toISOString() })
+    .eq("id", courseId);
+
+  if (error) throw new Error(friendlyDbError(error, "Unable to submit course."));
 
   return getCourseById(courseId);
 }
@@ -759,117 +442,44 @@ export async function submitForApproval(courseId) {
 ============================================================ */
 
 export async function unpublishCourse(courseId) {
-  const { courseRef, course } = await requireCourseOwner(courseId);
+  const { course } = await requireCourseOwner(courseId);
 
   if (course.status !== COURSE_STATUS.PUBLISHED) {
     throw new Error("Only published courses can be unpublished.");
   }
 
-  await updateDoc(courseRef, {
-    status: COURSE_STATUS.DRAFT,
-    publishedAt: null,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from(COURSES_TABLE)
+    .update({ status: COURSE_STATUS.DRAFT, published_at: null, updated_at: new Date().toISOString() })
+    .eq("id", courseId);
+
+  if (error) throw new Error(friendlyDbError(error, "Unable to unpublish course."));
 
   return getCourseById(courseId);
 }
 
 /* ============================================================
    PUBLIC — PUBLISHED COURSES (realtime)
+
+   Requires the `courses` table added to the "supabase_realtime"
+   publication in Database -> Replication.
 ============================================================ */
 
 export function usePublishedCourses(type) {
-  const [state, setState] = useState({
-    courses: [],
-    loading: true,
-    error: null,
-  });
-
-  const isMountedRef = useRef(true);
-
+  const [state, setState] = useState({ courses: [], loading: true, error: null });
   useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!type) {
-      setState({
-        courses: [],
-        loading: false,
-        error: "Course type is required.",
-      });
-
-      return;
-    }
-
-    setState((previous) => ({
-      ...previous,
-      loading: true,
-      error: null,
-    }));
-
-    const q = query(
-      collection(db, COURSES_COLLECTION),
-      where("type", "==", type),
-      where("status", "==", COURSE_STATUS.PUBLISHED)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        if (!isMountedRef.current) return;
-
-        const courses = snapshot.docs
-          .map(courseFromDoc)
-          .sort(sortCourses);
-
-        setState({
-          courses,
-          loading: false,
-          error: null,
-        });
-      },
-      (error) => {
-        if (!isMountedRef.current) return;
-
-        console.error("Published courses error:", error);
-
-        setState({
-          courses: [],
-          loading: false,
-          error: friendlyFirestoreError(
-            error,
-            "Unable to load courses."
-          ),
-        });
-      }
-    );
-
-    return () => unsubscribe();
+    setState({ courses: [], loading: true, error: null });
+    return onSnapshot(query(collection(db, "courses"), where("type", "==", type), where("status", "==", COURSE_STATUS.PUBLISHED)),
+      (snapshot) => setState({ courses: snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort(sortCourses), loading: false, error: null }),
+      (error) => setState({ courses: [], loading: false, error: friendlyDbError(error, "Unable to load courses.") }));
   }, [type]);
-
   return state;
 }
 
-/* ============================================================
-   PUBLIC — CATEGORY COURSES
-============================================================ */
-
 export function usePublishedCoursesByCategory(type) {
   const { courses, loading, error } = usePublishedCourses(type);
-
   const { categories, coursesByCategory } = groupByCategory(courses);
-
-  return {
-    categories,
-    coursesByCategory,
-    courses,
-    loading,
-    error,
-  };
+  return { categories, coursesByCategory, courses, loading, error };
 }
 
 /* ============================================================
@@ -881,70 +491,42 @@ export async function getPublishedCourseByIdOrSlug(idOrSlug) {
     return null;
   }
 
-  /* ----------------------------------------------------------
-     TRY DOCUMENT ID
-  ---------------------------------------------------------- */
+  // Try as a UUID first
+  const { data: byId } = await supabase
+    .from(COURSES_TABLE)
+    .select("*")
+    .eq("id", idOrSlug)
+    .maybeSingle();
 
-  const directRef = doc(db, COURSES_COLLECTION, idOrSlug);
-
-  const directSnapshot = await getDoc(directRef);
-
-  if (directSnapshot.exists()) {
-    const course = directSnapshot.data();
-
-    if (course.status === COURSE_STATUS.PUBLISHED) {
-      return courseFromDoc(directSnapshot);
-    }
-
-    return null;
+  if (byId) {
+    return byId.status === COURSE_STATUS.PUBLISHED ? fromRow("courses", byId) : null;
   }
 
-  /* ----------------------------------------------------------
-     TRY SLUG
-  ---------------------------------------------------------- */
+  // Fall back to slug
+  const { data: bySlug } = await supabase
+    .from(COURSES_TABLE)
+    .select("*")
+    .eq("slug", idOrSlug)
+    .eq("status", COURSE_STATUS.PUBLISHED)
+    .maybeSingle();
 
-  const q = query(
-    collection(db, COURSES_COLLECTION),
-    where("slug", "==", idOrSlug),
-    where("status", "==", COURSE_STATUS.PUBLISHED)
-  );
-
-  const snapshot = await getDocs(q);
-
-  if (snapshot.empty) {
-    return null;
-  }
-
-  return courseFromDoc(snapshot.docs[0]);
+  return fromRow("courses", bySlug);
 }
 
-/* ============================================================
-   THUMBNAIL UPLOAD (Cloudinary)
-
-   Signature is unchanged from the old Firebase Storage version,
-   so CreateCourse.jsx and EditCourse.jsx don't need any edits:
-
-     const uploaded = await uploadCourseThumbnail(courseId, file, onProgress);
-     // uploaded.url  -> course.thumbnailUrl
-     // uploaded.path -> course.thumbnailPath (Cloudinary publicId)
-============================================================ */
+// Thumbnails are uploaded to the public Supabase image bucket.
 
 export async function uploadCourseThumbnail(courseId, file, onProgress) {
   if (!courseId) {
     throw new Error("Course ID is required.");
   }
 
-  requireAuthUser();
+  await requireAuthUser();
 
-  // validateImage() inside uploadImage() also checks type/size, but
-  // failing fast here avoids a network round trip for an obviously
-  // bad file.
   if (!file?.type?.startsWith("image/")) {
     throw new Error("Please upload a valid image file.");
   }
 
   const MAX_SIZE = 5 * 1024 * 1024;
-
   if (file.size > MAX_SIZE) {
     throw new Error("Thumbnail must be smaller than 5MB.");
   }
@@ -954,49 +536,18 @@ export async function uploadCourseThumbnail(courseId, file, onProgress) {
     onProgress,
   });
 
-  return {
-    url: result.url,
-    path: result.publicId,
-  };
+  return { url: result.url, path: result.publicId };
 }
 
-/* ============================================================
-   DELETE THUMBNAIL
+// Remove the previous thumbnail after replacement.
 
-   Kept as a no-op-safe client stub. Cloudinary deletion needs
-   the API secret, which must never live in this bundle — actual
-   deletion happens in the onCourseDeleted / onCourseImageReplaced
-   Cloud Functions (functions/cloudinaryCleanup.js), triggered
-   automatically whenever thumbnailPath changes or the course
-   document is deleted. There is deliberately nothing to call here.
-============================================================ */
-
-export async function deleteCourseThumbnail() {
-  return;
+export async function deleteCourseThumbnail(path) {
+  if (path) await deleteObject(ref(null, path));
 }
 
-/* ============================================================
-   SAFE STORAGE DELETE (Firebase Storage only — banners, preview
-   videos, lesson videos/resources. NOT used for thumbnails.)
-============================================================ */
+// Private and public storage paths are routed to their bucket.
 
 async function safeDeleteStorageFile(path) {
-  if (!path) {
-    return;
-  }
-
-  try {
-    const storageRef = ref(storage, path);
-
-    await deleteObject(storageRef);
-  } catch (error) {
-    /*
-      File may already be deleted.
-      Do not stop course deletion.
-    */
-
-    if (error?.code !== "storage/object-not-found") {
-      console.warn("Storage cleanup failed:", path, error);
-    }
-  }
+  if (!path) return;
+  await deleteObject(ref(null, path));
 }

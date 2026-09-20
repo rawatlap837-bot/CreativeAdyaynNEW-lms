@@ -30,14 +30,14 @@ import {
   query,
   serverTimestamp,
   updateDoc,
-} from "firebase/firestore";
+} from "../lib/database";
 
 import {
   deleteObject,
   ref,
-} from "firebase/storage";
+} from "../lib/storage";
 
-import { auth, db, storage } from "../firebase/Firebase";
+import { auth, db, storage } from "../lib/backend";
 
 const STATUS = {
   DRAFT: "draft",
@@ -228,7 +228,6 @@ export default function CourseContent() {
   };
 
   const isLocked =
-    course?.status === STATUS.PENDING ||
     course?.status === STATUS.ARCHIVED;
 
   const isPublished =
@@ -921,7 +920,7 @@ export default function CourseContent() {
     }
 
     const confirmed = window.confirm(
-      "Submit this course for admin approval? You will not be able to edit it while it is pending."
+      "Publish this course? It will become visible to students."
     );
 
     if (!confirmed) return;
@@ -933,30 +932,31 @@ export default function CourseContent() {
       await updateDoc(
         doc(db, "courses", courseId),
         {
-          status: STATUS.PENDING,
+          status: STATUS.PUBLISHED,
           rejectionReason: null,
           updatedAt: serverTimestamp(),
+          publishedAt: serverTimestamp(),
         }
       );
 
       setCourse((previous) => ({
         ...previous,
-        status: STATUS.PENDING,
+        status: STATUS.PUBLISHED,
         rejectionReason: null,
       }));
 
       setSuccess(
-        "Course submitted successfully for admin approval."
+        "Course published successfully!"
       );
     } catch (err) {
       console.error(
-        "Submit course error:",
+        "Publish course error:",
         err
       );
 
       setError(
         err?.message ||
-        "Unable to submit the course."
+        "Unable to publish the course."
       );
     } finally {
       setSubmitting(false);
@@ -1071,16 +1071,14 @@ export default function CourseContent() {
               </button>
 
               {!isLocked &&
-                (course.status === STATUS.DRAFT ||
-                  course.status ===
-                  STATUS.REJECTED) && (
+                course.status === STATUS.DRAFT && (
                   <button
                     type="button"
                     onClick={submitCourse}
                     disabled={
                       saving || submitting
                     }
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 sm:w-auto"
                   >
                     {submitting ? (
                       <Loader2
@@ -1092,8 +1090,8 @@ export default function CourseContent() {
                     )}
 
                     {submitting
-                      ? "Submitting..."
-                      : "Submit for Approval"}
+                      ? "Publishing..."
+                      : "Publish Course"}
                   </button>
                 )}
             </div>
@@ -1122,28 +1120,6 @@ export default function CourseContent() {
             </div>
           )}
 
-        {/* PENDING */}
-        {course.status === STATUS.PENDING && (
-          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
-            <div className="flex gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-                <Send size={18} />
-              </div>
-
-              <div>
-                <h2 className="font-semibold text-amber-900">
-                  Waiting for Admin Approval
-                </h2>
-
-                <p className="mt-1 text-sm leading-6 text-amber-700">
-                  Your course has been submitted for
-                  review. Editing is locked until the
-                  administrator makes a decision.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* PUBLISHED */}
         {isPublished && (
@@ -2002,11 +1978,6 @@ function StatusBadge({ status }) {
         "bg-slate-100 text-slate-700",
     },
 
-    pending: {
-      label: "Pending Approval",
-      className:
-        "bg-amber-100 text-amber-700",
-    },
 
     published: {
       label: "Published",

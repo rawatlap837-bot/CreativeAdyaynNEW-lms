@@ -1,8 +1,8 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { signOut } from "firebase/auth";
-import { collection, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../firebase/Firebase";
+import { signOut } from "../lib/auth";
+import { collection, onSnapshot } from "../lib/database";
+import { auth, db } from "../lib/backend";
 
 import {
   getAdminActivityNotifications,

@@ -12,10 +12,10 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "../lib/auth";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { auth } from "../firebase/Firebase";
+import { auth } from "../lib/backend";
 import { getMyCourses } from "../services/CourseService";
 import {
   addStudentToBatch,

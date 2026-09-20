@@ -1,28 +1,27 @@
+import { supabase } from "../lib/supabase";
+import { fromRow } from "../lib/records";
 import {
   addDoc,
-  arrayRemove,
-  arrayUnion,
   collection,
   deleteDoc,
   doc,
   getDoc,
   getDocs,
   query,
-  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
   where,
-} from "firebase/firestore";
+} from "../lib/database";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 /* =========================================================
    COLLECTIONS
 ========================================================= */
 
 const BATCHES_COLLECTION = "batches";
-const ATTENDANCE_COLLECTION = "attendance";
+const ATTENDANCE_COLLECTION = "batch_attendance";
 const ENROLLMENTS_COLLECTION = "enrollments";
 const STUDENTS_COLLECTION = "students";
 const USERS_COLLECTION = "users";
@@ -561,202 +560,17 @@ export async function getEligibleStudents(courseId, batchId) {
    8. ADD STUDENT TO BATCH
 ========================================================= */
 
-export async function addStudentToBatch(batchId, studentUid) {
+async function changeBatchStudent(action, batchId, studentUid, destinationId = null) {
   requireUser();
-
-  if (!batchId) {
-    throw new Error("Batch ID is required.");
-  }
-
-  if (!studentUid) {
-    throw new Error("Student ID is required.");
-  }
-
-  const batchRef = doc(db, BATCHES_COLLECTION, batchId);
-
-  const result = await runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(batchRef);
-
-    if (!snapshot.exists()) {
-      throw new Error("Batch not found.");
-    }
-
-    const data = snapshot.data();
-    const studentIds = normalizeStudentIds(data.studentIds);
-    const enrollmentRef = doc(
-      db,
-      ENROLLMENTS_COLLECTION,
-      `${studentUid}_${data.courseId}`
-    );
-    const enrollmentSnapshot = await transaction.get(enrollmentRef);
-
-    if (studentIds.includes(studentUid)) {
-      throw new Error("This student is already in the batch.");
-    }
-
-    if (
-      !enrollmentSnapshot.exists() ||
-      enrollmentSnapshot.data().status !== "active" ||
-      (enrollmentSnapshot.data().uid || enrollmentSnapshot.data().studentId) !==
-      studentUid
-    ) {
-      throw new Error("Only actively enrolled students can join this batch.");
-    }
-
-    if (!ALLOWED_STATUSES.includes(data.status || "active")) {
-      throw new Error("This batch cannot be updated.");
-    }
-
-    transaction.update(batchRef, {
-      studentIds: arrayUnion(studentUid),
-      studentCount: studentIds.length + 1,
-    });
-
-    return {
-      id: batchId,
-      ...data,
-      studentIds: [...studentIds, studentUid],
-      studentCount: studentIds.length + 1,
-    };
+  const { data, error } = await supabase.rpc("lms_manage_batch_student", {
+    action, batch: batchId, student: studentUid, destination: destinationId,
   });
-
-  return result;
+  if (error) throw error;
+  return fromRow("batches", data);
 }
-
-/* =========================================================
-   9. REMOVE STUDENT FROM BATCH
-========================================================= */
-
-export async function removeStudentFromBatch(batchId, studentUid) {
-  requireUser();
-
-  if (!batchId) {
-    throw new Error("Batch ID is required.");
-  }
-
-  if (!studentUid) {
-    throw new Error("Student ID is required.");
-  }
-
-  const batchRef = doc(db, BATCHES_COLLECTION, batchId);
-
-  const result = await runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(batchRef);
-
-    if (!snapshot.exists()) {
-      throw new Error("Batch not found.");
-    }
-
-    const data = snapshot.data();
-    const studentIds = normalizeStudentIds(data.studentIds);
-
-    if (!studentIds.includes(studentUid)) {
-      throw new Error("This student is not in the batch.");
-    }
-
-    const nextCount = Math.max(0, studentIds.length - 1);
-
-    transaction.update(batchRef, {
-      studentIds: arrayRemove(studentUid),
-      studentCount: nextCount,
-    });
-
-    return {
-      id: batchId,
-      ...data,
-      studentIds: studentIds.filter((id) => id !== studentUid),
-      studentCount: nextCount,
-    };
-  });
-
-  return result;
-}
-
-/* =========================================================
-   10. SHIFT STUDENT BETWEEN BATCHES
-========================================================= */
-
-export async function shiftStudentBatch(
-  oldBatchId,
-  newBatchId,
-  studentUid
-) {
-  requireUser();
-
-  if (!oldBatchId || !newBatchId) {
-    throw new Error("Both batch IDs are required.");
-  }
-
-  if (oldBatchId === newBatchId) {
-    throw new Error("Choose a different batch to shift the student.");
-  }
-
-  if (!studentUid) {
-    throw new Error("Student ID is required.");
-  }
-
-  const oldBatchRef = doc(db, BATCHES_COLLECTION, oldBatchId);
-  const newBatchRef = doc(db, BATCHES_COLLECTION, newBatchId);
-
-  const result = await runTransaction(db, async (transaction) => {
-    const oldSnapshot = await transaction.get(oldBatchRef);
-    const newSnapshot = await transaction.get(newBatchRef);
-
-    if (!oldSnapshot.exists()) {
-      throw new Error("Current batch not found.");
-    }
-
-    if (!newSnapshot.exists()) {
-      throw new Error("Destination batch not found.");
-    }
-
-    const oldData = oldSnapshot.data();
-    const newData = newSnapshot.data();
-
-    if (oldData.courseId !== newData.courseId) {
-      throw new Error(
-        "Students can only be shifted between batches of the same course."
-      );
-    }
-
-    const oldIds = normalizeStudentIds(oldData.studentIds);
-    const newIds = normalizeStudentIds(newData.studentIds);
-
-    if (!oldIds.includes(studentUid)) {
-      throw new Error("This student is not in the current batch.");
-    }
-
-    if (newIds.includes(studentUid)) {
-      throw new Error("This student is already in the destination batch.");
-    }
-
-    if (oldData.status !== "active" || newData.status !== "active") {
-      throw new Error("Students can only be shifted between active batches.");
-    }
-
-    transaction.update(oldBatchRef, {
-      studentIds: arrayRemove(studentUid),
-      studentCount: Math.max(0, oldIds.length - 1),
-    });
-
-    transaction.update(newBatchRef, {
-      studentIds: arrayUnion(studentUid),
-      studentCount: newIds.length + 1,
-    });
-
-    return {
-      oldBatchId,
-      newBatchId,
-      studentUid,
-    };
-  });
-
-  return result;
-}
-
-/* =========================================================
-   11. MARK ATTENDANCE
-========================================================= */
+export const addStudentToBatch = (batchId, studentUid) => changeBatchStudent("add", batchId, studentUid);
+export const removeStudentFromBatch = (batchId, studentUid) => changeBatchStudent("remove", batchId, studentUid);
+export const shiftStudentBatch = (oldBatchId, newBatchId, studentUid) => changeBatchStudent("shift", oldBatchId, studentUid, newBatchId);
 
 export async function markAttendance(
   batchId,

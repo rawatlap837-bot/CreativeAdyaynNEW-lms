@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase/Firebase";
+import { collection, onSnapshot } from "../lib/database";
+import { db } from "../lib/backend";
 
 import {
   AlertCircle,

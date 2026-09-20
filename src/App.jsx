@@ -27,6 +27,8 @@ import Contact from "./pages/Contact.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
+import AuthCallback from "./pages/AuthCallback.jsx";
 
 /* ============================================================
    AUTH GUARDS
@@ -228,6 +230,7 @@ function App() {
     <Suspense fallback={<LoadingScreen />}>
 
       <Routes>
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* ======================================================
             PUBLIC WEBSITE + STUDENT AREA
@@ -279,6 +282,13 @@ function App() {
           <Route
             path="/forgot-password"
             element={<ForgotPassword />}
+          />
+
+          {/* Google OAuth redirect lands here */}
+
+          <Route
+            path="/auth/callback"
+            element={<AuthCallback />}
           />
 
           {/* ==================================================

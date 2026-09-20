@@ -9,9 +9,9 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
-} from "firebase/firestore";
+} from "../lib/database";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 const ATTENDANCE_COLLECTION = "attendance";
 const ATTENDANCE_SESSIONS_COLLECTION = "attendanceSessions";

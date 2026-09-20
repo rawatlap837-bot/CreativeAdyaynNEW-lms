@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import CALogo from "../assets/Images/CA.png";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "../firebase/Firebase";
+import { onAuthStateChanged, signOut } from "../lib/auth";
+import { auth } from "../lib/backend";
 import { COURSE_TYPES, usePublishedCourses } from "../services/CourseService";
 import {
   Menu,

@@ -11,9 +11,9 @@ import {
     where,
     orderBy,
     serverTimestamp,
-} from "firebase/firestore";
+} from "../lib/database";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 // ============================================================
 // ASSIGNMENT SERVICE

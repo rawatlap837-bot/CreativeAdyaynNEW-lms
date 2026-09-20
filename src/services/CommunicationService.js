@@ -11,9 +11,9 @@ import {
   setDoc,
   updateDoc,
   where,
-} from "firebase/firestore";
+} from "../lib/database";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 /* ============================================================
    COLLECTIONS
@@ -2019,43 +2019,6 @@ export async function createDiscussionReply(
     replyRef,
     reply
   );
-
-  /* ----------------------------------------------------------
-     UPDATE REPLY COUNT
-  ---------------------------------------------------------- */
-
-  const discussionRef =
-    doc(
-      db,
-      COMMUNICATION_COLLECTIONS.DISCUSSIONS,
-      discussionId
-    );
-
-  const discussionSnapshot =
-    await getDoc(
-      discussionRef
-    );
-
-  if (
-    discussionSnapshot.exists()
-  ) {
-    const currentCount =
-      Number(
-        discussionSnapshot.data()
-          ?.replyCount || 0
-      );
-
-    await updateDoc(
-      discussionRef,
-      {
-        replyCount:
-          currentCount + 1,
-
-        updatedAt:
-          serverTimestamp(),
-      }
-    );
-  }
 
   return {
     id:

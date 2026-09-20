@@ -1,3 +1,5 @@
+import { supabase } from "../lib/supabase";
+import { fromRow } from "../lib/records";
 import {
   collection,
   doc,
@@ -8,9 +10,9 @@ import {
   setDoc,
   updateDoc,
   serverTimestamp,
-} from "firebase/firestore";
+} from "../lib/database";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 
 /* =========================================================
    COLLECTION
@@ -139,203 +141,24 @@ export async function getEnrollment(
    ENROLL STUDENT
 ========================================================= */
 
-export async function enrollStudent({
-  courseId,
-  paymentStatus = "free",
-  paymentId = "",
-}) {
-  const user = requireUser();
-
-  if (!courseId) {
-    throw new Error("Course ID is required.");
-  }
-
-  const enrollmentId = getEnrollmentId(
-    user.uid,
-    courseId
-  );
-
-  const enrollmentRef = doc(
-    db,
-    ENROLLMENTS_COLLECTION,
-    enrollmentId
-  );
-
-  /*
-    Check if already enrolled.
-  */
-
-  const existingSnapshot =
-    await getDoc(enrollmentRef);
-
-  if (existingSnapshot.exists()) {
-    return {
-      id: existingSnapshot.id,
-      ...existingSnapshot.data(),
-    };
-  }
-
-  const isFree = paymentStatus === "free";
-  const isPaid = paymentStatus === "paid";
-
-  if (!isFree && !isPaid) {
-    throw new Error("Invalid payment status.");
-  }
-
-  if (isPaid && !paymentId) {
-    throw new Error("Payment ID is required for a paid enrollment.");
-  }
-
-  /*
-    Firebase-only flow:
-    Razorpay Checkout has returned a payment ID before this function
-    is called, so both free and paid enrollments are unlocked here.
-
-    Important: this is intentionally client-side and therefore cannot
-    verify a Razorpay signature. Add server-side verification before
-    using this as the final production payment flow.
-  */
-
-  const enrollment = {
-    uid: user.uid,
-    studentId: user.uid,
-
-    courseId,
-
-    status: "active",
-
-    paymentStatus: isFree ? "free" : "paid",
-
-    paymentId: paymentId || "",
-
-    progress: 0,
-
-    completedLessons: [],
-
-    lastLessonId: "",
-
-    enrolledAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    lastAccessedAt: serverTimestamp(),
-  };
-
-  await setDoc(
-    enrollmentRef,
-    enrollment
-  );
-
-  return {
-    id: enrollmentId,
-    ...enrollment,
-  };
+export async function enrollStudent({ courseId, paymentStatus = "free" }) {
+  requireUser();
+  if (!courseId) throw new Error("Course ID is required.");
+  if (paymentStatus !== "free") throw new Error("Paid enrollment must be verified by the payment server.");
+  const { data, error } = await supabase.rpc("lms_enroll_free", { course: courseId });
+  if (error) throw error;
+  return fromRow("enrollments", data);
 }
 
 /* =========================================================
    MARK LESSON COMPLETE
 ========================================================= */
 
-export async function markLessonComplete(
-  enrollmentId,
-  lessonId,
-  totalLessons
-) {
-  const user = requireUser();
-
-  if (!enrollmentId) {
-    throw new Error(
-      "Enrollment ID is required."
-    );
-  }
-
-  if (!lessonId) {
-    throw new Error(
-      "Lesson ID is required."
-    );
-  }
-
-  const enrollmentRef = doc(
-    db,
-    ENROLLMENTS_COLLECTION,
-    enrollmentId
-  );
-
-  const snapshot =
-    await getDoc(enrollmentRef);
-
-  if (!snapshot.exists()) {
-    throw new Error(
-      "Enrollment not found."
-    );
-  }
-
-  const enrollment =
-    snapshot.data();
-
-  /*
-    Security check
-  */
-
-  if (enrollment.uid !== user.uid) {
-    throw new Error(
-      "You cannot update this enrollment."
-    );
-  }
-
-  if (enrollment.status !== "active") {
-    throw new Error(
-      "Your enrollment is not active."
-    );
-  }
-
-  const completedLessons =
-    Array.isArray(
-      enrollment.completedLessons
-    )
-      ? [...enrollment.completedLessons]
-      : [];
-
-  /*
-    Don't add the same lesson twice.
-  */
-
-  if (
-    !completedLessons.includes(lessonId)
-  ) {
-    completedLessons.push(lessonId);
-  }
-
-  const total =
-    Math.max(
-      Number(totalLessons) || 0,
-      1
-    );
-
-  const progress = Math.min(
-    100,
-    Math.round(
-      (completedLessons.length /
-        total) *
-        100
-    )
-  );
-
-  await updateDoc(
-    enrollmentRef,
-    {
-      completedLessons,
-      progress,
-      lastLessonId: lessonId,
-      lastAccessedAt:
-        serverTimestamp(),
-      updatedAt:
-        serverTimestamp(),
-    }
-  );
-
-  return {
-    progress,
-    completedLessons,
-  };
+export async function markLessonComplete(enrollmentId, lessonId) {
+  requireUser();
+  const { data, error } = await supabase.rpc("lms_complete_lesson", { enrollment: enrollmentId, lesson: lessonId });
+  if (error) throw error;
+  return fromRow("enrollments", data);
 }
 
 /* =========================================================

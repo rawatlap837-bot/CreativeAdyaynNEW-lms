@@ -19,9 +19,9 @@ import {
   updateDoc,
   doc,
   serverTimestamp,
-} from "firebase/firestore";
+} from "../lib/database";
 
-import { auth, db } from "../firebase/Firebase.js";
+import { auth, db } from "../lib/backend";
 
 import {
   AT,

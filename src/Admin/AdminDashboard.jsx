@@ -27,9 +27,9 @@ import {
 import {
   collection,
   onSnapshot,
-} from "firebase/firestore";
+} from "../lib/database";
 
-import { db } from "../firebase/Firebase.js";
+import { db } from "../lib/backend";
 
 import {
   AT,

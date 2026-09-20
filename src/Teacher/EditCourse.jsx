@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 
-import { auth, storage } from "../firebase/Firebase";
+import { auth, storage } from "../lib/backend";
 import {
   getCourseById,
   updateCourse,
@@ -224,7 +224,7 @@ export default function EditCourse() {
 
     if (isLocked) {
       setError(
-        "This course cannot be edited while it is pending approval or archived."
+        "This course cannot be edited while it is archived."
       );
 
       return;

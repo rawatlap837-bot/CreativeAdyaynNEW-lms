@@ -4,8 +4,8 @@ import {
   getDocs,
   query,
   where,
-} from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+} from "../lib/database";
+import { onAuthStateChanged } from "../lib/auth";
 import {
   CheckCircle2,
   Clock3,
@@ -18,7 +18,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 import { getCourseAttendance } from "../services/AttendanceService";
 
 /* ============================================================

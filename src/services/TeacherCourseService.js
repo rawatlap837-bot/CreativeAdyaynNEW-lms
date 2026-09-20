@@ -26,9 +26,9 @@ import {
   serverTimestamp,
   updateDoc,
   where,
-} from "firebase/firestore";
+} from "../lib/database";
 import { useEffect, useState } from "react";
-import { auth, db } from "../firebase/Firebase";
+import { auth, db } from "../lib/backend";
 import {
   COURSES_COLLECTION,
   COURSE_STATUS,
@@ -146,14 +146,14 @@ export async function createCourse(form) {
     instructor: form.instructor || user.displayName || DEFAULT_INSTRUCTOR,
     instructorId: user.uid,
     icon: form.icon || iconForCategory(form.category),
-    price: form.price || DEFAULT_PRICE,
-    discountPrice: form.discountPrice || "",
+    price: Number(form.price) || 0,
+    discountPrice: Number(form.discountPrice) || 0,
     currency: form.currency || "INR",
     lessons: form.lessons ? Number(form.lessons) : 0,
     students: 0,
     status: COURSE_STATUS.DRAFT,
     featured: false,
-    order: 999999,
+    order: 0,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -223,8 +223,8 @@ export async function updateCourse(courseId, form) {
     tags: splitCommas(form.tagsInput || ""),
     instructor: form.instructor || existing.instructor,
     icon: form.icon || iconForCategory(form.category),
-    price: form.price || DEFAULT_PRICE,
-    discountPrice: form.discountPrice || "",
+    price: Number(form.price) || 0,
+    discountPrice: Number(form.discountPrice) || 0,
     currency: form.currency || existing.currency || "INR",
     lessons: form.lessons ? Number(form.lessons) : existing.lessons,
     updatedAt: serverTimestamp(),

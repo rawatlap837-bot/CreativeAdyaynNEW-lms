@@ -1,6 +1,6 @@
 // src/components/CourseImageUpload.jsx
 import { useRef, useState, useEffect } from "react";
-import { uploadImage, imageUrl, COURSE_COVER, validateImage } from "../lib/Cloudinary";
+import { uploadImage, imageUrl, COURSE_COVER, validateImage } from "../lib/Media";
 
 /**
  * Cover image picker for the course form.

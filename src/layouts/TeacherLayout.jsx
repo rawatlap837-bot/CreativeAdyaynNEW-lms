@@ -22,8 +22,8 @@ import {
 } from "lucide-react";
 
 import { useEffect, useRef, useState } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "../firebase/Firebase";
+import { onAuthStateChanged, signOut } from "../lib/auth";
+import { auth } from "../lib/backend";
 import CA2Logo from "../assets/Images/CA.png";
 import {
   getTeacherActivityNotifications,

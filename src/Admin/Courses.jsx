@@ -21,7 +21,7 @@ import {
 import {
   collection,
   getDocs,
-} from "firebase/firestore";
+} from "../lib/database";
 
 import {
   AT,
@@ -44,7 +44,7 @@ import {
   subscribeToAllCourses,
 } from "../services/AdminCourseService";
 
-import { db } from "../firebase/Firebase";
+import { db } from "../lib/backend";
 
 // ============================================================
 // HELPERS

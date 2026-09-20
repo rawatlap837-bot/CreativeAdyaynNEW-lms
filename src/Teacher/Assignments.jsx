@@ -34,9 +34,9 @@ import {
     gradeSubmission,
 } from "../services/AssignmentService.js";
 
-import { auth } from "../firebase/Firebase.js";
+import { auth } from "../lib/backend";
 import { getBatchesForTeacher } from "../services/BatchService.js";
-import { uploadAssignmentResource } from "../lib/Cloudinary.js";
+import { uploadAssignmentResource } from "../lib/Media.js";
 
 
 /* ============================================================

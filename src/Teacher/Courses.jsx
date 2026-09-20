@@ -5,13 +5,11 @@ import {
   Archive,
   BookOpen,
   CheckCircle2,
-  Clock3,
   Edit3,
   Eye,
   FileText,
   Plus,
   Search,
-  Send,
   Trash2,
   Video,
   XCircle,
@@ -20,7 +18,6 @@ import { useNavigate } from "react-router-dom";
 
 import {
   deleteCourse,
-  submitForApproval,
   useMyCourses,
 } from "../services/CourseService";
 
@@ -99,12 +96,6 @@ function getStatusConfig(status) {
       icon: FileText,
     },
 
-    pending: {
-      label: "Pending Approval",
-      className:
-        "bg-amber-50 text-amber-700",
-      icon: Clock3,
-    },
 
     published: {
       label: "Published",
@@ -241,9 +232,6 @@ export default function TeacherCourses() {
   const [deletingId, setDeletingId] =
     useState(null);
 
-  const [submittingId, setSubmittingId] =
-    useState(null);
-
   const [actionError, setActionError] =
     useState("");
 
@@ -332,12 +320,6 @@ export default function TeacherCourses() {
           "draft"
       ).length,
 
-      pending: courses.filter(
-        (course) =>
-          course.status ===
-          "pending"
-      ).length,
-
       published: courses.filter(
         (course) =>
           course.status ===
@@ -391,43 +373,6 @@ export default function TeacherCourses() {
   }
 
 
-  // ==========================================================
-  // SUBMIT FOR APPROVAL
-  // ==========================================================
-
-  async function handleSubmit(
-    course
-  ) {
-    const confirmed =
-      window.confirm(
-        `Submit "${course.title}" for admin approval?`
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setSubmittingId(course.id);
-    setActionError("");
-
-    try {
-      await submitForApproval(
-        course.id
-      );
-    } catch (err) {
-      console.error(
-        "Submit course:",
-        err
-      );
-
-      setActionError(
-        err?.message ||
-        "Unable to submit course."
-      );
-    } finally {
-      setSubmittingId(null);
-    }
-  }
 
 
   // ==========================================================
@@ -499,7 +444,7 @@ export default function TeacherCourses() {
             </h1>
 
             <p className="text-sm text-slate-500 mt-1">
-              Create, manage and submit your courses for approval.
+              Create, manage and publish your courses.
             </p>
           </div>
 
@@ -542,7 +487,7 @@ export default function TeacherCourses() {
             QUICK STATS
         ================================================== */}
 
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
 
           <MiniStat
             label="All Courses"
@@ -568,20 +513,6 @@ export default function TeacherCourses() {
             onClick={() =>
               setStatusFilter(
                 "draft"
-              )
-            }
-          />
-
-          <MiniStat
-            label="Pending"
-            value={counts.pending}
-            active={
-              statusFilter ===
-              "pending"
-            }
-            onClick={() =>
-              setStatusFilter(
-                "pending"
               )
             }
           />
@@ -690,9 +621,6 @@ export default function TeacherCourses() {
                 Draft
               </option>
 
-              <option value="pending">
-                Pending Approval
-              </option>
 
               <option value="published">
                 Published
@@ -742,10 +670,6 @@ export default function TeacherCourses() {
                     deletingId ===
                     course.id
                   }
-                  submitting={
-                    submittingId ===
-                    course.id
-                  }
                   onEdit={
                     handleEdit
                   }
@@ -757,9 +681,6 @@ export default function TeacherCourses() {
                   }
                   onDelete={
                     handleDelete
-                  }
-                  onSubmit={
-                    handleSubmit
                   }
                 />
               )
@@ -815,12 +736,10 @@ function MiniStat({
 function CourseRow({
   course,
   deleting,
-  submitting,
   onEdit,
   onContent,
   onView,
   onDelete,
-  onSubmit,
 }) {
   const status =
     getStatusConfig(
@@ -830,12 +749,6 @@ function CourseRow({
   const canEdit =
     course.status !==
     "published";
-
-  const canSubmit =
-    course.status ===
-    "draft" ||
-    course.status ===
-    "rejected";
 
   const canDelete =
     course.status !==
@@ -1045,30 +958,6 @@ function CourseRow({
               )}
 
 
-            {/* Submit */}
-
-            {canSubmit && (
-              <button
-                type="button"
-                disabled={
-                  submitting
-                }
-                onClick={() =>
-                  onSubmit(
-                    course
-                  )
-                }
-                className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-2 text-xs font-medium hover:bg-emerald-100 disabled:opacity-50 transition"
-              >
-                <Send
-                  size={14}
-                />
-
-                {submitting
-                  ? "Submitting..."
-                  : "Submit for Approval"}
-              </button>
-            )}
 
 
             {/* Delete */}
