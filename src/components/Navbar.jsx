@@ -3,6 +3,7 @@ import CALogo from "../assets/Images/CA.png";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "../lib/auth";
 import { auth } from "../lib/backend";
+import { supabase } from "../lib/supabase";
 import { COURSE_TYPES, usePublishedCourses } from "../services/CourseService";
 import {
   Menu,
@@ -101,6 +102,7 @@ export default function Navbar() {
   // undefined = still resolving Supabase's auth state (avoids a Login-button
   // flash for users who are actually signed in); null = signed out.
   const [user, setUser] = useState(undefined);
+  const [accountRole, setAccountRole] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
   const coursesRef = useRef(null);
@@ -108,7 +110,20 @@ export default function Navbar() {
   const mobileMenuRef = useRef(null);
   const mobileToggleRef = useRef(null);
 
-  useEffect(() => onAuthStateChanged(auth, setUser), []);
+  useEffect(() => onAuthStateChanged(auth, async (nextUser) => {
+    setUser(nextUser);
+    if (!nextUser) {
+      setAccountRole("");
+      return;
+    }
+
+    const { data } = await supabase
+      .from("lms_profiles")
+      .select("role")
+      .eq("id", nextUser.uid)
+      .maybeSingle();
+    setAccountRole(String(data?.role || "student").toLowerCase());
+  }), []);
 
   // Logo + "Home" both use this. If we're already on the homepage,
   // clicking either wouldn't otherwise do anything — navigating to the
@@ -165,6 +180,17 @@ export default function Navbar() {
   }, [courseCategories]);
 
   const isLoggedIn = Boolean(user);
+  const panelRoute = accountRole === "admin"
+    ? "/admin"
+    : accountRole === "teacher"
+      ? "/teacher/courses"
+      : "/dashboard";
+  const panelLabel = accountRole === "admin"
+    ? "Admin Panel"
+    : accountRole === "teacher"
+      ? "Teacher Panel"
+      : "Dashboard";
+  const studentAccount = accountRole === "student";
 
   const handleLogout = async () => {
     setAccountOpen(false);
@@ -335,7 +361,7 @@ export default function Navbar() {
                   style={{ background: CANVAS, borderRadius: 24 }}
                 >
                   <div className="px-3 py-2.5">
-                    <p className="truncate text-sm font-semibold text-[#1B0E3D]">{user?.displayName || "Student"}</p>
+                    <p className="truncate text-sm font-semibold text-[#1B0E3D]">{user?.displayName || "Account"}</p>
                     <p className="truncate text-xs text-slate-500">{user?.email || ""}</p>
                   </div>
                   <button
@@ -343,14 +369,14 @@ export default function Navbar() {
                     role="menuitem"
                     onClick={() => {
                       setAccountOpen(false);
-                      navigate("/dashboard");
+                      navigate(panelRoute);
                     }}
                     className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-[#1B0E3D] transition-all hover:bg-white/60"
                   >
                     <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
+                    {panelLabel}
                   </button>
-                  <button
+                  {studentAccount && <button
                     type="button"
                     role="menuitem"
                     onClick={() => {
@@ -361,7 +387,7 @@ export default function Navbar() {
                   >
                     <UserCircle className="h-4 w-4" />
                     Profile
-                  </button>
+                  </button>}
                   <button
                     type="button"
                     role="menuitem"
@@ -523,7 +549,7 @@ export default function Navbar() {
                     type="button"
                     onClick={() => {
                       setMobileOpen(false);
-                      navigate("/dashboard");
+                      navigate(panelRoute);
                     }}
                     onMouseEnter={(e) =>
                       Object.assign(e.currentTarget.style, {
@@ -543,10 +569,10 @@ export default function Navbar() {
                     }}
                   >
                     <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
+                    {panelLabel}
                   </button>
 
-                  <button
+                  {studentAccount && <button
                     type="button"
                     onClick={() => {
                       setMobileOpen(false);
@@ -557,7 +583,7 @@ export default function Navbar() {
                   >
                     <UserCircle className="h-4 w-4" />
                     Profile
-                  </button>
+                  </button>}
 
                   <button
                     type="button"

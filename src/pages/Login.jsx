@@ -55,27 +55,24 @@ function scrollToTop() {
 }
 
 // Looks up the signed-in user's role and returns the route they should
-// land on. Fails safe: any missing row, missing field, or read error
-// resolves to the student dashboard, never the admin one.
+// land on. A missing or unavailable role must never temporarily route an
+// administrator into the student area.
 async function resolvePostLoginRoute(userId) {
-  try {
-    const { data, error } = await supabase
-      .from("lms_profiles")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle();
+  const { data, error } = await supabase
+    .from("lms_profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
 
-    if (error || !data) {
-      return "/dashboard";
-    }
-
-    if (data.role === "admin") return "/admin";
-    if (data.role === "teacher") return "/teacher/courses";
-    return "/dashboard";
-  } catch (error) {
-    console.error("Failed to resolve user role:", error);
-    return "/dashboard";
+  if (error || !data?.role) {
+    throw new Error("We could not load your account role. Please try again.");
   }
+
+  const role = String(data.role).toLowerCase();
+  if (role === "admin") return "/admin";
+  if (role === "teacher") return "/teacher/courses";
+  if (role === "student") return "/dashboard";
+  throw new Error("Your account role is not supported. Please contact the institute.");
 }
 
 export default function LoginForm() {
@@ -97,7 +94,9 @@ export default function LoginForm() {
     supabase.auth.getSession().then(({ data }) => {
       const user = data.session?.user;
       if (user && !suppressAutoRedirect.current) {
-        resolvePostLoginRoute(user.id).then((dest) => navigate(dest, { replace: true }));
+        resolvePostLoginRoute(user.id)
+          .then((dest) => navigate(dest, { replace: true }))
+          .catch((error) => setErrorMsg(error.message));
       }
     });
   }, [navigate]);

@@ -510,7 +510,7 @@ export default function MyCourses() {
   ========================================================= */
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="student-ui min-h-screen bg-gray-50 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
 
       <div className="mx-auto max-w-7xl">
 

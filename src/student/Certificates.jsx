@@ -109,7 +109,7 @@ export default function Certificates() {
   const loading = certsLoading || progressLoading || purchasedLoading;
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="student-ui mx-auto max-w-5xl">
       <motion.div variants={fadeUp} initial="hidden" animate="show" custom={0} className="mb-6">
         <h2 className="text-2xl font-black tracking-tight text-[#1B0E3D]">Certificates</h2>
         <p className="mt-1 text-sm text-[#6b5f87]">

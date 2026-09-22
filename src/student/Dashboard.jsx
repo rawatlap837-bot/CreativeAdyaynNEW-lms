@@ -16,6 +16,7 @@ import {
   limit,
   onSnapshot,
   doc,
+  addDoc,
   updateDoc,
   deleteDoc,
   Timestamp,
@@ -26,7 +27,6 @@ import usePresence from "../hooks/usePresence";
 
 import {
   Plus,
-  Video,
   CalendarClock,
   Bell,
   X,
@@ -34,11 +34,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Crown,
   ArrowUpRight,
-  Play,
-  RotateCcw,
-  MapPin,
   LayoutGrid,
   Award,
   BookOpen,
@@ -61,6 +57,10 @@ import {
 import {
   getMyEnrollments,
 } from "../services/EnrollmentService";
+
+import {
+  getMyAssignments,
+} from "../services/AssignmentService";
 
 /* =========================================================
    DESIGN
@@ -117,12 +117,6 @@ const QUICK_ACTIONS = [
     caption: "Plan this week's sessions",
     icon: CalendarClock,
     to: "#schedule",
-  },
-  {
-    label: "Live sessions",
-    caption: "Join your next live class",
-    icon: Video,
-    to: "#live",
   },
 ];
 
@@ -531,24 +525,11 @@ export default function Dashboard() {
     setScheduleError,
   ] = useState(false);
 
-  /* =======================================================
-     LIVE CLASS
-  ======================================================= */
-
-  const [
-    liveClass,
-    setLiveClass,
-  ] = useState(null);
-
-  const [
-    liveClassLoading,
-    setLiveClassLoading,
-  ] = useState(true);
-
-  const [
-    liveClassError,
-    setLiveClassError,
-  ] = useState(false);
+  const [plannerOpen, setPlannerOpen] = useState(false);
+  const [plannerTitle, setPlannerTitle] = useState("");
+  const [plannerDateTime, setPlannerDateTime] = useState("");
+  const [plannerSaving, setPlannerSaving] = useState(false);
+  const [plannerMessage, setPlannerMessage] = useState("");
 
   /* =======================================================
      ANNOUNCEMENTS
@@ -596,9 +577,6 @@ export default function Dashboard() {
   ] = useState(0);
 
   const scheduleSectionRef =
-    useRef(null);
-
-  const liveClassSectionRef =
     useRef(null);
 
   /* =======================================================
@@ -856,11 +834,11 @@ export default function Dashboard() {
   }, [uid]);
 
   /* =======================================================
-     TODAY'S TASKS
+     TODAY'S ASSIGNMENTS
   ======================================================= */
 
   useEffect(() => {
-    if (!uid) {
+    if (!uid || assignmentCourseIds.length === 0) {
       setTasks([]);
       setTasksLoading(false);
       setTasksError(false);
@@ -875,79 +853,45 @@ export default function Dashboard() {
       end,
     } = startEndOfToday();
 
-    const q = query(
-      collection(
-        db,
-        "tasks"
-      ),
-      where(
-        "uid",
-        "==",
-        uid
-      ),
-      where(
-        "date",
-        ">=",
-        Timestamp.fromDate(start)
-      ),
-      where(
-        "date",
-        "<=",
-        Timestamp.fromDate(end)
-      )
-    );
+    let cancelled = false;
 
-    const unsubscribe =
-      onSnapshot(
-        q,
-        (snapshot) => {
-          const items =
-            snapshot.docs.map(
-              (item) => {
-                const data =
-                  item.data();
+    const loadTodaysAssignments = async () => {
+      try {
+        const assignments = await getMyAssignments(assignmentCourseIds);
+        const items = assignments
+          .filter((assignment) => {
+            if (!assignment.dueDate) return false;
+            const dueDate = new Date(assignment.dueDate);
+            return !Number.isNaN(dueDate.getTime()) && dueDate >= start && dueDate <= end;
+          })
+          .map((assignment) => ({
+            id: assignment.id,
+            title: assignment.title || "Untitled assignment",
+            courseName: assignment.courseName || "Your course",
+            dueLabel: new Date(assignment.dueDate).toLocaleTimeString("en-IN", {
+              hour: "numeric",
+              minute: "2-digit",
+            }),
+          }));
 
-                return {
-                  id: item.id,
-
-                  title:
-                    data.title ||
-                    "Task",
-
-                  duration:
-                    data.duration ||
-                    "",
-
-                  progress:
-                    data.progress ??
-                    0,
-
-                  prevProgress:
-                    data.prevProgress ??
-                    data.progress ??
-                    0,
-                };
-              }
-            );
-
+        if (!cancelled) {
           setTasks(items);
-          setTasksLoading(false);
           setTasksError(false);
-        },
-        (error) => {
-          console.error(
-            "Tasks listener failed:",
-            error
-          );
-
+        }
+      } catch (error) {
+        console.error("Failed to load today's assignments:", error);
+        if (!cancelled) {
           setTasks([]);
-          setTasksLoading(false);
           setTasksError(true);
         }
-      );
+      } finally {
+        if (!cancelled) setTasksLoading(false);
+      }
+    };
 
-    return unsubscribe;
-  }, [uid]);
+    loadTodaysAssignments();
+    return () => { cancelled = true; };
+  }, [uid, assignmentCourseIds.join(",")]);
 
   /* =======================================================
      WEEKLY SCHEDULE
@@ -1029,7 +973,11 @@ export default function Dashboard() {
 
                   label:
                     data.label ||
+                    data.title ||
                     "Scheduled session",
+
+                  isStudyPlan:
+                    data.type === "study-plan",
                 };
               }
             );
@@ -1087,10 +1035,8 @@ export default function Dashboard() {
       scheduleEvents,
     ]);
 
-  /* =======================================================
-     LIVE CLASS
-  ======================================================= */
-
+  /* Live classes will be added in a future release. */
+  /*
   useEffect(() => {
     if (!uid) {
       setLiveClass(null);
@@ -1198,6 +1144,7 @@ export default function Dashboard() {
 
     return unsubscribe;
   }, [uid]);
+  */
 
   /* =======================================================
      SCROLL HELPERS
@@ -1213,26 +1160,12 @@ export default function Dashboard() {
       );
     };
 
-  const scrollToLive = () => {
-    liveClassSectionRef.current?.scrollIntoView(
-      {
-        behavior: "smooth",
-        block: "start",
-      }
-    );
-  };
-
   const handleQuickAction =
     (to) => {
       if (
         to === "#schedule"
       ) {
         scrollToSchedule();
-        return;
-      }
-
-      if (to === "#live") {
-        scrollToLive();
         return;
       }
 
@@ -1368,10 +1301,8 @@ export default function Dashboard() {
       }
     };
 
-  /* =======================================================
-     LIVE CLASS STATUS
-  ======================================================= */
-
+  /* Live-class controls are intentionally disabled until that feature is added. */
+  /*
   const setLiveClassStatus =
     async (status) => {
       if (!liveClass) {
@@ -1406,6 +1337,53 @@ export default function Dashboard() {
         );
       }
     };
+  */
+
+  /* =======================================================
+     STUDY PLANNER ACTIONS
+  ======================================================= */
+
+  const saveStudySession = async (event) => {
+    event.preventDefault();
+
+    const title = plannerTitle.trim();
+    const date = new Date(plannerDateTime);
+
+    if (!uid || !title || Number.isNaN(date.getTime())) {
+      setPlannerMessage("Enter a session name and date/time.");
+      return;
+    }
+
+    setPlannerSaving(true);
+    setPlannerMessage("");
+
+    try {
+      await addDoc(collection(db, "scheduleEvents"), {
+        uid,
+        title,
+        date,
+        type: "study-plan",
+      });
+
+      setPlannerTitle("");
+      setPlannerDateTime("");
+      setPlannerOpen(false);
+    } catch (error) {
+      console.error("Failed to save study session:", error);
+      setPlannerMessage("Couldn't save this session. Please try again.");
+    } finally {
+      setPlannerSaving(false);
+    }
+  };
+
+  const deleteStudySession = async (id) => {
+    try {
+      await deleteDoc(doc(db, "scheduleEvents", id));
+    } catch (error) {
+      console.error("Failed to delete study session:", error);
+      setPlannerMessage("Couldn't remove this session. Please try again.");
+    }
+  };
 
   /* =======================================================
      ANNOUNCEMENT DISPLAY
@@ -1431,7 +1409,7 @@ export default function Dashboard() {
 
   return (
     <div
-      className="min-h-screen overflow-x-hidden"
+      className="student-ui min-h-screen overflow-x-hidden"
       style={{
         background: CANVAS,
       }}
@@ -1561,12 +1539,8 @@ export default function Dashboard() {
                   <Skeleton className="mt-3 h-3 w-64" />
                 ) : (
                   <p className="mt-3 max-w-sm text-sm leading-relaxed text-[#6b5f87]">
-                    You've completed{" "}
-                    {tasksDone} of{" "}
-                    {tasks.length}{" "}
-                    tasks today. Keep the
-                    streak going — your next
-                    lesson is waiting.
+                    You have {tasks.length} assignment{tasks.length === 1 ? "" : "s"} due today.
+                    Open an assignment to review the instructions and submit your work.
                   </p>
                 )}
 
@@ -2031,13 +2005,30 @@ export default function Dashboard() {
                 className={`scroll-mt-6 rounded-3xl bg-white p-5 ${cardShadow}`}
               >
 
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-3 flex items-center justify-between gap-2">
 
-                  <h3 className="text-sm font-bold text-[#1B0E3D]">
-                    This week
-                  </h3>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1B0E3D]">
+                      Study planner
+                    </h3>
+                    <p className="mt-0.5 text-[10px] text-[#8A82A6]">
+                      Add your own study sessions for the week.
+                    </p>
+                  </div>
 
                   <div className="flex items-center gap-1">
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPlannerMessage("");
+                        setPlannerOpen((value) => !value);
+                      }}
+                      className="mr-1 flex items-center gap-1 rounded-full bg-[#5227FF] px-2.5 py-1.5 text-[10px] font-bold text-white transition-transform hover:scale-[1.02]"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add
+                    </button>
 
                     <button
                       type="button"
@@ -2070,6 +2061,58 @@ export default function Dashboard() {
                   </div>
 
                 </div>
+
+                {plannerOpen && (
+                  <form
+                    onSubmit={saveStudySession}
+                    className="mb-3 rounded-2xl border border-violet-100 bg-violet-50/50 p-3"
+                  >
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="text-[10px] font-bold text-[#62567F]">
+                        Session name
+                        <input
+                          value={plannerTitle}
+                          onChange={(event) => setPlannerTitle(event.target.value)}
+                          placeholder="e.g. Revise module 2"
+                          maxLength={100}
+                          required
+                          className="mt-1 w-full rounded-xl border border-violet-100 bg-white px-3 py-2 text-xs text-[#1B0E3D] outline-none ring-[#5227FF]/20 focus:ring-2"
+                        />
+                      </label>
+                      <label className="text-[10px] font-bold text-[#62567F]">
+                        Date and time
+                        <input
+                          type="datetime-local"
+                          value={plannerDateTime}
+                          onChange={(event) => setPlannerDateTime(event.target.value)}
+                          required
+                          className="mt-1 w-full rounded-xl border border-violet-100 bg-white px-3 py-2 text-xs text-[#1B0E3D] outline-none ring-[#5227FF]/20 focus:ring-2"
+                        />
+                      </label>
+                    </div>
+                    {plannerMessage && (
+                      <p className="mt-2 text-[10px] font-semibold text-red-500">
+                        {plannerMessage}
+                      </p>
+                    )}
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPlannerOpen(false)}
+                        className="rounded-full px-3 py-1.5 text-[10px] font-bold text-[#62567F] hover:bg-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={plannerSaving}
+                        className="rounded-full bg-[#5227FF] px-3 py-1.5 text-[10px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {plannerSaving ? "Saving..." : "Save session"}
+                      </button>
+                    </div>
+                  </form>
+                )}
 
                 {weekOffset !== 0 && (
                   <p className="mb-2 text-[10px] font-semibold text-[#B4ABCB]">
@@ -2221,6 +2264,17 @@ export default function Dashboard() {
 
                             </div>
 
+                            {item.isStudyPlan && (
+                              <button
+                                type="button"
+                                onClick={() => deleteStudySession(item.id)}
+                                aria-label={`Delete ${item.label}`}
+                                className="ml-auto rounded-full p-1 text-[#A79BC4] transition-colors hover:bg-red-50 hover:text-red-500"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+
                           </div>
                         )
                       )
@@ -2234,7 +2288,7 @@ export default function Dashboard() {
             </div>
 
             {/* =================================================
-                TASKS + PREMIUM + LIVE CLASS
+                TODAY'S ASSIGNMENTS
             ================================================= */}
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
@@ -2246,19 +2300,17 @@ export default function Dashboard() {
                 initial="hidden"
                 animate="show"
                 custom={7}
-                className={`rounded-3xl bg-white p-5 lg:col-span-6 ${cardShadow}`}
+                className={`rounded-3xl bg-white p-5 lg:col-span-12 ${cardShadow}`}
               >
 
                 <div className="mb-3 flex items-center justify-between">
 
                   <h3 className="text-sm font-bold text-[#1B0E3D]">
-                    Today's tasks
+                    Today's assignments
                   </h3>
 
                   <span className="text-[11px] font-semibold text-[#8A82A6]">
-                    {tasksDone}/
-                    {tasks.length}{" "}
-                    done
+                    {tasks.length} due today
                   </span>
 
                 </div>
@@ -2282,7 +2334,7 @@ export default function Dashboard() {
                     <AlertTriangle className="h-4 w-4 text-red-400" />
 
                     <p className="text-xs font-bold text-red-500">
-                      Couldn't load today's tasks.
+                      Couldn't load today's assignments.
                     </p>
 
                   </div>
@@ -2290,175 +2342,34 @@ export default function Dashboard() {
                 ) : tasks.length ===
                   0 ? (
                   <p className="py-6 text-center text-xs text-[#A79BC4]">
-                    No tasks for today.
+                    No assignments due today.
                   </p>
 
                 ) : (
                   <ul className="space-y-3">
 
-                    {tasks.map(
-                      (task) => {
-                        const done =
-                          task.progress ===
-                          100;
-
-                        return (
-                          <li
-                            key={
-                              task.id
-                            }
-                            className="flex items-center gap-3"
-                          >
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                toggleTask(
-                                  task.id
-                                )
-                              }
-                              aria-label={
-                                done
-                                  ? "Mark as not done"
-                                  : "Mark as done"
-                              }
-                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors"
-                              style={{
-                                borderColor:
-                                  done
-                                    ? ACCENT
-                                    : "#D9D2EC",
-
-                                background:
-                                  done
-                                    ? ACCENT
-                                    : "transparent",
-                              }}
-                            >
-                              {done && (
-                                <Check
-                                  className="h-3.5 w-3.5 text-white"
-                                  strokeWidth={
-                                    3
-                                  }
-                                />
-                              )}
-                            </button>
-
-                            <div className="min-w-0 flex-1">
-
-                              <div className="flex items-center justify-between gap-2">
-
-                                <p
-                                  className={`truncate text-xs font-bold ${done
-                                    ? "text-[#B4ABCB] line-through"
-                                    : "text-[#1B0E3D]"
-                                    }`}
-                                >
-                                  {
-                                    task.title
-                                  }
-                                </p>
-
-                                <span className="shrink-0 text-[10px] font-semibold text-[#8A82A6]">
-                                  {
-                                    task.duration
-                                  }
-                                </span>
-
-                              </div>
-
-                              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#EFEAFB]">
-
-                                <div
-                                  className="h-full rounded-full transition-all duration-500"
-                                  style={{
-                                    width: `${Math.min(
-                                      Math.max(
-                                        task.progress,
-                                        0
-                                      ),
-                                      100
-                                    )}%`,
-
-                                    background:
-                                      done
-                                        ? "#22c55e"
-                                        : ACCENT,
-                                  }}
-                                />
-
-                              </div>
-
-                            </div>
-
-                          </li>
-                        );
-                      }
-                    )}
+                    {tasks.map((task) => (
+                      <li key={task.id} className="flex items-center gap-3 rounded-xl border border-violet-100 bg-violet-50/40 px-3 py-2">
+                        <GraduationCap className="h-5 w-5 shrink-0 text-[#6D3FC0]" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-xs font-bold text-[#1B0E3D]">{task.title}</p>
+                            <span className="shrink-0 text-[10px] font-semibold text-[#8A82A6]">Due {task.dueLabel}</span>
+                          </div>
+                          <p className="mt-0.5 truncate text-[10px] text-[#8A82A6]">{task.courseName}</p>
+                        </div>
+                        <button type="button" onClick={() => setActiveTab("assignments")} className="shrink-0 rounded-full bg-[#5227FF] px-3 py-1.5 text-[10px] font-bold text-white">
+                          Open
+                        </button>
+                      </li>
+                    ))}
 
                   </ul>
                 )}
 
               </motion.div>
 
-              {/* PREMIUM */}
-
-              <motion.div
-                variants={fadeUp}
-                initial="hidden"
-                animate="show"
-                custom={8}
-                className="relative overflow-hidden rounded-3xl p-5 text-white lg:col-span-3"
-                style={{
-                  background: `linear-gradient(155deg, #6D3FC0, ${VIOLET})`,
-                }}
-              >
-
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -bottom-10 -right-10 h-32 w-32 rounded-full opacity-20 blur-xl"
-                  style={{
-                    background:
-                      AMBER,
-                  }}
-                />
-
-                <Crown
-                  className="h-7 w-7"
-                  style={{
-                    color: AMBER,
-                  }}
-                />
-
-                <h3 className="mt-3 text-base font-black leading-tight">
-                  Go Premium
-                </h3>
-
-                <p className="mt-1.5 text-xs leading-relaxed text-white/70">
-                  Unlock mentor 1:1s,
-                  verified certificates,
-                  and every course in the
-                  catalog.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      "/dashboard/profile?tab=payments"
-                    )
-                  }
-                  className="mt-4 flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-[#2E1A55] transition-transform active:scale-[0.98]"
-                >
-                  Explore plans
-
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </button>
-
-              </motion.div>
-
-              {/* LIVE CLASS */}
+              {false && (
 
               <motion.div
                 ref={
@@ -2468,7 +2379,7 @@ export default function Dashboard() {
                 initial="hidden"
                 animate="show"
                 custom={9}
-                className={`scroll-mt-6 rounded-3xl bg-white p-5 lg:col-span-3 ${cardShadow}`}
+                className={`scroll-mt-6 rounded-3xl bg-white p-5 lg:col-span-4 ${cardShadow}`}
               >
 
                 <h3 className="flex items-center gap-2 text-sm font-bold text-[#1B0E3D]">
@@ -2583,6 +2494,7 @@ export default function Dashboard() {
                 )}
 
               </motion.div>
+              )}
 
             </div>
 

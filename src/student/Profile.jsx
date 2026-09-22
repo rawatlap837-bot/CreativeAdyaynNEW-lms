@@ -5,7 +5,7 @@ import { onAuthStateChanged, updateProfile, sendPasswordResetEmail, signOut } fr
 import { doc, onSnapshot, setDoc, collection, query, where, onSnapshot as onSnap } from "../lib/database";
 import { ref, uploadBytes, getDownloadURL } from "../lib/storage";
 import { auth, db, storage } from "../lib/backend";
-import { Camera, Pencil, Check, X, Award, BookOpen, Calendar, KeyRound, LogOut, Loader2 } from "lucide-react";
+import { Camera, Pencil, Check, X, Award, BookOpen, Calendar, KeyRound, LogOut, Loader2, ShieldCheck, Sparkles, ChevronRight } from "lucide-react";
 import { Skeleton } from "../components/Skeleton"; // adjust path
 
 const ACCENT = "#5227FF";
@@ -202,8 +202,16 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ background: "#ECEEF3" }}>
-      <div className="mx-auto max-w-3xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
+    <div className="student-ui min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_50%_0%,_#EAE4FF_0,_#ECEEF3_35%,_#F8F7FC_100%)]">
+      <div className="mx-auto max-w-4xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
+      <motion.div variants={fadeUp} initial="hidden" animate="show" custom={0} className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.16em] text-[#6D3FC0]"><Sparkles className="h-3.5 w-3.5" /> Student account</p>
+          <h1 className="mt-1 text-3xl font-black tracking-tight text-[#1B0E3D]">Your profile</h1>
+          <p className="mt-1 text-sm text-[#6B5F87]">Keep your learning profile and account details up to date.</p>
+        </div>
+        <div className="flex items-center gap-2 rounded-full border border-violet-100 bg-white/80 px-3 py-2 text-xs font-bold text-[#62567F] shadow-sm"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Account secured</div>
+      </motion.div>
       {message && (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-600">
           {message}
@@ -215,19 +223,19 @@ export default function Profile() {
         </motion.div>
       )}
 
-      <motion.div variants={fadeUp} initial="hidden" animate="show" custom={0} className={`relative overflow-hidden rounded-3xl bg-white p-7 ${cardShadow}`}>
+      <motion.div variants={fadeUp} initial="hidden" animate="show" custom={1} className={`relative overflow-hidden rounded-[2rem] border border-white/80 bg-white/90 p-6 sm:p-8 ${cardShadow}`}>
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full opacity-[0.07] blur-2xl"
+          className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-[0.14] blur-2xl"
           style={{ background: ACCENT }}
         />
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
           <div className="relative shrink-0">
             {authUser?.photoURL ? (
-              <img src={authUser.photoURL} alt="Profile" className="h-20 w-20 rounded-full object-cover" />
+              <img src={authUser.photoURL} alt="Profile" className="h-24 w-24 rounded-3xl object-cover ring-4 ring-violet-100" />
             ) : (
               <div
-                className="flex h-20 w-20 items-center justify-center rounded-full text-lg font-black text-white"
+                className="flex h-24 w-24 items-center justify-center rounded-3xl text-2xl font-black text-white shadow-lg shadow-violet-500/25"
                 style={{ background: `linear-gradient(135deg, ${ACCENT}, ${VIOLET})` }}
               >
                 {initials(authUser?.displayName, authUser?.email)}
@@ -238,7 +246,7 @@ export default function Profile() {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPhoto}
               aria-label="Change profile photo"
-              className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-white text-[#6D3FC0] shadow-sm transition-colors hover:bg-violet-50"
+              className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-white text-[#6D3FC0] shadow-md transition-colors hover:bg-violet-50"
             >
               {uploadingPhoto ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
             </button>
@@ -248,7 +256,7 @@ export default function Profile() {
           <div className="min-w-0 flex-1 text-center sm:text-left">
             {!editing ? (
               <>
-                <p className="text-lg font-black text-[#1B0E3D]">{authUser?.displayName || "Add your name"}</p>
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start"><p className="text-xl font-black text-[#1B0E3D]">{authUser?.displayName || "Add your name"}</p><span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#6D3FC0]">Student</span></div>
                 <p className="mt-0.5 text-xs text-[#8A82A6]">{authUser?.email}</p>
                 {profileDoc.bio && <p className="mt-2 text-xs leading-relaxed text-[#6b5f87]">{profileDoc.bio}</p>}
               </>
@@ -282,7 +290,7 @@ export default function Profile() {
               <button
                 type="button"
                 onClick={startEditing}
-                className="flex items-center gap-1.5 rounded-full border border-violet-100 px-4 py-2 text-xs font-bold text-[#6D3FC0] transition-colors hover:bg-violet-50"
+                className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#5227FF] to-[#6D3FC0] px-4 py-2 text-xs font-bold text-white shadow-md shadow-violet-500/20 transition hover:brightness-110"
               >
                 <Pencil className="h-3.5 w-3.5" />
                 Edit
@@ -317,46 +325,42 @@ export default function Profile() {
         )}
       </motion.div>
 
-      <motion.div variants={fadeUp} initial="hidden" animate="show" custom={1} className="mt-4 grid grid-cols-3 gap-4">
-        <div className={`rounded-2xl bg-white p-4 text-center ${cardShadow}`}>
-          <BookOpen className="mx-auto h-4 w-4" style={{ color: ACCENT }} />
-          <p className="mt-1.5 text-lg font-black text-[#1B0E3D]">{courseCount}</p>
-          <p className="text-[10px] font-semibold text-[#8A82A6]">Courses</p>
+      <motion.div variants={fadeUp} initial="hidden" animate="show" custom={2} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className={`flex items-center gap-3 rounded-2xl border border-violet-100 bg-white/90 p-4 ${cardShadow}`}>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100"><BookOpen className="h-5 w-5" style={{ color: ACCENT }} /></span>
+          <div><p className="text-xl font-black text-[#1B0E3D]">{courseCount}</p><p className="text-[10px] font-semibold text-[#8A82A6]">Enrolled courses</p></div>
         </div>
-        <div className={`rounded-2xl bg-white p-4 text-center ${cardShadow}`}>
-          <Award className="mx-auto h-4 w-4" style={{ color: AMBER }} />
-          <p className="mt-1.5 text-lg font-black text-[#1B0E3D]">{certCount}</p>
-          <p className="text-[10px] font-semibold text-[#8A82A6]">Certificates</p>
+        <div className={`flex items-center gap-3 rounded-2xl border border-amber-100 bg-white/90 p-4 ${cardShadow}`}>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50"><Award className="h-5 w-5" style={{ color: AMBER }} /></span>
+          <div><p className="text-xl font-black text-[#1B0E3D]">{certCount}</p><p className="text-[10px] font-semibold text-[#8A82A6]">Certificates earned</p></div>
         </div>
-        <div className={`rounded-2xl bg-white p-4 text-center ${cardShadow}`}>
-          <Calendar className="mx-auto h-4 w-4 text-[#8A82A6]" />
-          <p className="mt-1.5 text-xs font-black text-[#1B0E3D]">{memberSince}</p>
-          <p className="text-[10px] font-semibold text-[#8A82A6]">Member since</p>
+        <div className={`flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white/90 p-4 ${cardShadow}`}>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50"><Calendar className="h-5 w-5 text-emerald-500" /></span>
+          <div><p className="text-sm font-black text-[#1B0E3D]">{memberSince}</p><p className="text-[10px] font-semibold text-[#8A82A6]">Member since</p></div>
         </div>
       </motion.div>
 
-      <motion.div variants={fadeUp} initial="hidden" animate="show" custom={2} className={`mt-4 rounded-3xl bg-white p-5 ${cardShadow}`}>
-        <h3 className="mb-3 text-sm font-bold text-[#1B0E3D]">Account</h3>
+      <motion.div variants={fadeUp} initial="hidden" animate="show" custom={3} className={`mt-4 rounded-[2rem] border border-white/80 bg-white/90 p-5 sm:p-6 ${cardShadow}`}>
+        <div className="mb-4"><h3 className="text-base font-black text-[#1B0E3D]">Account settings</h3><p className="mt-1 text-xs text-[#8A82A6]">Manage your account security and session.</p></div>
 
         <button
           type="button"
           onClick={handlePasswordReset}
-          className="flex w-full items-center justify-between rounded-2xl bg-[#F7F5FC] px-4 py-3 text-left transition-colors hover:bg-violet-50"
+          className="group flex w-full items-center justify-between rounded-2xl border border-violet-100 bg-[#F7F5FC] px-4 py-3.5 text-left transition hover:border-violet-300 hover:bg-violet-50"
         >
           <span className="flex items-center gap-2.5">
             <KeyRound className="h-4 w-4 text-[#6D3FC0]" />
             <span className="text-xs font-bold text-[#1B0E3D]">Reset password</span>
           </span>
-          <span className="text-[10px] text-[#8A82A6]">Sends a link to {authUser?.email}</span>
+          <span className="flex items-center gap-2 text-[10px] text-[#8A82A6]"><span className="hidden sm:inline">Sends a link to {authUser?.email}</span><ChevronRight className="h-4 w-4 text-[#6D3FC0] transition group-hover:translate-x-0.5" /></span>
         </button>
 
         <button
           type="button"
           onClick={handleSignOut}
-          className="mt-2 flex w-full items-center gap-2.5 rounded-2xl bg-[#FDF2F2] px-4 py-3 text-left transition-colors hover:bg-red-50"
+          className="mt-3 flex w-full items-center justify-between rounded-2xl border border-red-100 bg-[#FDF2F2] px-4 py-3.5 text-left transition hover:bg-red-50"
         >
-          <LogOut className="h-4 w-4 text-red-500" />
-          <span className="text-xs font-bold text-red-500">Sign out</span>
+          <span className="flex items-center gap-2.5"><LogOut className="h-4 w-4 text-red-500" /><span className="text-xs font-bold text-red-500">Sign out</span></span><ChevronRight className="h-4 w-4 text-red-400" />
         </button>
       </motion.div>
       </div>

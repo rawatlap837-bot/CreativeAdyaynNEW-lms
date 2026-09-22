@@ -400,6 +400,11 @@ function App() {
             />
 
             <Route
+              path="announcements"
+              element={<Announcements />}
+            />
+
+            <Route
               path="batches"
               element={<TeacherBatchList />}
             />

@@ -110,7 +110,26 @@ export default function Admins() {
   const [assignedLoading, setAssignedLoading] = useState(true);
   const [assignedError, setAssignedError] = useState("");
 
+  // A small directory used only for the type-ahead in the single-user
+  // role editor. It lets an admin find somebody by either their name or
+  // their email, rather than having to know and type the full email first.
+  const [userDirectory, setUserDirectory] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const bulkEmailList = parseEmailList(bulkEmails);
+
+  const emailSuggestions = (() => {
+    const term = email.trim().toLowerCase();
+    if (!term) return [];
+
+    return userDirectory
+      .filter((user) => {
+        const name = String(user.name || "").toLowerCase();
+        const userEmail = String(user.email || "").toLowerCase();
+        return name.includes(term) || userEmail.includes(term);
+      })
+      .slice(0, 6);
+  })();
 
   /* ============================================================
      SEARCH USER
@@ -337,8 +356,28 @@ export default function Admins() {
     }
   };
 
+  const fetchUserDirectory = async () => {
+    try {
+      const snap = await getDocs(
+        query(collection(db, "users"), orderBy("email"), limit(250))
+      );
+
+      setUserDirectory(
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }))
+      );
+    } catch (err) {
+      // The normal exact-email search remains available if a deployment
+      // restricts directory reads. Avoid making the whole admin page fail.
+      console.error("Couldn't load user suggestions.", err);
+    }
+  };
+
   useEffect(() => {
     fetchAssigned();
+    fetchUserDirectory();
   }, []);
 
   // Jump from the list straight into the existing single-user
@@ -355,6 +394,15 @@ export default function Admins() {
       behavior: "smooth",
       block: "start",
     });
+  };
+
+  const selectSuggestion = (user) => {
+    setEmail(user.email || "");
+    setFound(user);
+    setStatus("found");
+    setError("");
+    setPendingRole(null);
+    setShowSuggestions(false);
   };
 
   /* ============================================================
@@ -388,7 +436,7 @@ export default function Admins() {
 
             {/* Email Input */}
 
-            <div className="relative min-w-0 flex-1">
+              <div className="relative min-w-0 flex-1">
 
               <Search
                 size={16}
@@ -401,14 +449,16 @@ export default function Admins() {
                 color={AT.sub}
               />
 
-              <input
-                type="email"
-                required
-                placeholder="student@example.com"
-                value={email}
-                onChange={(e) =>
-                  setEmail(e.target.value)
-                }
+                <input
+                  type="text"
+                  required
+                  placeholder="Search by name or email"
+                  value={email}
+                  onFocus={() => setShowSuggestions(true)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setShowSuggestions(true);
+                  }}
                 className="
                   w-full
                   rounded-xl
@@ -425,9 +475,39 @@ export default function Admins() {
                 style={{
                   borderColor: AT.line,
                 }}
-              />
+                />
 
-            </div>
+                {showSuggestions && emailSuggestions.length > 0 && (
+                  <div
+                    className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border bg-white shadow-lg"
+                    style={{ borderColor: AT.line }}
+                  >
+                    {emailSuggestions.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selectSuggestion(user)}
+                        className="flex w-full items-center justify-between gap-3 border-b px-3 py-2.5 text-left text-sm transition last:border-b-0 hover:bg-violet-50"
+                        style={{ borderColor: AT.line }}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium" style={{ color: AT.ink }}>
+                            {user.name || "Unnamed user"}
+                          </span>
+                          <span className="block truncate text-xs" style={{ color: AT.sub }}>
+                            {user.email}
+                          </span>
+                        </span>
+                        <span className="shrink-0 rounded-full bg-violet-50 px-2 py-0.5 text-xs capitalize text-violet-700">
+                          {user.role || "student"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+              </div>
 
             {/* Search Button */}
 

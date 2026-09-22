@@ -518,7 +518,7 @@ export default function Payments() {
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-black tracking-tight text-[#0F172A] sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-[#0F172A] sm:text-3xl">
           Payment records
         </h1>
 

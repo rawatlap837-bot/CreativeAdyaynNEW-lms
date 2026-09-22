@@ -38,7 +38,7 @@ import {
 } from "../lib/storage";
 
 import { auth, db, storage } from "../lib/backend";
-import { submitForApproval } from "../services/CourseService";
+import { publishCourse } from "../services/CourseService";
 
 const STATUS = {
   DRAFT: "draft",
@@ -886,7 +886,11 @@ export default function CourseContent() {
 
   /*
    * -------------------------------------------------------
-   * SUBMIT
+   * SUBMIT / PUBLISH
+   *
+   * Teacher publishes the course directly — there is no
+   * admin approval step. publishCourse() (CourseService)
+   * sets status = "published" immediately.
    * -------------------------------------------------------
    */
 
@@ -930,7 +934,7 @@ export default function CourseContent() {
       setSubmitting(true);
       clearMessages();
 
-      await submitForApproval(courseId);
+      await publishCourse(courseId);
 
       setCourse((previous) => ({
         ...previous,

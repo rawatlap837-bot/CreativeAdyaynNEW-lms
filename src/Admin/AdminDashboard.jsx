@@ -794,12 +794,7 @@ export default function AdminDashboard() {
     return months.map(
       (month) => ({
         m: month.label,
-        v: Number(
-          (
-            totals[month.key] /
-            100000
-          ).toFixed(2)
-        ),
+        v: totals[month.key],
       })
     );
 
@@ -1327,10 +1322,7 @@ export default function AdminDashboard() {
 
             <StatCard
               label="Total Revenue"
-              value={`₹${(
-                totalRevenue /
-                100000
-              ).toFixed(2)}L`}
+              value={formatIndianAmount(totalRevenue)}
               icon={Wallet}
             />
 
@@ -1594,7 +1586,7 @@ export default function AdminDashboard() {
             REVENUE TREND
         ---------------------------------------------------------- */}
 
-        <Card title="Revenue (₹ Lakh)">
+        <Card title="Revenue">
 
           <div className="w-full min-w-0 overflow-hidden p-3 pt-2 sm:p-5 sm:pt-3">
 
@@ -1643,6 +1635,7 @@ export default function AdminDashboard() {
                     axisLine={false}
                     tickLine={false}
                     width={35}
+                    tickFormatter={formatIndianAmount}
                   />
 
 
@@ -1650,7 +1643,7 @@ export default function AdminDashboard() {
                     formatter={(
                       value
                     ) => [
-                      `₹${value}L`,
+                      formatIndianAmount(value),
                       "Revenue",
                     ]}
                     contentStyle={{
@@ -1987,4 +1980,25 @@ export default function AdminDashboard() {
 
     </div>
   );
+}
+
+function formatIndianAmount(value) {
+  const amount = Number(value) || 0;
+  const absolute = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+  const rounded = (number) => Number(number.toFixed(number >= 10 ? 1 : 2));
+
+  if (absolute < 1000) {
+    return `${sign}\u20B9${absolute.toLocaleString("en-IN")}`;
+  }
+
+  if (absolute < 100000) {
+    return `${sign}\u20B9${rounded(absolute / 1000)}K`;
+  }
+
+  if (absolute < 10000000) {
+    return `${sign}\u20B9${rounded(absolute / 100000)}L`;
+  }
+
+  return `${sign}\u20B9${rounded(absolute / 10000000)}Cr`;
 }

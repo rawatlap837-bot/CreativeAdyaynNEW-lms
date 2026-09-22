@@ -35,17 +35,22 @@ export default function AuthCallback() {
 
       const userId = data.session.user.id;
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("lms_profiles")
         .select("role")
         .eq("id", userId)
         .maybeSingle();
 
       if (cancelled) return;
+      if (profileError || !profile?.role) {
+        setError("We could not load your account role. Please try again.");
+        return;
+      }
 
       if (profile?.role === "admin") navigate("/admin", { replace: true });
       else if (profile?.role === "teacher") navigate("/teacher/courses", { replace: true });
-      else navigate("/dashboard", { replace: true });
+      else if (profile.role === "student") navigate("/dashboard", { replace: true });
+      else setError("Your account role is not supported. Please contact the institute.");
     }
 
     finishSignIn();

@@ -533,7 +533,7 @@ export default function Assignments({
     ======================================================= */
 
     return (
-        <div className="space-y-6">
+        <div className="student-ui space-y-6">
 
             {/* ---------------------------------------------------
           HEADER

@@ -559,16 +559,22 @@ function HeaderBell() {
 
       setOpen(false);
 
-      if (notification.actionUrl) {
-        navigate(notification.actionUrl);
-        return;
-      }
+      // Admin activity uses `link`. Never follow a public or teacher URL
+      // from the admin panel; every notification must stay inside /admin.
+      const adminRoute = typeof notification.link === "string" &&
+        notification.link.startsWith("/admin/")
+        ? notification.link
+        : notification.type === "payment" || notification.type === "refund"
+          ? "/admin/payments"
+          : notification.type === "announcement" || notification.type === "announcement_expired"
+            ? "/admin/announcements"
+            : notification.type === "enrollment" || notification.type === "system"
+              ? "/admin/students"
+              : notification.type?.startsWith("course")
+                ? "/admin/courses"
+                : "/admin";
 
-      if (notification.courseId) {
-        navigate(
-          `/courses/${notification.courseId}`
-        );
-      }
+      navigate(adminRoute);
     } catch (error) {
       console.error(
         "Failed to open notification:",

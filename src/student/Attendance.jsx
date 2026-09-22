@@ -166,33 +166,6 @@ export default function Attendance() {
 
 
       /* --------------------------------------------------------
-         1b. DIAGNOSTIC: verify enrollment doc IDs match the
-         {uid}_{courseId} pattern the Supabase database rules' isEnrolled()
-         helper requires. If an enrollment was created with an
-         auto-generated ID instead, isEnrolled() will silently
-         fail for that course's attendanceSessions/announcements
-         reads even though the enrollment itself looks "active".
-         This won't fix bad data, but it tells you exactly which
-         course is affected instead of a generic permission error.
-      -------------------------------------------------------- */
-
-      enrollments.forEach((enrollment) => {
-        if (!enrollment.courseId) return;
-
-        const expectedId = `${user.uid}_${enrollment.courseId}`;
-
-        if (enrollment.id !== expectedId) {
-          console.warn(
-            `Enrollment doc ID mismatch for course ${enrollment.courseId}: ` +
-            `found "${enrollment.id}", expected "${expectedId}". ` +
-            `This will cause isEnrolled() to fail in Supabase database rules ` +
-            `for attendanceSessions/announcements on this course.`
-          );
-        }
-      });
-
-
-      /* --------------------------------------------------------
          2. LOAD COURSES
       -------------------------------------------------------- */
 
@@ -484,7 +457,7 @@ export default function Attendance() {
   ============================================================ */
 
   return (
-    <div className="min-h-[70vh] bg-gray-50 px-4 py-6 sm:px-6 md:py-8 lg:px-8">
+    <div className="student-ui min-h-[70vh] bg-gray-50 px-4 py-6 sm:px-6 md:py-8 lg:px-8">
       <div className="mx-auto max-w-6xl">
 
         {/* HEADER */}

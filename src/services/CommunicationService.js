@@ -31,6 +31,7 @@ export const COMMUNICATION_COLLECTIONS = {
 
 export const ANNOUNCEMENT_AUDIENCE = {
   GLOBAL: "global",
+  TEACHERS: "teachers",
   COURSE: "course",
 };
 
@@ -814,6 +815,17 @@ export async function getMyTeacherAnnouncements({
     );
   }
 
+  // Organization messages intended for teachers only. These stay separate
+  // from global notices so student feeds do not include them.
+  try {
+    const teacherAnnouncements = await getTeacherOnlyAnnouncements({
+      limitCount,
+    });
+    results.push(...teacherAnnouncements);
+  } catch (error) {
+    console.error("Failed to load teacher-only announcements:", error);
+  }
+
   /* ----------------------------------------------------------
      TEACHER COURSES
   ---------------------------------------------------------- */
@@ -895,6 +907,24 @@ export async function getMyTeacherAnnouncements({
     0,
     limitCount
   );
+}
+
+/** Get published announcements intended only for teacher accounts. */
+export async function getTeacherOnlyAnnouncements({
+  limitCount = 50,
+} = {}) {
+  await requireTeacher();
+
+  const snapshot = await getDocs(
+    query(
+      collection(db, COMMUNICATION_COLLECTIONS.ANNOUNCEMENTS),
+      where("audienceType", "==", ANNOUNCEMENT_AUDIENCE.TEACHERS),
+      where("status", "==", ANNOUNCEMENT_STATUS.PUBLISHED),
+      limit(limitCount)
+    )
+  );
+
+  return sortNewestFirst(snapshot.docs.map(documentToObject));
 }
 
 /* ============================================================
@@ -1038,12 +1068,10 @@ export async function getTeacherActivityNotifications({
     ...announcements.map((announcement) => ({
       id: `announcement-${announcement.id}`,
       type: "announcement",
-      title: announcement.title || "New announcement",
+      title: `Admin announcement: ${announcement.title || "New announcement"}`,
       message: announcement.body || announcement.message || "Announcement updated.",
       courseId: announcement.courseId || null,
-      actionUrl: announcement.courseId
-        ? `/teacher/courses/${announcement.courseId}`
-        : "/teacher",
+      actionUrl: "/teacher/announcements",
       createdAt: announcement.updatedAt || announcement.createdAt,
     })),
   ];
@@ -1165,10 +1193,9 @@ export async function createAnnouncement({
   }
 
   if (
-    finalAudience !==
-    ANNOUNCEMENT_AUDIENCE.GLOBAL &&
-    finalAudience !==
-    ANNOUNCEMENT_AUDIENCE.COURSE
+    finalAudience !== ANNOUNCEMENT_AUDIENCE.GLOBAL &&
+    finalAudience !== ANNOUNCEMENT_AUDIENCE.TEACHERS &&
+    finalAudience !== ANNOUNCEMENT_AUDIENCE.COURSE
   ) {
     throw new Error(
       "Invalid announcement audience."
@@ -1214,12 +1241,12 @@ export async function createAnnouncement({
   ---------------------------------------------------------- */
 
   if (
-    finalAudience ===
-    ANNOUNCEMENT_AUDIENCE.GLOBAL
+    finalAudience === ANNOUNCEMENT_AUDIENCE.GLOBAL ||
+    finalAudience === ANNOUNCEMENT_AUDIENCE.TEACHERS
   ) {
     if (role !== "admin") {
       throw new Error(
-        "Only administrators can create global announcements."
+        "Only administrators can create organization-wide announcements."
       );
     }
   }
@@ -1427,6 +1454,34 @@ export async function updateAnnouncement(
   }
 
   /* STATUS */
+
+  /* AUDIENCE — admins may change an announcement's audience while editing. */
+  if (updates.audienceType !== undefined) {
+    const nextAudience = updates.audienceType;
+    const role = await getCurrentUserRole();
+
+    if (
+      nextAudience !== ANNOUNCEMENT_AUDIENCE.GLOBAL &&
+      nextAudience !== ANNOUNCEMENT_AUDIENCE.TEACHERS &&
+      nextAudience !== ANNOUNCEMENT_AUDIENCE.COURSE
+    ) {
+      throw new Error("Invalid announcement audience.");
+    }
+
+    if (role !== "admin" && nextAudience !== ANNOUNCEMENT_AUDIENCE.COURSE) {
+      throw new Error("Teachers can only send announcements to their course students.");
+    }
+
+    if (nextAudience === ANNOUNCEMENT_AUDIENCE.COURSE) {
+      const nextCourseId = updates.courseId || existing.courseId;
+      if (!nextCourseId) throw new Error("Course ID is required for course announcements.");
+      cleanUpdates.courseId = nextCourseId;
+    } else {
+      cleanUpdates.courseId = null;
+    }
+
+    cleanUpdates.audienceType = nextAudience;
+  }
 
   if (
     updates.status !== undefined

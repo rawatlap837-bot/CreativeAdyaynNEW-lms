@@ -340,6 +340,8 @@ const TeacherDashboard = () => {
                         {announcements.map((announcement) => {
                           const isCourseAnnouncement =
                             announcement.audienceType === "course";
+                          const isTeacherAnnouncement =
+                            announcement.audienceType === "teachers";
 
                           return (
                             <div
@@ -362,7 +364,7 @@ const TeacherDashboard = () => {
                                 >
                                   {announcement.pinned ? (
                                     <Pin size={16} />
-                                  ) : isCourseAnnouncement ? (
+                                  ) : isCourseAnnouncement || isTeacherAnnouncement ? (
                                     <GraduationCap size={17} />
                                   ) : (
                                     <Globe2 size={17} />
@@ -392,6 +394,11 @@ const TeacherDashboard = () => {
                                         <>
                                           <GraduationCap size={12} />
                                           Course Announcement
+                                        </>
+                                      ) : isTeacherAnnouncement ? (
+                                        <>
+                                          <GraduationCap size={12} />
+                                          Teachers Only
                                         </>
                                       ) : (
                                         <>

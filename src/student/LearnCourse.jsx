@@ -713,7 +713,7 @@ export default function LearnCourse() {
   ===================================================== */
 
   return (
-    <div className="min-h-screen bg-slate-50 pt-24 text-slate-900">
+    <div className="student-ui min-h-screen bg-slate-50 pt-24 text-slate-900">
 
       {/* =================================================
           TOP BAR

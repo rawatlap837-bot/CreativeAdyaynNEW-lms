@@ -730,7 +730,7 @@ export default function CourseDetails() {
   ========================================================= */
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-[#F8F7FC] text-[#1B0E3D]">
 
       <main className="pt-24">
 
@@ -738,16 +738,16 @@ export default function CourseDetails() {
             HERO
         =================================================== */}
 
-        <section className="border-b border-gray-200 bg-white">
+        <section className="border-b border-violet-100 bg-[radial-gradient(circle_at_top_left,_#EEE9FF_0,_#F8F7FC_42%,_#FFFFFF_100%)]">
 
-          <div className="mx-auto max-w-7xl px-5 pb-14 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-5 pb-14 pt-8 sm:px-6 sm:pt-10 lg:px-8">
 
             {/* BACK */}
 
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-gray-600 transition hover:text-black"
+              className="mb-8 inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/80 px-4 py-2 text-sm font-semibold text-[#62567F] shadow-sm transition hover:border-violet-300 hover:text-[#5227FF]"
             >
               <ArrowLeft className="h-4 w-4" />
 
@@ -755,7 +755,7 @@ export default function CourseDetails() {
             </button>
 
 
-            <div className="grid gap-12 lg:grid-cols-[1.45fr_0.75fr] lg:items-start">
+            <div className="grid gap-8 lg:grid-cols-[1.45fr_0.75fr] lg:items-start">
 
               {/* =================================================
                   LEFT CONTENT
@@ -768,13 +768,13 @@ export default function CourseDetails() {
                 <div className="mb-5 flex flex-wrap gap-2">
 
                   {course.category && (
-                    <span className="rounded-full bg-black px-3 py-1.5 text-xs font-semibold text-white">
+                    <span className="rounded-full bg-[#2E1A55] px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
                       {course.category}
                     </span>
                   )}
 
                   {course.type && (
-                    <span className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold capitalize text-gray-700">
+                    <span className="rounded-full border border-violet-200 bg-white/80 px-3 py-1.5 text-xs font-semibold capitalize text-[#62567F]">
                       {course.type === "long"
                         ? "Live Course"
                         : "Short Course"}
@@ -782,7 +782,7 @@ export default function CourseDetails() {
                   )}
 
                   {course.level && (
-                    <span className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold capitalize text-gray-700">
+                    <span className="rounded-full border border-violet-200 bg-white/80 px-3 py-1.5 text-xs font-semibold capitalize text-[#62567F]">
                       {course.level}
                     </span>
                   )}
@@ -792,7 +792,7 @@ export default function CourseDetails() {
 
                 {/* TITLE */}
 
-                <h1 className="max-w-4xl text-4xl font-bold tracking-tight text-gray-950 sm:text-5xl lg:text-6xl">
+                <h1 className="max-w-4xl text-4xl font-extrabold tracking-tight text-[#1B0E3D] sm:text-5xl lg:text-6xl">
                   {course.title}
                 </h1>
 
@@ -800,7 +800,7 @@ export default function CourseDetails() {
                 {/* SHORT DESCRIPTION */}
 
                 {course.shortDescription && (
-                  <p className="mt-6 max-w-3xl text-lg leading-8 text-gray-600">
+                  <p className="mt-5 max-w-3xl text-lg leading-8 text-[#62567F]">
                     {course.shortDescription}
                   </p>
                 )}
@@ -808,15 +808,15 @@ export default function CourseDetails() {
 
                 {/* COURSE INFO */}
 
-                <div className="mt-8 flex flex-wrap gap-x-7 gap-y-4 text-sm text-gray-600">
+                <div className="mt-8 flex flex-wrap gap-3 text-sm text-[#62567F]">
 
                   {course.instructorName && (
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
+                    <div className="flex items-center gap-2 rounded-2xl border border-violet-100 bg-white/80 px-3 py-2 shadow-sm">
+                      <User className="h-4 w-4 text-[#6D3FC0]" />
 
                       <span>
                         Instructor{" "}
-                        <strong className="text-gray-900">
+                        <strong className="text-[#1B0E3D]">
                           {course.instructorName}
                         </strong>
                       </span>
@@ -825,8 +825,8 @@ export default function CourseDetails() {
 
 
                   {course.duration && (
-                    <div className="flex items-center gap-2">
-                      <Clock3 className="h-4 w-4" />
+                    <div className="flex items-center gap-2 rounded-2xl border border-violet-100 bg-white/80 px-3 py-2 shadow-sm">
+                      <Clock3 className="h-4 w-4 text-[#6D3FC0]" />
 
                       <span>
                         {course.duration}
@@ -836,8 +836,8 @@ export default function CourseDetails() {
 
 
                   {totalModules > 0 && (
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="h-4 w-4" />
+                    <div className="flex items-center gap-2 rounded-2xl border border-violet-100 bg-white/80 px-3 py-2 shadow-sm">
+                      <BookOpen className="h-4 w-4 text-[#6D3FC0]" />
 
                       <span>
                         {totalModules}{" "}
@@ -850,8 +850,8 @@ export default function CourseDetails() {
 
 
                   {totalLessons > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Video className="h-4 w-4" />
+                    <div className="flex items-center gap-2 rounded-2xl border border-violet-100 bg-white/80 px-3 py-2 shadow-sm">
+                      <Video className="h-4 w-4 text-[#6D3FC0]" />
 
                       <span>
                         {totalLessons}{" "}
@@ -867,30 +867,30 @@ export default function CourseDetails() {
 
                 {/* FUNCTIONAL FEATURES */}
 
-                <div className="mt-10 grid gap-5 border-t border-gray-200 pt-7 sm:grid-cols-3">
+                <div className="mt-10 grid gap-3 border-t border-violet-100 pt-7 sm:grid-cols-3">
 
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <div className="flex items-center gap-3 rounded-2xl border border-violet-100 bg-white/75 p-4 shadow-sm">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
 
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm font-medium text-[#3E315E]">
                       Structured curriculum
                     </span>
                   </div>
 
 
-                  <div className="flex items-center gap-3">
-                    <PlayCircle className="h-5 w-5 text-gray-700" />
+                  <div className="flex items-center gap-3 rounded-2xl border border-violet-100 bg-white/75 p-4 shadow-sm">
+                    <PlayCircle className="h-5 w-5 text-[#6D3FC0]" />
 
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm font-medium text-[#3E315E]">
                       Video lessons
                     </span>
                   </div>
 
 
-                  <div className="flex items-center gap-3">
-                    <Lock className="h-5 w-5 text-gray-700" />
+                  <div className="flex items-center gap-3 rounded-2xl border border-violet-100 bg-white/75 p-4 shadow-sm">
+                    <Lock className="h-5 w-5 text-[#6D3FC0]" />
 
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm font-medium text-[#3E315E]">
                       Secure access
                     </span>
                   </div>
@@ -906,11 +906,11 @@ export default function CourseDetails() {
 
               <div className="lg:sticky lg:top-24">
 
-                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-xl shadow-violet-900/[0.08]">
 
                   {/* IMAGE */}
 
-                  <div className="relative aspect-video overflow-hidden bg-gray-100">
+                  <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-[#2E1A55] via-[#5227FF] to-[#A78BFA]">
 
                     {course.thumbnailUrl ? (
                       <img
@@ -919,14 +919,22 @@ export default function CourseDetails() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <BookOpen className="h-14 w-14 text-gray-300" />
+                      <div className="flex h-full flex-col items-center justify-center px-8 text-center text-white">
+                        <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
+                          <BookOpen className="h-7 w-7" />
+                        </span>
+                        <p className="line-clamp-2 text-lg font-bold">
+                          {course.title}
+                        </p>
+                        <p className="mt-1 text-xs text-white/70">
+                          Start your learning journey
+                        </p>
                       </div>
                     )}
 
 
                     {discountPercentage > 0 && (
-                      <span className="absolute right-4 top-4 rounded-full bg-black px-3 py-1.5 text-xs font-bold text-white">
+                      <span className="absolute right-4 top-4 rounded-full bg-[#1B0E3D] px-3 py-1.5 text-xs font-bold text-white shadow-lg">
                         {discountPercentage}% OFF
                       </span>
                     )}
@@ -936,13 +944,13 @@ export default function CourseDetails() {
 
                   {/* CARD */}
 
-                  <div className="p-6">
+                  <div className="p-6 sm:p-7">
 
                     {/* PRICE */}
 
                     <div className="flex items-end gap-3">
 
-                      <span className="text-3xl font-bold text-gray-950">
+                      <span className="text-3xl font-extrabold text-[#1B0E3D]">
                         {formatPrice(
                           course.discountPrice ??
                           course.price
@@ -988,7 +996,7 @@ export default function CourseDetails() {
                             `/student/courses/${course.id}`
                           )
                         }
-                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-4 text-sm font-semibold text-white transition hover:bg-green-700"
+                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#5227FF] to-[#6D3FC0] px-5 py-4 text-sm font-bold text-white shadow-lg shadow-violet-500/25 transition hover:brightness-110"
                       >
                         <PlayCircle className="h-5 w-5" />
 
@@ -1000,7 +1008,7 @@ export default function CourseDetails() {
                       <button
                         type="button"
                         disabled
-                        className="mt-6 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-gray-200 px-5 py-4 text-sm font-semibold text-gray-600"
+                        className="mt-6 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-violet-100 px-5 py-4 text-sm font-semibold text-[#62567F]"
                       >
                         <Clock3 className="h-5 w-5" />
 
@@ -1016,7 +1024,7 @@ export default function CourseDetails() {
                           enrollmentLoading
                         }
                         onClick={handleEnroll}
-                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-black px-5 py-4 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#5227FF] to-[#6D3FC0] px-5 py-4 text-sm font-bold text-white shadow-lg shadow-violet-500/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                       >
 
                         {enrolling ? (
@@ -1042,7 +1050,7 @@ export default function CourseDetails() {
 
                     {/* INFO */}
 
-                    <p className="mt-4 text-center text-xs leading-5 text-gray-500">
+                    <p className="mt-4 text-center text-xs leading-5 text-[#8A82A6]">
 
                       {isEnrolled
                         ? "You already have access to this course."
@@ -1061,17 +1069,17 @@ export default function CourseDetails() {
                       totalModules > 0 ||
                       course.duration) && (
 
-                        <div className="mt-7 border-t border-gray-200 pt-6">
+                        <div className="mt-7 border-t border-violet-100 pt-6">
 
-                          <h3 className="font-semibold text-gray-900">
+                          <h3 className="font-bold text-[#1B0E3D]">
                             This course includes
                           </h3>
 
                           <div className="mt-4 space-y-3">
 
                             {totalLessons > 0 && (
-                              <div className="flex items-center gap-3 text-sm text-gray-600">
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <div className="flex items-center gap-3 text-sm text-[#62567F]">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
 
                                 {totalLessons} lessons
                               </div>
@@ -1079,8 +1087,8 @@ export default function CourseDetails() {
 
 
                             {totalModules > 0 && (
-                              <div className="flex items-center gap-3 text-sm text-gray-600">
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <div className="flex items-center gap-3 text-sm text-[#62567F]">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
 
                                 {totalModules} structured modules
                               </div>
@@ -1088,8 +1096,8 @@ export default function CourseDetails() {
 
 
                             {course.duration && (
-                              <div className="flex items-center gap-3 text-sm text-gray-600">
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <div className="flex items-center gap-3 text-sm text-[#62567F]">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
 
                                 {course.duration} learning duration
                               </div>

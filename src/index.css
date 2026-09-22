@@ -43,6 +43,96 @@
   font-style: normal;
   font-display: swap;
 }
+
+/* One visual system for every student screen. Individual pages keep their
+   functionality, but no longer fall back to older gray, slate, or indigo UI. */
+.student-ui {
+  color: #1b0e3d;
+}
+
+.student-ui .bg-gray-50,
+.student-ui .bg-slate-50 {
+  background-color: #f7f5fc;
+}
+
+.student-ui .bg-gray-100,
+.student-ui .bg-slate-100 {
+  background-color: #f0ecfb;
+}
+
+.student-ui .border-gray-100,
+.student-ui .border-gray-200,
+.student-ui .border-gray-300,
+.student-ui .border-slate-200,
+.student-ui .border-slate-300 {
+  border-color: #e5ddfb;
+}
+
+.student-ui .text-gray-900,
+.student-ui .text-gray-800,
+.student-ui .text-slate-900,
+.student-ui .text-slate-800 {
+  color: #1b0e3d;
+}
+
+.student-ui .text-gray-700,
+.student-ui .text-gray-600,
+.student-ui .text-gray-500,
+.student-ui .text-slate-700,
+.student-ui .text-slate-600,
+.student-ui .text-slate-500 {
+  color: #6b5f87;
+}
+
+.student-ui .text-gray-400,
+.student-ui .text-gray-300,
+.student-ui .text-slate-400 {
+  color: #a79bc4;
+}
+
+.student-ui .bg-indigo-50,
+.student-ui .bg-indigo-50\/30 {
+  background-color: #f3efff;
+}
+
+.student-ui .text-indigo-600,
+.student-ui .text-indigo-700 {
+  color: #6d3fc0;
+}
+
+.student-ui .border-indigo-500,
+.student-ui .border-indigo-400,
+.student-ui .focus\:border-indigo-500:focus {
+  border-color: #6d3fc0;
+}
+
+.student-ui .bg-indigo-600,
+.student-ui .bg-black {
+  background-color: #5227ff;
+}
+
+.student-ui .hover\:bg-indigo-700:hover,
+.student-ui .hover\:bg-gray-800:hover {
+  background-color: #3e1cc9;
+}
+
+.student-ui .rounded-2xl.border,
+.student-ui .rounded-3xl.border {
+  box-shadow: 0 12px 30px rgba(68, 37, 133, 0.06);
+}
+
+.student-ui input,
+.student-ui select,
+.student-ui textarea {
+  border-color: #e5ddfb;
+}
+
+.student-ui input:focus,
+.student-ui select:focus,
+.student-ui textarea:focus {
+  border-color: #6d3fc0;
+  box-shadow: 0 0 0 3px rgba(109, 63, 192, 0.12);
+}
 @font-face {
   font-family: 'Tirra';
   src: url('./assets/Tirra/Tirra-Medium.ttf') format('truetype');

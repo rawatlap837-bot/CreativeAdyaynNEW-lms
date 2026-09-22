@@ -256,6 +256,10 @@ function getAudienceLabel(item) {
     return "Course Students";
   }
 
+  if (audience === "teachers") {
+    return "Teachers Only";
+  }
+
   return "Everyone";
 }
 
@@ -1910,6 +1914,11 @@ function AnnouncementRow({
                   size={12}
                   className="shrink-0"
                 />
+              ) : audience === "teachers" ? (
+                <GraduationCap
+                  size={12}
+                  className="shrink-0"
+                />
               ) : (
                 <Globe2
                   size={12}
@@ -2527,7 +2536,7 @@ function AnnouncementModal({
                   grid
                   grid-cols-1
                   gap-3
-                  sm:grid-cols-2
+                  sm:grid-cols-3
                 "
               >
                 <AudienceOption
@@ -2548,6 +2557,17 @@ function AnnouncementModal({
                       "courseId",
                       ""
                     );
+                  }}
+                />
+
+                <AudienceOption
+                  selected={form.audienceType === "teachers"}
+                  icon={GraduationCap}
+                  title="Teachers Only"
+                  description="Send to all teacher accounts"
+                  onClick={() => {
+                    onChange("audienceType", "teachers");
+                    onChange("courseId", "");
                   }}
                 />
 

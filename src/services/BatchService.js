@@ -556,6 +556,29 @@ export async function getEligibleStudents(courseId, batchId) {
   return hydrateStudents(uniqueUids);
 }
 
+// Secure server-side directory search for a teacher's own batch. This avoids
+// exposing every profile to the browser while still supporting type-ahead by
+// the first character of a student's name or email.
+export async function searchBatchStudents(courseId, batchId, searchText = "") {
+  requireUser();
+
+  const { data, error } = await supabase.rpc("lms_search_batch_students", {
+    p_course: courseId,
+    p_batch: batchId,
+    p_search: String(searchText || "").trim(),
+  });
+
+  if (error) throw error;
+
+  return (data || []).map((student) => ({
+    id: student.uid,
+    uid: student.uid,
+    name: student.name || "",
+    email: student.email || "",
+    enrolled: Boolean(student.enrolled),
+  }));
+}
+
 /* =========================================================
    8. ADD STUDENT TO BATCH
 ========================================================= */
@@ -755,6 +778,7 @@ export default {
   getBatchesForTeacher,
   getBatchesForCourse,
   getEligibleStudents,
+  searchBatchStudents,
   addStudentToBatch,
   removeStudentFromBatch,
   shiftStudentBatch,

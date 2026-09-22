@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Archive,
   ArrowLeft,
@@ -26,7 +26,7 @@ import {
   getAttendanceForDate,
   getBatchesForTeacher,
   getBatchRoster,
-  getEligibleStudents,
+  searchBatchStudents,
   markAttendance,
   removeStudentFromBatch,
   shiftStudentBatch,
@@ -266,36 +266,44 @@ export default function BatchDetail() {
     loadAttendance(batch, students);
   }, [tab, attendanceDate, batch?.id, students.length]);
 
-  const filteredEligible = useMemo(() => {
-    const term = eligibleSearch.trim().toLowerCase();
-
-    if (!term) return eligible;
-
-    return eligible.filter(
-      (student) =>
-        studentLabel(student).toLowerCase().includes(term) ||
-        String(student.uid || "").toLowerCase().includes(term)
-    );
-  }, [eligible, eligibleSearch]);
-
   async function openAddModal() {
     if (!batch) return;
 
     setAddOpen(true);
-    setEligibleLoading(true);
     setEligibleSearch("");
     setActionError("");
-
-    try {
-      const list = await getEligibleStudents(batch.courseId, batch.id);
-      setEligible(list);
-    } catch (err) {
-      console.error("Eligible students:", err);
-      setActionError(err?.message || "Unable to load eligible students.");
-    } finally {
-      setEligibleLoading(false);
-    }
   }
+
+  useEffect(() => {
+    if (!addOpen || !batch?.id || !batch?.courseId) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setEligibleLoading(true);
+
+      try {
+        const list = await searchBatchStudents(
+          batch.courseId,
+          batch.id,
+          eligibleSearch
+        );
+        if (!cancelled) setEligible(list);
+      } catch (err) {
+        console.error("Student directory search:", err);
+        if (!cancelled) {
+          setEligible([]);
+          setActionError(err?.message || "Unable to search students.");
+        }
+      } finally {
+        if (!cancelled) setEligibleLoading(false);
+      }
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [addOpen, batch?.id, batch?.courseId, eligibleSearch]);
 
   async function handleAddStudent(studentUid) {
     setAddingUid(studentUid);
@@ -965,7 +973,7 @@ export default function BatchDetail() {
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <h2 className="text-base font-semibold text-slate-900">
-                Add enrolled student
+                  Add student to batch
               </h2>
               <button
                 type="button"
@@ -984,7 +992,7 @@ export default function BatchDetail() {
                 <input
                   value={eligibleSearch}
                   onChange={(event) => setEligibleSearch(event.target.value)}
-                  placeholder="Search enrolled students..."
+                  placeholder="Type a name or email..."
                   className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none"
                 />
               </div>
@@ -992,13 +1000,13 @@ export default function BatchDetail() {
                 <div className="flex justify-center py-8">
                   <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-300 border-t-violet-600" />
                 </div>
-              ) : filteredEligible.length === 0 ? (
+              ) : eligible.length === 0 ? (
                 <p className="py-8 text-center text-sm text-slate-500">
-                  No eligible enrolled students found.
+                  No matching students found.
                 </p>
               ) : (
                 <div className="max-h-80 space-y-2 overflow-y-auto">
-                  {filteredEligible.map((student) => (
+                  {eligible.map((student) => (
                     <div
                       key={student.uid}
                       className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2.5"
@@ -1010,6 +1018,11 @@ export default function BatchDetail() {
                         <p className="text-xs text-slate-400">
                           {student.email || student.uid}
                         </p>
+                        {!student.enrolled && (
+                          <p className="mt-0.5 text-[11px] text-violet-600">
+                            Will be enrolled in this course
+                          </p>
+                        )}
                       </div>
                       <button
                         type="button"

@@ -17,6 +17,7 @@ import {
   ChevronRight,
   UserCircle,
   Bell,
+  Megaphone,
   Check,
   Loader2,
 } from "lucide-react";
@@ -171,16 +172,17 @@ function TeacherNotificationBell() {
             ) : (
               notifications.map((notification) => {
                 const isRead = readIds.has(notification.id);
+                const isAnnouncement = notification.type === "announcement";
 
                 return (
                   <button
                     type="button"
                     key={notification.id}
                     onClick={() => openNotification(notification)}
-                    className={`flex w-full gap-3 border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 ${isRead ? "bg-white" : "bg-violet-50/50"}`}
+                    className={`flex w-full gap-3 border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 ${isAnnouncement ? "border-l-4 border-l-violet-500 bg-violet-50/70" : isRead ? "bg-white" : "bg-violet-50/50"}`}
                   >
-                    <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isRead ? "bg-slate-100 text-slate-400" : "bg-violet-100 text-violet-600"}`}>
-                      {isRead ? <Check size={15} /> : <Bell size={15} />}
+                    <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isAnnouncement ? "bg-violet-600 text-white" : isRead ? "bg-slate-100 text-slate-400" : "bg-violet-100 text-violet-600"}`}>
+                      {isAnnouncement ? <Megaphone size={15} /> : isRead ? <Check size={15} /> : <Bell size={15} />}
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-slate-800">
