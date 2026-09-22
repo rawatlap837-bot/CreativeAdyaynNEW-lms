@@ -6,7 +6,7 @@ import { uploadImage, imageUrl, COURSE_COVER, validateImage } from "../lib/Media
  * Cover image picker for the course form.
  *
  * Controlled component. The parent owns the value and decides when to
- * write it to Firestore, so an abandoned form leaves no orphan reference.
+ * write it to Supabase database, so an abandoned form leaves no orphan reference.
  *
  * @param {{url: string, publicId: string} | null} value
  * @param {function} onChange  Receives the new value, or null when removed

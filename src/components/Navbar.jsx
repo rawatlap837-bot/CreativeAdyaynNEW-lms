@@ -98,7 +98,7 @@ export default function Navbar() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [coursesHover, setCoursesHover] = useState(false);
   const [hoveredLink, setHoveredLink] = useState(null);
-  // undefined = still resolving Firebase's auth state (avoids a Login-button
+  // undefined = still resolving Supabase's auth state (avoids a Login-button
   // flash for users who are actually signed in); null = signed out.
   const [user, setUser] = useState(undefined);
   const navigate = useNavigate();

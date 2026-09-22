@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import CourseCategorySelect from "./CourseCategorySelect";
 
 import {
   ArrowLeft,
@@ -314,7 +315,7 @@ export default function CreateCourse() {
       setCreating(true);
 
       /* ========================================================
-         STEP 1 — CREATE FIRESTORE COURSE
+         STEP 1 — CREATE Supabase database COURSE
          ======================================================== */
 
       const createdCourse =
@@ -590,7 +591,7 @@ export default function CreateCourse() {
                       className={[
                         "relative rounded-2xl border p-5 text-left transition",
                         selected
-                          ? "border-slate-950 bg-slate-50 ring-2 ring-slate-950/10"
+                          ? "border-violet-500 bg-violet-50 ring-2 ring-violet-500/10"
                           : "border-slate-200 bg-white hover:border-slate-400",
                       ].join(" ")}
                     >
@@ -599,8 +600,8 @@ export default function CreateCourse() {
                           className={[
                             "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
                             selected
-                              ? "bg-slate-950 text-white"
-                              : "bg-slate-100 text-slate-600",
+                              ? "bg-violet-600 text-white"
+                              : "bg-violet-50 text-slate-600",
                           ].join(" ")}
                         >
                           <Icon
@@ -627,7 +628,7 @@ export default function CreateCourse() {
                         <div className="absolute right-4 top-4">
                           <CheckCircle2
                             size={20}
-                            className="text-slate-950"
+                            className="text-violet-600"
                           />
                         </div>
                       )}
@@ -681,7 +682,7 @@ export default function CreateCourse() {
                     creating ||
                     uploading
                   }
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10 disabled:bg-slate-50"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
                 />
               </div>
 
@@ -714,7 +715,7 @@ export default function CreateCourse() {
                     creating ||
                     uploading
                   }
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10 disabled:bg-slate-50"
+                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
                 />
               </div>
 
@@ -747,7 +748,7 @@ export default function CreateCourse() {
                     creating ||
                     uploading
                   }
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10 disabled:bg-slate-50"
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
                 />
               </div>
 
@@ -766,7 +767,7 @@ export default function CreateCourse() {
                     </span>
                   </label>
 
-                  <input
+                  <CourseCategorySelect
                     id="category"
                     name="category"
                     value={
@@ -775,12 +776,12 @@ export default function CreateCourse() {
                     onChange={
                       handleChange
                     }
-                    placeholder="e.g. Digital Marketing"
+                    required
                     disabled={
                       creating ||
                       uploading
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10 disabled:bg-slate-50"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
                   />
                 </div>
 
@@ -805,7 +806,7 @@ export default function CreateCourse() {
                       creating ||
                       uploading
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10 disabled:bg-slate-50"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
                   >
                     <option value="">
                       Select level
@@ -858,7 +859,7 @@ export default function CreateCourse() {
                     creating ||
                     uploading
                   }
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10 disabled:bg-slate-50"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
                 />
               </div>
             </div>
@@ -911,7 +912,7 @@ export default function CreateCourse() {
                       creating ||
                       uploading
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-9 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10 disabled:bg-slate-50"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-9 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
                   />
                 </div>
               </div>
@@ -946,7 +947,7 @@ export default function CreateCourse() {
                       creating ||
                       uploading
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-9 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10 disabled:bg-slate-50"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-9 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
                   />
                 </div>
               </div>
@@ -971,7 +972,7 @@ export default function CreateCourse() {
             </div>
 
             {thumbnailPreview ? (
-              <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+              <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-violet-50">
                 <img
                   src={
                     thumbnailPreview
@@ -1014,7 +1015,7 @@ export default function CreateCourse() {
             ) : (
               <label
                 htmlFor="thumbnail"
-                className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center transition hover:border-slate-400 hover:bg-slate-100"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center transition hover:border-slate-400 hover:bg-violet-50"
               >
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-500 shadow-sm">
                   <ImageIcon
@@ -1030,7 +1031,7 @@ export default function CreateCourse() {
                   PNG, JPG, WEBP up to 5MB
                 </p>
 
-                <span className="mt-5 inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white">
+                <span className="mt-5 inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-medium text-white">
                   <Upload
                     size={16}
                   />
@@ -1093,8 +1094,8 @@ export default function CreateCourse() {
                 </div>
 
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Admin reviews the course
-                  before it becomes public.
+                  Publish your course directly
+                  to make it public.
                 </p>
               </div>
             </div>
@@ -1131,9 +1132,9 @@ export default function CreateCourse() {
                 </div>
 
                 {uploading && (
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-violet-50">
                     <div
-                      className="h-full rounded-full bg-slate-950 transition-all"
+                      className="h-full rounded-full bg-violet-600 transition-all"
                       style={{
                         width: `${uploadProgress}%`,
                       }}
@@ -1164,7 +1165,7 @@ export default function CreateCourse() {
                   creating ||
                   uploading
                 }
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {creating ||
                 uploading ? (

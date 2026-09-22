@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { auth, db } from "../lib/backend";
+import { onAuthStateChanged } from "../lib/auth";
 
 import {
   collection,
@@ -107,7 +108,7 @@ export default function Attendance() {
   ============================================================ */
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
 
@@ -166,7 +167,7 @@ export default function Attendance() {
 
       /* --------------------------------------------------------
          1b. DIAGNOSTIC: verify enrollment doc IDs match the
-         {uid}_{courseId} pattern the Firestore rules' isEnrolled()
+         {uid}_{courseId} pattern the Supabase database rules' isEnrolled()
          helper requires. If an enrollment was created with an
          auto-generated ID instead, isEnrolled() will silently
          fail for that course's attendanceSessions/announcements
@@ -184,7 +185,7 @@ export default function Attendance() {
           console.warn(
             `Enrollment doc ID mismatch for course ${enrollment.courseId}: ` +
             `found "${enrollment.id}", expected "${expectedId}". ` +
-            `This will cause isEnrolled() to fail in Firestore rules ` +
+            `This will cause isEnrolled() to fail in Supabase database rules ` +
             `for attendanceSessions/announcements on this course.`
           );
         }
@@ -291,7 +292,7 @@ export default function Attendance() {
             /*
              * A permission-denied here almost always means this
              * specific course's enrollment doc doesn't satisfy
-             * isEnrolled() in the Firestore rules (see the
+             * isEnrolled() in the Supabase database rules (see the
              * diagnostic warning above) — not a real outage.
              * We degrade gracefully: treat it as "no open session"
              * instead of surfacing a scary top-level error.

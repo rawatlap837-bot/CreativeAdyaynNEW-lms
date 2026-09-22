@@ -75,6 +75,7 @@ await test("assignment IDs are unique per assignment and student", () => {
 await test("profile and student lists share the canonical profile table", () => {
   assert.equal(resolveReference(collection(root, "users")).table, "profiles");
   assert.deepEqual(resolveReference(collection(root, "students")).filters, [["role", "student"]]);
+  assert.deepEqual(resolveReference(collection(root, "instructors")), { table: "profiles", id: null, filters: [["role", "teacher"]] });
 });
 await test("queries translate column names and preserve ordering", async () => {
   rows = [{ id: "a", instructor_id: "teacher", title: "Course" }]; calls = [];

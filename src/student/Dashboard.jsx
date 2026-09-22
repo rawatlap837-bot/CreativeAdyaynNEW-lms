@@ -414,7 +414,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   // Marks this student "online" in Realtime Database for as long as
-  // the dashboard is mounted; Firebase's onDisconnect flips them back
+  // the dashboard is mounted; Supabase's onDisconnect flips them back
   // to "offline" automatically when the tab closes or connection drops.
   // Free on the Spark plan — see src/hooks/usePresence.js.
   usePresence();

@@ -163,7 +163,7 @@ function getMode(course) {
 
 /* --------------------------------------------------------------
    DATE HANDLING
-   Firestore returns Timestamp objects, but a course may also
+   Supabase database returns Timestamp objects, but a course may also
    carry a Date, an ISO string, or millis depending on how it
    was written. Normalise all of them to a number.
 -------------------------------------------------------------- */

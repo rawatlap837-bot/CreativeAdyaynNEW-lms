@@ -28,6 +28,7 @@ import CA2Logo from "../assets/Images/CA.png";
 import {
   getTeacherActivityNotifications,
 } from "../services/CommunicationService";
+import "../Teacher/teacherTheme.css";
 
 function TeacherNotificationBell() {
   const navigate = useNavigate();
@@ -309,7 +310,7 @@ const TeacherLayout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="teacher-shell min-h-screen bg-slate-50">
 
       {/* =====================================================
           MOBILE TOP BAR

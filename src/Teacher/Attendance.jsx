@@ -83,7 +83,7 @@ function statusConfig(status) {
       return {
         label: status || "Unknown",
         icon: Clock3,
-        className: "bg-slate-100 text-slate-600",
+        className: "bg-violet-50 text-slate-600",
         dotClass: "bg-slate-400",
       };
   }

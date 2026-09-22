@@ -19,7 +19,7 @@ import { usePublishedCoursesByCategory, slugify } from "../services/CourseServic
 
 /* ================================================================
    This section is the compact, homepage-facing sibling of the full
-   ShortCourses.jsx page. It reuses the SAME live data (Firestore via
+   ShortCourses.jsx page. It reuses the SAME live data (Supabase database via
    usePublishedCoursesByCategory) and the SAME card vocabulary —
    price, New/Featured/Popular badges, category, duration, students —
    just sized down to fit a homepage section instead of a full grid.

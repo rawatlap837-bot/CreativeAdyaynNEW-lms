@@ -1185,7 +1185,7 @@ const CourseContent = () => {
                   />
 
                   <p className="mt-1.5 text-xs text-slate-400">
-                    Video uploading to Firebase Storage can be connected next.
+                    Video uploading to Supabase Storage can be connected next.
                   </p>
 
                 </div>

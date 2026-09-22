@@ -300,9 +300,9 @@ const TeacherDashboard = () => {
                             key={item}
                             className="animate-pulse rounded-xl border border-slate-100 p-4"
                           >
-                            <div className="h-4 w-1/3 rounded bg-slate-100" />
-                            <div className="mt-3 h-3 w-full rounded bg-slate-100" />
-                            <div className="mt-2 h-3 w-3/4 rounded bg-slate-100" />
+                            <div className="h-4 w-1/3 rounded bg-violet-50" />
+                            <div className="mt-3 h-3 w-full rounded bg-violet-50" />
+                            <div className="mt-2 h-3 w-3/4 rounded bg-violet-50" />
                           </div>
                         ))}
                       </div>
@@ -357,7 +357,7 @@ const TeacherDashboard = () => {
                                   className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                                     announcement.pinned
                                       ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-slate-100 text-slate-500"
+                                      : "bg-violet-50 text-slate-500"
                                   }`}
                                 >
                                   {announcement.pinned ? (
@@ -503,7 +503,7 @@ const TeacherDashboard = () => {
 
                       <p className="mt-1 text-sm text-slate-500">
                         Create a short course or long/live course and submit
-                        it for approval.
+                        it directly.
                       </p>
                     </div>
 

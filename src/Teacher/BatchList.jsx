@@ -62,7 +62,7 @@ function modeConfig(mode) {
     default:
       return {
         label: mode || "Unknown",
-        className: "bg-slate-100 text-slate-600",
+        className: "bg-violet-50 text-slate-600",
         icon: BookOpen,
       };
   }
@@ -72,7 +72,7 @@ function statusConfig(status) {
   if (status === "archived") {
     return {
       label: "Archived",
-      className: "bg-slate-100 text-slate-500",
+      className: "bg-violet-50 text-slate-500",
       icon: Archive,
     };
   }
@@ -258,7 +258,7 @@ export default function BatchList() {
               }));
               setModalOpen(true);
             }}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-violet-700 sm:w-auto"
           >
             <Plus size={17} />
             Create Batch
@@ -303,7 +303,7 @@ export default function BatchList() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search batches or courses..."
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none focus:border-slate-400"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none focus:border-violet-500"
             />
           </div>
         </div>
@@ -363,7 +363,7 @@ export default function BatchList() {
                       {mode.label}
                     </span>
 
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-slate-600">
                       <Users size={12} />
                       {batch.studentCount || 0} students
                     </span>
@@ -398,7 +398,7 @@ export default function BatchList() {
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-violet-50 hover:text-slate-700"
                 aria-label="Close"
               >
                 <X size={18} />
@@ -426,7 +426,7 @@ export default function BatchList() {
                     }))
                   }
                   placeholder="Morning batch"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
                 />
               </label>
 
@@ -443,7 +443,7 @@ export default function BatchList() {
                       courseId: event.target.value,
                     }))
                   }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
                 >
                   <option value="">Select a course</option>
                   {courses.map((course) => (
@@ -466,7 +466,7 @@ export default function BatchList() {
                       mode: event.target.value,
                     }))
                   }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
                 >
                   {MODES.map((mode) => (
                     <option key={mode.value} value={mode.value}>
@@ -491,7 +491,7 @@ export default function BatchList() {
                         onClick={() => toggleDay(day)}
                         className={`rounded-full px-3 py-1.5 text-xs font-semibold ${selected
                           ? "bg-violet-600 text-white"
-                          : "bg-slate-100 text-slate-600"
+                          : "bg-violet-50 text-slate-600"
                           }`}
                       >
                         {day}
@@ -514,7 +514,7 @@ export default function BatchList() {
                       time: event.target.value,
                     }))
                   }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
                 />
               </label>
 
@@ -522,7 +522,7 @@ export default function BatchList() {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="w-full rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 min-[381px]:w-auto"
+                  className="w-full rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-violet-50 min-[381px]:w-auto"
                 >
                   Cancel
                 </button>

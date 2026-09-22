@@ -575,7 +575,7 @@ export default function BatchDetail() {
                   type="button"
                   disabled={archived}
                   onClick={openAddModal}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
                 >
                   <Plus size={16} />
                   Add Student
@@ -664,7 +664,7 @@ export default function BatchDetail() {
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2 text-xs">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium capitalize text-slate-600">
+                        <span className="rounded-full bg-violet-50 px-2.5 py-1 font-medium capitalize text-slate-600">
                           {assignment.status || "draft"}
                         </span>
                         <span className="text-slate-500">
@@ -888,7 +888,7 @@ export default function BatchDetail() {
                         onClick={() => toggleSettingsDay(day)}
                         className={`rounded-full px-3 py-1.5 text-xs font-semibold ${selected
                           ? "bg-violet-600 text-white"
-                          : "bg-slate-100 text-slate-600"
+                          : "bg-violet-50 text-slate-600"
                           }`}
                       >
                         {day}
@@ -970,7 +970,7 @@ export default function BatchDetail() {
               <button
                 type="button"
                 onClick={() => setAddOpen(false)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
+                className="rounded-lg p-2 text-slate-400 hover:bg-violet-50"
               >
                 <X size={18} />
               </button>
@@ -1038,7 +1038,7 @@ export default function BatchDetail() {
               <button
                 type="button"
                 onClick={() => setShiftStudent(null)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
+                className="rounded-lg p-2 text-slate-400 hover:bg-violet-50"
               >
                 <X size={18} />
               </button>

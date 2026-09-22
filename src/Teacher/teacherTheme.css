@@ -1,0 +1,100 @@
+/* One coherent violet design language for all teacher routes. */
+.teacher-shell {
+  --teacher-primary: #7c3aed;
+  --teacher-primary-hover: #6d28d9;
+  --teacher-primary-deep: #5b21b6;
+  --teacher-soft: #f5f3ff;
+  --teacher-soft-strong: #ede9fe;
+  --teacher-border: #ddd6fe;
+  --teacher-canvas: #f8fafc;
+  --teacher-card: #ffffff;
+  --teacher-ink: #0f172a;
+  --teacher-muted: #64748b;
+  color: var(--teacher-ink);
+  background: var(--teacher-canvas);
+}
+
+.teacher-shell main {
+  background: var(--teacher-canvas);
+}
+
+/* Convert competing decorative palettes to the teacher violet brand.
+   Semantic success, warning, and error colors remain unchanged. */
+.teacher-shell :is(.bg-blue-500, .bg-blue-600, .bg-blue-700,
+  .bg-indigo-500, .bg-indigo-600, .bg-indigo-700,
+  .bg-purple-500, .bg-purple-600, .bg-purple-700,
+  .bg-cyan-500, .bg-cyan-600, .bg-teal-500, .bg-teal-600) {
+  background-color: var(--teacher-primary) !important;
+}
+
+.teacher-shell :is(.hover\:bg-blue-600, .hover\:bg-blue-700,
+  .hover\:bg-indigo-600, .hover\:bg-indigo-700,
+  .hover\:bg-purple-600, .hover\:bg-purple-700,
+  .hover\:bg-cyan-600, .hover\:bg-teal-600):hover {
+  background-color: var(--teacher-primary-hover) !important;
+}
+
+.teacher-shell :is(.bg-blue-50, .bg-blue-100, .bg-indigo-50, .bg-indigo-100,
+  .bg-purple-50, .bg-purple-100, .bg-cyan-50, .bg-cyan-100,
+  .bg-teal-50, .bg-teal-100) {
+  background-color: var(--teacher-soft) !important;
+}
+
+.teacher-shell :is(.text-blue-500, .text-blue-600, .text-blue-700,
+  .text-indigo-500, .text-indigo-600, .text-indigo-700,
+  .text-purple-500, .text-purple-600, .text-purple-700,
+  .text-cyan-600, .text-cyan-700, .text-teal-600, .text-teal-700) {
+  color: var(--teacher-primary) !important;
+}
+
+.teacher-shell :is(.border-blue-200, .border-blue-300,
+  .border-indigo-200, .border-indigo-300,
+  .border-purple-200, .border-purple-300,
+  .border-cyan-200, .border-teal-200) {
+  border-color: var(--teacher-border) !important;
+}
+
+.teacher-shell :is(.ring-blue-200, .ring-blue-500, .ring-indigo-200,
+  .ring-indigo-500, .ring-purple-200, .ring-purple-500,
+  .ring-cyan-500, .ring-teal-500) {
+  --tw-ring-color: rgb(124 58 237 / 0.28) !important;
+}
+
+.teacher-shell :is(input, select, textarea):focus {
+  border-color: var(--teacher-primary) !important;
+  --tw-ring-color: rgb(124 58 237 / 0.22) !important;
+}
+
+.teacher-shell table thead {
+  background-color: #fafafa;
+}
+
+.teacher-shell main > * {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Older teacher pages used near-black for primary actions and selected
+   summary cards. In the teacher area those surfaces belong to violet. */
+.teacher-shell button.bg-slate-900,
+.teacher-shell button.bg-slate-950,
+.teacher-shell span.bg-slate-900,
+.teacher-shell span.bg-slate-950,
+.teacher-shell .border-slate-900.bg-slate-900 {
+  background-color: var(--teacher-primary) !important;
+  border-color: var(--teacher-primary) !important;
+}
+
+.teacher-shell button.hover\:bg-slate-800:hover,
+.teacher-shell button.hover\:bg-slate-900:hover,
+.teacher-shell span.hover\:bg-slate-800:hover {
+  background-color: var(--teacher-primary-hover) !important;
+}
+
+.teacher-shell .border-slate-900 {
+  border-color: var(--teacher-primary) !important;
+}
+
+.teacher-shell .border-slate-900.bg-slate-900 .text-slate-300 {
+  color: #ddd6fe !important;
+}

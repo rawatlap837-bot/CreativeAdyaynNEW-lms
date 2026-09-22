@@ -37,7 +37,7 @@ import { getMyEnrollments } from "../services/EnrollmentService";
 ========================================================= */
 
 /**
- * Normalizes a Firestore Timestamp, ISO string, or millis value
+ * Normalizes a Supabase database Timestamp, ISO string, or millis value
  * into a readable date string. Returns null if nothing usable.
  */
 function formatPaymentDate(value) {
@@ -173,11 +173,11 @@ export default function MyCourses() {
         /* ---------------------------------------------------
            GET STUDENT ENROLLMENTS
 
-           Firestore query:
+           Supabase database query:
 
            where("uid", "==", user.uid)
 
-           This matches the Firestore rules.
+           This matches the Supabase database rules.
         --------------------------------------------------- */
 
         const enrollmentData =
@@ -228,7 +228,7 @@ export default function MyCourses() {
                 /* ------------------------------------------------
                    Only show published courses to students.
 
-                   The Firestore rules already protect this,
+                   The Supabase database rules already protect this,
                    but this also keeps the UI clean.
                 ------------------------------------------------ */
 

@@ -164,11 +164,11 @@ function TypeBadge({ type }) {
       style={{
         background:
           type === "long"
-            ? "#EEF2FF"
+            ? AT.accentSoft
             : "#F0FDFA",
         color:
           type === "long"
-            ? "#4F46E5"
+            ? AT.accentDeep
             : AT.accentDeep,
       }}
     >
@@ -245,14 +245,14 @@ export default function Courses() {
           setLoading(false);
         },
 
-        (firebaseError) => {
+        (backendError) => {
           console.error(
             "Admin course listener:",
-            firebaseError
+            backendError
           );
 
           setError(
-            firebaseError?.message ||
+            backendError?.message ||
             "Unable to load courses."
           );
 
@@ -302,10 +302,10 @@ export default function Courses() {
         });
 
         setInstructors(map);
-      } catch (firebaseError) {
+      } catch (backendError) {
         console.error(
           "Unable to load instructors:",
-          firebaseError
+          backendError
         );
       }
     }
@@ -347,7 +347,7 @@ export default function Courses() {
     const term = search.trim().toLowerCase();
 
     // Create a copy so the original courses array
-    // from Firebase is never mutated.
+    // from Supabase is never mutated.
     const sortedCourses = [...courses].sort(
       (a, b) => {
         const getTimestamp = (course) => {
@@ -484,14 +484,14 @@ export default function Courses() {
 
     try {
       await action();
-    } catch (firebaseError) {
+    } catch (backendError) {
       console.error(
         "Admin course action:",
-        firebaseError
+        backendError
       );
 
       setActionError(
-        firebaseError?.message ||
+        backendError?.message ||
         "Something went wrong."
       );
     } finally {

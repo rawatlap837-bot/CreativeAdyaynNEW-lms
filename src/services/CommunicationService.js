@@ -60,7 +60,7 @@ export const NOTIFICATION_TYPES = {
 ============================================================ */
 
 /**
- * Require logged-in Firebase user.
+ * Require logged-in Supabase user.
  */
 function requireAuthUser() {
   const user = auth.currentUser;
@@ -73,7 +73,7 @@ function requireAuthUser() {
 }
 
 /**
- * Convert Firestore document into normal object.
+ * Convert Supabase database document into normal object.
  */
 function documentToObject(snapshot) {
   return {
@@ -83,7 +83,7 @@ function documentToObject(snapshot) {
 }
 
 /**
- * Convert Firestore Timestamp / Date / number
+ * Convert Supabase database Timestamp / Date / number
  * into milliseconds.
  */
 function getTimestampValue(value) {
@@ -110,7 +110,7 @@ function getTimestampValue(value) {
  * Sort newest first.
  *
  * Client-side sorting intentionally avoids
- * Firestore composite index requirements.
+ * Supabase database composite index requirements.
  */
 function sortNewestFirst(items = []) {
   return [...items].sort(
@@ -152,7 +152,7 @@ function cleanString(value) {
  * Get current user's role.
  *
  * Priority:
- * 1. Firebase custom claims
+ * 1. Supabase custom claims
  * 2. users/{uid}.role
  */
 async function getCurrentUserRole() {
@@ -192,13 +192,13 @@ async function getCurrentUserRole() {
     }
   } catch (error) {
     console.warn(
-      "Could not read Firebase custom claims.",
+      "Could not read Supabase custom claims.",
       error
     );
   }
 
   /* ----------------------------------------------------------
-     FIRESTORE USER DOCUMENT
+     Supabase database USER DOCUMENT
   ---------------------------------------------------------- */
 
   try {
@@ -229,7 +229,7 @@ async function getCurrentUserRole() {
     }
   } catch (error) {
     console.warn(
-      "Could not read user role from Firestore.",
+      "Could not read user role from Supabase database.",
       error
     );
   }
@@ -543,7 +543,7 @@ export async function getGlobalAnnouncements({
    * audienceType == global
    *
    * These conditions must match the
-   * Firestore security rules.
+   * Supabase database security rules.
    */
   const q = query(
     announcementsRef,
@@ -580,7 +580,7 @@ export async function getGlobalAnnouncements({
 /**
  * Get published announcements for one course.
  *
- * Access is ultimately controlled by Firestore rules.
+ * Access is ultimately controlled by Supabase database rules.
  *
  * Student:
  * - must be enrolled
@@ -911,7 +911,7 @@ export async function getMyTeacherAnnouncements({
  *
  * where("authorId", "==", uid)
  *
- * because Firestore security rules validate
+ * because Supabase database security rules validate
  * teacher access through course ownership.
  *
  * This function intentionally includes drafts

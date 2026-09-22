@@ -24,7 +24,7 @@ export const tableColumns = {
 };
 
 const aliases = {
-  users: "profiles", students: "profiles", attendanceSessions: "attendance_sessions",
+  users: "profiles", students: "profiles", instructors: "profiles", attendanceSessions: "attendance_sessions",
   attendance: "attendance_records", scheduleEvents: "schedule_events", liveClasses: "live_classes",
 };
 export const tableName = (name) => aliases[name] || name;

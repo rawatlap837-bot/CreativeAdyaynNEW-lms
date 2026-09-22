@@ -514,7 +514,7 @@ export default function CourseDetails() {
 
 
     /* -------------------------------------------------------
-       PAID COURSE — FIREBASE-ONLY CLIENT FLOW
+       PAID COURSE — Supabase-ONLY CLIENT FLOW
 
        The Edge Function creates the order using the stored course price.
        Enrollment is activated only after signature and capture verification.

@@ -90,7 +90,7 @@ function formatDate(value) {
 }
 
 /*
- * Normalizes a Firestore Timestamp, JS Date, ISO string, or
+ * Normalizes a Supabase database Timestamp, JS Date, ISO string, or
  * datetime-local string into a plain JS Date (or null).
  */
 function toJsDate(value) {
@@ -422,7 +422,7 @@ export default function Announcements() {
        * -------
        * Teacher must NOT call getAnnouncements().
        *
-       * Firestore rules restrict teacher access to
+       * Supabase database rules restrict teacher access to
        * their own course announcements.
        */
       if (userRole === "teacher") {
@@ -439,7 +439,7 @@ export default function Announcements() {
 
       setError(
         err?.message ||
-        "Unable to load announcements. Please check your Firestore rules."
+        "Unable to load announcements. Please check your Supabase database rules."
       );
     } finally {
       setLoading(false);

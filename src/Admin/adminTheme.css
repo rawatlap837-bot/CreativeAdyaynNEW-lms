@@ -1,0 +1,67 @@
+/* Shared visual language for every page rendered inside AdminLayout. */
+.admin-shell {
+  --admin-chrome: #0f172a;
+  --admin-chrome-hover: #1e293b;
+  --admin-accent: #0f766e;
+  --admin-accent-hover: #115e59;
+  --admin-accent-soft: #f0fdfa;
+  --admin-accent-border: #99f6e4;
+  --admin-canvas: #f8fafc;
+  --admin-card: #ffffff;
+  --admin-ink: #0f172a;
+  --admin-muted: #64748b;
+  --admin-line: #e2e8f0;
+  color: var(--admin-ink);
+  background: var(--admin-canvas);
+}
+
+.admin-shell main {
+  background: var(--admin-canvas);
+}
+
+/* Keep section accents consistent, including older pages that used
+   green, blue, indigo, or violet utility classes. */
+.admin-shell :is(.bg-teal-600, .bg-teal-700, .bg-emerald-600, .bg-green-600,
+  .bg-blue-600, .bg-indigo-600, .bg-violet-600, .bg-purple-600) {
+  background-color: var(--admin-accent) !important;
+}
+
+.admin-shell :is(.hover\:bg-teal-700, .hover\:bg-emerald-700,
+  .hover\:bg-green-700, .hover\:bg-blue-700, .hover\:bg-indigo-700,
+  .hover\:bg-violet-700, .hover\:bg-purple-700):hover {
+  background-color: var(--admin-accent-hover) !important;
+}
+
+.admin-shell :is(.bg-teal-50, .bg-teal-100, .bg-emerald-50, .bg-emerald-100,
+  .bg-green-50, .bg-green-100, .bg-blue-50, .bg-blue-100, .bg-cyan-50,
+  .bg-indigo-50, .bg-indigo-100, .bg-violet-50, .bg-violet-100,
+  .bg-purple-50, .bg-purple-100) {
+  background-color: var(--admin-accent-soft) !important;
+}
+
+.admin-shell :is(.text-teal-600, .text-teal-700, .text-emerald-600,
+  .text-emerald-700, .text-green-600, .text-green-700, .text-blue-600,
+  .text-blue-700, .text-cyan-700, .text-indigo-600, .text-indigo-700,
+  .text-violet-600, .text-violet-700, .text-purple-600, .text-purple-700) {
+  color: var(--admin-accent) !important;
+}
+
+.admin-shell :is(.border-teal-200, .border-teal-300, .border-emerald-200,
+  .border-green-200, .border-blue-200, .border-indigo-200,
+  .border-violet-200, .border-purple-200) {
+  border-color: var(--admin-accent-border) !important;
+}
+
+.admin-shell :is(input, select, textarea):focus {
+  border-color: var(--admin-accent) !important;
+  box-shadow: 0 0 0 3px rgb(15 118 110 / 0.12);
+}
+
+.admin-shell table thead {
+  background: #f8fafc;
+}
+
+.admin-shell main > * {
+  width: 100%;
+  max-width: 100%;
+}

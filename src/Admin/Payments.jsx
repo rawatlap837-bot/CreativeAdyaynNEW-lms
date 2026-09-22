@@ -131,7 +131,7 @@ function PaymentDetailsModal({
         className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between bg-[#16351F] px-5 py-4 text-white">
+        <div className="flex items-center justify-between bg-[#0F172A] px-5 py-4 text-white">
           <div className="flex items-center gap-2">
             <Receipt className="h-5 w-5" />
 
@@ -201,7 +201,7 @@ function PaymentDetailsModal({
             />
 
             <DetailRow
-              label="Firestore record ID"
+              label="Supabase database record ID"
               value={payment.id}
               mono
             />
@@ -216,7 +216,7 @@ function PaymentDetailsModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-full bg-[#16351F] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#24552f]"
+            className="w-full rounded-full bg-[#0F172A] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1E293B]"
           >
             Close
           </button>
@@ -239,7 +239,7 @@ function DetailRow({
       </span>
 
       <span
-        className={`break-words text-sm text-[#16351F] sm:text-right ${strong ? "font-bold" : "font-medium"
+        className={`break-words text-sm text-[#0F172A] sm:text-right ${strong ? "font-bold" : "font-medium"
           } ${mono ? "font-mono text-xs" : ""
           }`}
       >
@@ -274,7 +274,7 @@ function StatCard({
             {title}
           </p>
 
-          <p className="mt-1 text-xl font-black text-[#16351F]">
+          <p className="mt-1 text-xl font-black text-[#0F172A]">
             {value}
           </p>
         </div>
@@ -389,7 +389,7 @@ export default function Payments() {
         );
 
         setError(
-          "Unable to load payment records. Check the Firestore rules and your admin role."
+          "Unable to load payment records. Check the Supabase database rules and your admin role."
         );
 
         setLoading(false);
@@ -518,7 +518,7 @@ export default function Payments() {
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-black tracking-tight text-[#16351F] sm:text-3xl">
+        <h1 className="text-2xl font-black tracking-tight text-[#0F172A] sm:text-3xl">
           Payment records
         </h1>
 
@@ -578,7 +578,7 @@ export default function Payments() {
       <section className="mt-6 overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div>
-            <h2 className="font-bold text-[#16351F]">
+            <h2 className="font-bold text-[#0F172A]">
               Transactions
             </h2>
 
@@ -646,7 +646,7 @@ export default function Payments() {
             </h3>
 
             <p className="mt-1 max-w-sm text-sm text-slate-500">
-              Payments recorded in the Firestore
+              Payments recorded in the Supabase database
               <code className="mx-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs">
                 payments
               </code>
@@ -698,7 +698,7 @@ export default function Payments() {
                           </div>
 
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-[#16351F]">
+                            <p className="truncate text-sm font-bold text-[#0F172A]">
                               {payment.studentName}
                             </p>
 
@@ -715,7 +715,7 @@ export default function Payments() {
                         </p>
                       </td>
 
-                      <td className="px-5 py-4 text-sm font-bold text-[#16351F]">
+                      <td className="px-5 py-4 text-sm font-bold text-[#0F172A]">
                         {formatAmount(
                           payment.amount,
                           payment.currency
@@ -742,7 +742,7 @@ export default function Payments() {
                           onClick={() =>
                             setSelectedPayment(payment)
                           }
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[#16351F] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#24552f]"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F172A] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#1E293B]"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           View
@@ -766,7 +766,7 @@ export default function Payments() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-bold text-[#16351F]">
+                      <p className="truncate font-bold text-[#0F172A]">
                         {payment.studentName}
                       </p>
 
@@ -785,7 +785,7 @@ export default function Payments() {
                   </div>
 
                   <div className="mt-3 flex items-center justify-between gap-3">
-                    <span className="font-bold text-[#16351F]">
+                    <span className="font-bold text-[#0F172A]">
                       {formatAmount(
                         payment.amount,
                         payment.currency

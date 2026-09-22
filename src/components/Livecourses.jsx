@@ -907,7 +907,7 @@ export default function LiveCourses({
 }) {
   /*
    * IMPORTANT:
-   * Courses now come directly from Firestore.
+   * Courses now come directly from Supabase database.
    *
    * Only published LONG courses appear here.
    */
@@ -936,7 +936,7 @@ export default function LiveCourses({
   const location = useLocation();
 
   /* ======================================================================
-     BUILD CATEGORIES FROM FIRESTORE
+     BUILD CATEGORIES FROM Supabase database
      ====================================================================== */
 
   const categories = useMemo(() => {
@@ -986,7 +986,7 @@ export default function LiveCourses({
      dropdown). Re-applies on every navigation to this page (tracked via
      location.key) so it fires on repeat clicks too, but won't fight the
      visitor's own tab switches afterwards or retrigger on unrelated
-     Firestore updates.
+     Supabase database updates.
      ====================================================================== */
 
   const appliedKeyRef = useRef(null);

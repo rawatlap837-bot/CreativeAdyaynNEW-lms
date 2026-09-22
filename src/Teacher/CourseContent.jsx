@@ -38,6 +38,7 @@ import {
 } from "../lib/storage";
 
 import { auth, db, storage } from "../lib/backend";
+import { submitForApproval } from "../services/CourseService";
 
 const STATUS = {
   DRAFT: "draft",
@@ -894,7 +895,7 @@ export default function CourseContent() {
 
     if (
       course.status !== STATUS.DRAFT &&
-      course.status !== STATUS.REJECTED
+      course.status !== STATUS.REJECTED && course.status !== STATUS.PENDING
     ) {
       return;
     }
@@ -920,7 +921,7 @@ export default function CourseContent() {
     }
 
     const confirmed = window.confirm(
-      "Publish this course? It will become visible to students."
+      "Publish this course now? It will become visible to students."
     );
 
     if (!confirmed) return;
@@ -929,15 +930,7 @@ export default function CourseContent() {
       setSubmitting(true);
       clearMessages();
 
-      await updateDoc(
-        doc(db, "courses", courseId),
-        {
-          status: STATUS.PUBLISHED,
-          rejectionReason: null,
-          updatedAt: serverTimestamp(),
-          publishedAt: serverTimestamp(),
-        }
-      );
+      await submitForApproval(courseId);
 
       setCourse((previous) => ({
         ...previous,
@@ -946,11 +939,11 @@ export default function CourseContent() {
       }));
 
       setSuccess(
-        "Course published successfully!"
+        "Course published successfully. It is now visible to students."
       );
     } catch (err) {
       console.error(
-        "Publish course error:",
+        "Submit course error:",
         err
       );
 
@@ -997,7 +990,7 @@ export default function CourseContent() {
             onClick={() =>
               navigate("/teacher/courses")
             }
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700"
           >
             <ArrowLeft size={17} />
             Back to My Courses
@@ -1050,7 +1043,7 @@ export default function CourseContent() {
                   )
                 }
                 disabled={saving || submitting}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700 hover:bg-purple-100 disabled:opacity-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 sm:w-auto"
               >
                 <ClipboardList size={17} />
                 Assignments
@@ -1071,14 +1064,14 @@ export default function CourseContent() {
               </button>
 
               {!isLocked &&
-                course.status === STATUS.DRAFT && (
+                [STATUS.DRAFT, STATUS.REJECTED, STATUS.PENDING].includes(course.status) && (
                   <button
                     type="button"
                     onClick={submitCourse}
                     disabled={
                       saving || submitting
                     }
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 sm:w-auto"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 sm:w-auto"
                   >
                     {submitting ? (
                       <Loader2
@@ -1101,6 +1094,12 @@ export default function CourseContent() {
 
       {/* MAIN */}
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {course.status === STATUS.PENDING && (
+          <div role="status" className="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5 text-violet-800">
+            <h2 className="font-semibold">Ready to publish</h2>
+            <p className="mt-1 text-sm">Approval is no longer required. Use Publish Course to make this course visible to students.</p>
+          </div>
+        )}
         {/* REJECTION */}
         {course.status === STATUS.REJECTED &&
           course.rejectionReason && (
@@ -1169,7 +1168,7 @@ export default function CourseContent() {
             type="button"
             onClick={openAddModule}
             disabled={isLocked || saving}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             <Plus size={18} />
             Add Module
@@ -1179,7 +1178,7 @@ export default function CourseContent() {
         {/* EMPTY */}
         {modules.length === 0 && (
           <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
               <BookOpen size={27} />
             </div>
 
@@ -1197,7 +1196,7 @@ export default function CourseContent() {
               <button
                 type="button"
                 onClick={openAddModule}
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700"
               >
                 <Plus size={17} />
                 Create First Module
@@ -1231,7 +1230,7 @@ export default function CourseContent() {
                       }
                       className="flex min-w-0 items-start gap-3 text-left"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-slate-600">
                         <BookOpen size={19} />
                       </div>
 
@@ -1404,7 +1403,7 @@ export default function CourseContent() {
                             )
                           }
                           disabled={saving}
-                          className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+                          className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50"
                         >
                           <Plus size={17} />
                           Add Lesson
@@ -1476,7 +1475,7 @@ export default function CourseContent() {
                 }
               }}
               placeholder="e.g. Introduction to Digital Marketing"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
             />
           </div>
 
@@ -1494,7 +1493,7 @@ export default function CourseContent() {
               type="button"
               onClick={saveModule}
               disabled={saving}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 sm:w-auto"
             >
               {saving && (
                 <Loader2
@@ -1543,7 +1542,7 @@ export default function CourseContent() {
                 disabled={
                   saving
                 }
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100 disabled:bg-violet-50"
               />
             </div>
 
@@ -1613,7 +1612,7 @@ export default function CourseContent() {
                 disabled={
                   saving
                 }
-                className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
+                className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100 disabled:bg-violet-50"
               />
             </div>
 
@@ -1636,7 +1635,7 @@ export default function CourseContent() {
                 disabled={
                   saving
                 }
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100 disabled:bg-violet-50"
               />
             </div>
 
@@ -1648,7 +1647,7 @@ export default function CourseContent() {
                     Lesson Video
                   </label>
 
-                  <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                  <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4">
                     <input
                       type="url"
                       value={videoLinkInput}
@@ -1657,7 +1656,7 @@ export default function CourseContent() {
                       }
                       placeholder="https://www.youtube.com/watch?v=..."
                       disabled={saving}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100 disabled:bg-violet-50"
                     />
                     <p className="mt-2 text-xs text-slate-500">
                       Students will watch this video inside the LMS.
@@ -1684,7 +1683,7 @@ export default function CourseContent() {
                     disabled={
                       saving
                     }
-                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600"
                   />
 
                   <span>
@@ -1715,7 +1714,7 @@ export default function CourseContent() {
                 type="button"
                 onClick={saveLesson}
                 disabled={saving}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 sm:w-auto"
               >
                 {saving ? (
                   <Loader2
@@ -1767,8 +1766,8 @@ function LessonRow({
 
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isVideo
-            ? "bg-blue-50 text-blue-600"
-            : "bg-slate-100 text-slate-600"
+            ? "bg-violet-50 text-violet-600"
+            : "bg-violet-50 text-slate-600"
             }`}
         >
           {isVideo ? (
@@ -1897,7 +1896,7 @@ function Modal({
             type="button"
             onClick={onClose}
             disabled={disabled}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-violet-50 hover:text-slate-700 disabled:opacity-50"
           >
             <X size={19} />
           </button>
@@ -1929,15 +1928,15 @@ function LessonTypeCard({
       onClick={onClick}
       disabled={disabled}
       className={`rounded-xl border-2 p-4 text-left transition ${selected
-        ? "border-blue-600 bg-blue-50"
+        ? "border-violet-600 bg-violet-50"
         : "border-slate-200 hover:border-slate-300"
         } disabled:cursor-not-allowed disabled:opacity-50`}
     >
       <div className="flex items-center gap-3">
         <div
           className={`flex h-10 w-10 items-center justify-center rounded-xl ${selected
-            ? "bg-blue-100 text-blue-600"
-            : "bg-slate-100 text-slate-500"
+            ? "bg-violet-100 text-violet-600"
+            : "bg-violet-50 text-slate-500"
             }`}
         >
           {icon}
@@ -1956,7 +1955,7 @@ function LessonTypeCard({
         {selected && (
           <Check
             size={17}
-            className="ml-auto text-blue-600"
+            className="ml-auto text-violet-600"
           />
         )}
       </div>
@@ -1975,7 +1974,7 @@ function StatusBadge({ status }) {
     draft: {
       label: "Draft",
       className:
-        "bg-slate-100 text-slate-700",
+        "bg-violet-50 text-slate-700",
     },
 
 

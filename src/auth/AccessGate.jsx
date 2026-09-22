@@ -14,6 +14,28 @@ export default function AccessGate({ roles, children }) {
     {error && <button className="underline" onClick={() => window.location.reload()}>Try again</button>}
     <button className="underline" onClick={() => signOut().catch(() => window.location.reload())}>Sign out</button>
   </div>;
-  if (roles && !roles.includes(profile.role)) return <Navigate to="/dashboard" replace />;
+  const role = String(profile?.role || "").trim().toLowerCase();
+  const allowedRoles = roles?.map((item) => String(item).trim().toLowerCase());
+
+  if (!role) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+    <p role="alert">Your account has no assigned role. Please contact the institute administrator.</p>
+    <button className="underline" onClick={() => signOut().catch(() => window.location.reload())}>Sign out</button>
+  </div>;
+
+  if (allowedRoles && !allowedRoles.includes(role)) {
+    const homeByRole = {
+      admin: "/admin",
+      teacher: "/teacher/courses",
+      student: "/dashboard",
+    };
+
+    const destination = homeByRole[role];
+    if (destination) return <Navigate to={destination} replace />;
+
+    return <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+      <p role="alert">Your account role is not supported. Please contact the institute administrator.</p>
+      <button className="underline" onClick={() => signOut().catch(() => window.location.reload())}>Sign out</button>
+    </div>;
+  }
   return children || <Outlet />;
 }

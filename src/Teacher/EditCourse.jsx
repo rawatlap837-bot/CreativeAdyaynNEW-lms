@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import CourseCategorySelect from "./CourseCategorySelect";
 import {
   ArrowLeft,
   Check,
@@ -117,7 +118,7 @@ export default function EditCourse() {
   }
 
   const isLocked =
-    course?.status === "pending" ||
+    
     course?.status === "archived";
 
   function handleChange(event) {
@@ -337,7 +338,7 @@ export default function EditCourse() {
 
             <button
               onClick={goBack}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to My Courses
@@ -389,7 +390,7 @@ export default function EditCourse() {
                   ? "bg-red-100 text-red-700"
                   : course.status === "archived"
                   ? "bg-slate-200 text-slate-700"
-                  : "bg-blue-100 text-blue-700"
+                  : "bg-violet-100 text-violet-700"
               }`}
             >
               {course.status === "pending"
@@ -413,7 +414,7 @@ export default function EditCourse() {
 
                 <p className="mt-1 text-sm text-amber-800">
                   {course.status === "pending"
-                    ? "This course is currently waiting for admin approval."
+                    ? "This course is ready for you to publish from Manage Content."
                     : "This course has been archived and cannot be edited."}
                 </p>
               </div>
@@ -435,7 +436,7 @@ export default function EditCourse() {
 
               <p className="mt-2 text-xs text-red-700">
                 Make the required changes and submit the course
-                again for approval.
+                again when ready.
               </p>
             </div>
           )}
@@ -490,7 +491,7 @@ export default function EditCourse() {
                     onChange={handleChange}
                     disabled={isLocked || saving}
                     placeholder="Enter course title"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:bg-slate-100"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-violet-50"
                   />
                 </div>
 
@@ -504,7 +505,7 @@ export default function EditCourse() {
                     <label
                       className={`cursor-pointer rounded-xl border p-4 ${
                         form.type === "short"
-                          ? "border-slate-900 bg-slate-50"
+                          ? "border-violet-500 bg-violet-50"
                           : "border-slate-200"
                       } ${
                         isLocked
@@ -534,7 +535,7 @@ export default function EditCourse() {
                     <label
                       className={`cursor-pointer rounded-xl border p-4 ${
                         form.type === "long"
-                          ? "border-slate-900 bg-slate-50"
+                          ? "border-violet-500 bg-violet-50"
                           : "border-slate-200"
                       } ${
                         isLocked
@@ -577,7 +578,7 @@ export default function EditCourse() {
                     disabled={isLocked || saving}
                     rows={3}
                     placeholder="A short description for course cards..."
-                    className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:bg-slate-100"
+                    className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-violet-50"
                   />
                 </div>
 
@@ -594,7 +595,7 @@ export default function EditCourse() {
                     disabled={isLocked || saving}
                     rows={7}
                     placeholder="Describe the course in detail..."
-                    className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:bg-slate-100"
+                    className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-violet-50"
                   />
                 </div>
               </div>
@@ -618,13 +619,12 @@ export default function EditCourse() {
                     Category
                   </label>
 
-                  <input
+                  <CourseCategorySelect
                     name="category"
                     value={form.category}
                     onChange={handleChange}
                     disabled={isLocked || saving}
-                    placeholder="e.g. Web Development"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:bg-slate-100"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-violet-50"
                   />
                 </div>
 
@@ -638,7 +638,7 @@ export default function EditCourse() {
                     value={form.level}
                     onChange={handleChange}
                     disabled={isLocked || saving}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:bg-slate-100"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-violet-50"
                   >
                     <option value="">Select level</option>
                     <option value="Beginner">Beginner</option>
@@ -661,7 +661,7 @@ export default function EditCourse() {
                     onChange={handleChange}
                     disabled={isLocked || saving}
                     placeholder="e.g. 8 weeks / 20 hours"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:bg-slate-100"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-violet-50"
                   />
                 </div>
               </div>
@@ -698,7 +698,7 @@ export default function EditCourse() {
                       onChange={handleChange}
                       disabled={isLocked || saving}
                       placeholder="0"
-                      className="w-full rounded-xl border border-slate-300 py-3 pl-9 pr-4 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:bg-slate-100"
+                      className="w-full rounded-xl border border-slate-300 py-3 pl-9 pr-4 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-violet-50"
                     />
                   </div>
                 </div>
@@ -721,7 +721,7 @@ export default function EditCourse() {
                       onChange={handleChange}
                       disabled={isLocked || saving}
                       placeholder="0"
-                      className="w-full rounded-xl border border-slate-300 py-3 pl-9 pr-4 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:bg-slate-100"
+                      className="w-full rounded-xl border border-slate-300 py-3 pl-9 pr-4 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-violet-50"
                     />
                   </div>
                 </div>
@@ -760,7 +760,7 @@ export default function EditCourse() {
                   )}
                 </div>
               ) : (
-                <div className="flex aspect-video items-center justify-center rounded-2xl bg-slate-100">
+                <div className="flex aspect-video items-center justify-center rounded-2xl bg-violet-50">
                   <ImageIcon className="h-10 w-10 text-slate-400" />
                 </div>
               )}
@@ -807,7 +807,7 @@ export default function EditCourse() {
 
                   <div className="h-2 overflow-hidden rounded-full bg-slate-200">
                     <div
-                      className="h-full rounded-full bg-slate-900 transition-all"
+                      className="h-full rounded-full bg-violet-600 transition-all"
                       style={{
                         width: `${uploadProgress}%`,
                       }}
@@ -841,7 +841,7 @@ export default function EditCourse() {
                 <button
                   type="submit"
                   disabled={isLocked || saving}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   {saving ? (
                     <>

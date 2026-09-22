@@ -57,7 +57,7 @@ function formatDate(value) {
 }
 
 
-// Turns a Firestore Timestamp, Date, ISO string, or millis number
+// Turns a Supabase database Timestamp, Date, ISO string, or millis number
 // into a plain number of milliseconds, so courses can be sorted
 // newest-first regardless of how their date fields are stored.
 function toMillis(value) {
@@ -68,7 +68,7 @@ function toMillis(value) {
   }
 
   if (typeof value?.seconds === "number") {
-    // Raw Firestore Timestamp-like object (not yet hydrated).
+    // Raw Supabase database Timestamp-like object (not yet hydrated).
     return value.seconds * 1000;
   }
 
@@ -92,7 +92,7 @@ function getStatusConfig(status) {
     draft: {
       label: "Draft",
       className:
-        "bg-slate-100 text-slate-600",
+        "bg-violet-50 text-slate-600",
       icon: FileText,
     },
 
@@ -114,7 +114,7 @@ function getStatusConfig(status) {
     archived: {
       label: "Archived",
       className:
-        "bg-slate-100 text-slate-500",
+        "bg-violet-50 text-slate-500",
       icon: Archive,
     },
   };
@@ -123,7 +123,7 @@ function getStatusConfig(status) {
     configs[status] || {
       label: status || "Unknown",
       className:
-        "bg-slate-100 text-slate-600",
+        "bg-violet-50 text-slate-600",
       icon: FileText,
     }
   );
@@ -192,7 +192,7 @@ function TypeBadge({ type }) {
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${isLive
           ? "bg-violet-50 text-violet-700"
-          : "bg-blue-50 text-blue-700"
+          : "bg-violet-50 text-violet-700"
         }`}
     >
       {isLive ? (
@@ -453,7 +453,7 @@ export default function TeacherCourses() {
             onClick={
               handleCreateCourse
             }
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-slate-800 transition sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 text-white px-4 py-2.5 text-sm font-medium hover:bg-violet-700 transition sm:w-auto"
           >
             <Plus size={17} />
 
@@ -572,7 +572,7 @@ export default function TeacherCourses() {
                   )
                 }
                 placeholder="Search your courses..."
-                className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-400"
+                className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-500"
               />
             </div>
 
@@ -708,13 +708,13 @@ function MiniStat({
       type="button"
       onClick={onClick}
       className={`text-left rounded-xl border p-4 transition ${active
-          ? "border-slate-900 bg-slate-900 text-white"
+          ? "border-violet-500 bg-violet-600 text-white"
           : "border-slate-200 bg-white hover:border-slate-300"
         }`}
     >
       <p
         className={`text-xs ${active
-            ? "text-slate-300"
+            ? "text-violet-100"
             : "text-slate-500"
           }`}
       >
@@ -766,7 +766,7 @@ function CourseRow({
               THUMBNAIL
           ================================================= */}
 
-          <div className="w-full lg:w-52 h-32 shrink-0 rounded-xl overflow-hidden bg-slate-100">
+          <div className="w-full lg:w-52 h-32 shrink-0 rounded-xl overflow-hidden bg-violet-50">
 
             {course.thumbnailUrl ? (
               <img
@@ -905,7 +905,7 @@ function CourseRow({
                   course
                 )
               }
-              className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 text-white px-3 py-2 text-xs font-medium hover:bg-slate-800 transition"
+              className="w-full lg:flex-none inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 text-white px-3 py-2 text-xs font-medium hover:bg-violet-700 transition"
             >
               <FileText
                 size={14}
@@ -1008,14 +1008,14 @@ function LoadingState() {
           >
             <div className="flex gap-5">
 
-              <div className="w-52 h-32 bg-slate-100 rounded-xl" />
+              <div className="w-52 h-32 bg-violet-50 rounded-xl" />
 
               <div className="flex-1">
-                <div className="h-4 bg-slate-100 rounded w-32 mb-3" />
+                <div className="h-4 bg-violet-50 rounded w-32 mb-3" />
 
-                <div className="h-6 bg-slate-100 rounded w-2/3 mb-3" />
+                <div className="h-6 bg-violet-50 rounded w-2/3 mb-3" />
 
-                <div className="h-3 bg-slate-100 rounded w-1/2" />
+                <div className="h-3 bg-violet-50 rounded w-1/2" />
               </div>
             </div>
           </div>
@@ -1037,7 +1037,7 @@ function EmptyCourses({
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
 
-      <div className="w-14 h-14 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500">
+      <div className="w-14 h-14 mx-auto rounded-2xl bg-violet-50 flex items-center justify-center text-slate-500">
         {hasCourses ? (
           <Search
             size={24}
@@ -1065,7 +1065,7 @@ function EmptyCourses({
         <button
           type="button"
           onClick={onCreate}
-          className="inline-flex items-center gap-2 mt-5 rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-medium"
+          className="inline-flex items-center gap-2 mt-5 rounded-xl bg-violet-600 text-white px-4 py-2.5 text-sm font-medium"
         >
           <Plus size={16} />
           Create Course

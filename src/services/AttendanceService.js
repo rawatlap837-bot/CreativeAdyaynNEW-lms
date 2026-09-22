@@ -374,7 +374,7 @@ export async function reopenAttendanceSession(
 
 /**
  * Admin/teacher can use this later according
- * to Firestore security rules.
+ * to Supabase database security rules.
  *
  * IMPORTANT:
  * Deleting a session does NOT automatically

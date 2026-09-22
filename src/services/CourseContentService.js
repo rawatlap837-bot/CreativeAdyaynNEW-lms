@@ -700,12 +700,12 @@ export async function setLessonPublished(
 /* ============================================================
    LIVE LISTENERS
 
-   These subscribe to Firestore in real time and return an
+   These subscribe to Supabase database in real time and return an
    unsubscribe function (the standard onSnapshot pattern), rather
    than a one-time Promise like the getX functions above. Because
    onSnapshot must attach synchronously, these do NOT call
    requireCourseOwner first — ownership/visibility must instead be
-   enforced by Firestore security rules for the "courses",
+   enforced by Supabase database security rules for the "courses",
    "modules", and "lessons" collections.
    ============================================================ */
 

@@ -186,7 +186,7 @@ export default function Students() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   /* ================================================================
-     FIRESTORE LIVE DATA
+     Supabase database LIVE DATA
   ================================================================ */
 
   useEffect(() => {
@@ -1575,7 +1575,7 @@ function StudentDetail({
           />
 
           <DetailRow
-            label="Firebase UID"
+            label="Supabase UID"
             value={student.uid}
           />
 

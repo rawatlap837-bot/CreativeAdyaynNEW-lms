@@ -211,8 +211,14 @@ export async function getCourseById(courseId) {
   IMPORTANT:
 
   Teacher creates:
-      draft → teacher adds content → submit for approval →
-      pending → admin approves → published
+      draft → teacher adds content → teacher publishes directly →
+      published
+
+  No admin approval step. Teachers own their courses end-to-end;
+  admins do not gate the draft → published transition. See
+  publishCourse() below, and the corresponding Supabase RLS UPDATE
+  policy on lms_courses which must allow the owning instructor to
+  set status = 'published' (not just 'draft').
 ============================================================ */
 
 export async function createCourse(courseData = {}) {
@@ -228,6 +234,7 @@ export async function createCourse(courseData = {}) {
   }
 
   const course = {
+    id: crypto.randomUUID(),
     title,
     slug: courseData.slug?.trim() || slugify(title),
     description: courseData.description?.trim() || "",
@@ -256,15 +263,18 @@ export async function createCourse(courseData = {}) {
     enrollment_count: 0,
   };
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from(COURSES_TABLE)
-    .insert(course)
-    .select()
-    .single();
+    .insert(course);
 
-  if (error) throw new Error(friendlyDbError(error, "Unable to create course."));
+  // The SELECT policy checks ownership by querying the course table. During
+  // INSERT RETURNING its stable helper cannot see the newly inserted draft.
+  // Save without RETURNING; subsequent requests can read the committed row.
+  if (error) throw new Error(error.code === "42501"
+    ? "Your account does not have permission to create courses. Please contact the institute administrator."
+    : friendlyDbError(error, "Unable to create course."));
 
-  return fromRow("courses", data);
+  return fromRow("courses", course);
 }
 
 /* ============================================================
@@ -274,9 +284,6 @@ export async function createCourse(courseData = {}) {
 export async function updateCourse(courseId, courseData = {}) {
   const { course: existingCourse } = await requireCourseOwner(courseId);
 
-  if (existingCourse.status === COURSE_STATUS.PENDING) {
-    throw new Error("This course is waiting for admin approval and cannot be edited right now.");
-  }
   if (existingCourse.status === COURSE_STATUS.ARCHIVED) {
     throw new Error("Archived courses cannot be edited.");
   }
@@ -337,20 +344,6 @@ export async function updateCourse(courseId, courseData = {}) {
   delete updates.created_at;
   delete updates.status;
 
-  const titleChanged = courseData.title !== undefined && courseData.title.trim() !== existingCourse.title;
-  const priceChanged = courseData.price !== undefined && Number(courseData.price) !== Number(existingCourse.price || 0);
-  const discountChanged =
-    courseData.discountPrice !== undefined &&
-    Number(courseData.discountPrice) !== Number(existingCourse.discount_price || 0);
-  const typeChanged = courseData.type !== undefined && courseData.type !== existingCourse.type;
-  const majorChange = titleChanged || priceChanged || discountChanged || typeChanged;
-
-  if (existingCourse.status === COURSE_STATUS.PUBLISHED && majorChange) {
-    updates.status = COURSE_STATUS.PENDING;
-    updates.published_at = null;
-    updates.rejection_reason = "";
-  }
-
   if (existingCourse.status === COURSE_STATUS.REJECTED) {
     updates.status = COURSE_STATUS.DRAFT;
     updates.rejection_reason = "";
@@ -372,7 +365,7 @@ export async function updateCourse(courseId, courseData = {}) {
    certificates tied to this course all cascade-delete
    automatically via the "on delete cascade" foreign keys in the
    schema — Postgres handles that in one transaction, so there's
-   no manual walk-the-subcollections step here like Firestore
+   no manual walk-the-subcollections step here like Supabase database
    needed. We only need to clean up Storage files manually.
 ============================================================ */
 
@@ -405,20 +398,22 @@ export async function deleteCourse(courseId) {
 }
 
 /* ============================================================
-   SUBMIT FOR APPROVAL
+   PUBLISH COURSE
+
+   Teacher-facing action. Teachers publish their own courses
+   directly — no admin approval step. Requires the Supabase RLS
+   UPDATE policy on lms_courses to allow the course owner to set
+   status to "published" (not just "draft"/"pending").
 ============================================================ */
 
-export async function submitForApproval(courseId) {
+export async function publishCourse(courseId) {
   const { course } = await requireCourseOwner(courseId);
 
-  if (course.status === COURSE_STATUS.PENDING) {
-    throw new Error("This course is already waiting for approval.");
-  }
   if (course.status === COURSE_STATUS.PUBLISHED) {
     throw new Error("This course is already published.");
   }
   if (course.status === COURSE_STATUS.ARCHIVED) {
-    throw new Error("Archived courses cannot be submitted.");
+    throw new Error("Archived courses cannot be published.");
   }
   if (!course.title?.trim()) {
     throw new Error("Course title is required.");
@@ -429,10 +424,10 @@ export async function submitForApproval(courseId) {
 
   const { error } = await supabase
     .from(COURSES_TABLE)
-    .update({ status: COURSE_STATUS.PENDING, rejection_reason: "", updated_at: new Date().toISOString() })
+    .update({ status: COURSE_STATUS.PUBLISHED, published_at: new Date().toISOString(), rejection_reason: "", updated_at: new Date().toISOString() })
     .eq("id", courseId);
 
-  if (error) throw new Error(friendlyDbError(error, "Unable to submit course."));
+  if (error) throw new Error(friendlyDbError(error, "Unable to publish course."));
 
   return getCourseById(courseId);
 }

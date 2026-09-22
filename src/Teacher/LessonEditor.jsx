@@ -321,7 +321,7 @@ const LessonEditor = () => {
 
       /*
        * StorageService currently uses uploadBytes().
-       * Therefore Firebase does not provide real progress
+       * Therefore Supabase does not provide real progress
        * callbacks yet.
        *
        * We show an upload state here and set progress to

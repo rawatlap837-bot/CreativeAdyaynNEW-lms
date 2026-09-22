@@ -56,7 +56,7 @@ export async function getMyEnrollments() {
     We only use ONE where() condition.
 
     There is intentionally NO orderBy().
-    This avoids requiring a composite Firestore index.
+    This avoids requiring a composite Supabase database index.
   */
 
   const enrollmentsQuery = query(
@@ -72,7 +72,7 @@ export async function getMyEnrollments() {
   }));
 
   /*
-    Sort on the client instead of using Firestore orderBy().
+    Sort on the client instead of using Supabase database orderBy().
   */
 
   enrollments.sort((a, b) => {

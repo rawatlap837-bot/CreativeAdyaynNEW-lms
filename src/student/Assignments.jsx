@@ -401,7 +401,7 @@ export default function Assignments({
             }
 
             /* ---------------------------------------------------
-               SUBMIT TO FIRESTORE
+               SUBMIT TO Supabase database
 
                FIX: submitAssignment(assignmentId, submissionData)
                takes the assignment ID and the submission payload

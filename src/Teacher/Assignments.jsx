@@ -138,10 +138,10 @@ const TOAST_STYLES = {
     },
     info: {
         icon: Info,
-        border: "border-purple-200",
-        bg: "bg-purple-50",
-        iconColor: "text-purple-600",
-        text: "text-purple-800",
+        border: "border-violet-200",
+        bg: "bg-violet-50",
+        iconColor: "text-violet-600",
+        text: "text-violet-800",
     },
 };
 
@@ -814,7 +814,7 @@ export default function TeacherAssignments() {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                    <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
 
                     <p className="text-sm text-slate-500">
                         Loading assignments...
@@ -860,13 +860,13 @@ export default function TeacherAssignments() {
                                         `/teacher/courses/${courseId}/content`
                                     )
                                 }
-                                className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+                                className="p-2 rounded-lg hover:bg-violet-50 text-slate-600"
                             >
                                 <ArrowLeft className="w-5 h-5" />
                             </button>
 
-                            <div className="p-3 rounded-xl bg-purple-100">
-                                <ClipboardList className="w-6 h-6 text-purple-600" />
+                            <div className="p-3 rounded-xl bg-violet-100">
+                                <ClipboardList className="w-6 h-6 text-violet-600" />
                             </div>
 
                             <div>
@@ -884,7 +884,7 @@ export default function TeacherAssignments() {
                         <button
                             type="button"
                             onClick={openCreateForm}
-                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-700 transition"
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-700 transition"
                         >
                             <Plus className="w-5 h-5" />
                             Create Assignment
@@ -906,8 +906,8 @@ export default function TeacherAssignments() {
 
                     <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
 
-                        <div className="mx-auto w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center">
-                            <ClipboardList className="w-8 h-8 text-purple-600" />
+                        <div className="mx-auto w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center">
+                            <ClipboardList className="w-8 h-8 text-violet-600" />
                         </div>
 
                         <h2 className="mt-5 text-xl font-bold text-slate-900">
@@ -923,7 +923,7 @@ export default function TeacherAssignments() {
                         <button
                             type="button"
                             onClick={openCreateForm}
-                            className="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-700"
+                            className="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-700"
                         >
                             <Plus className="w-5 h-5" />
                             Create Assignment
@@ -1121,7 +1121,7 @@ export default function TeacherAssignments() {
                             <button
                                 type="button"
                                 onClick={closeForm}
-                                className="p-2 rounded-lg hover:bg-slate-100"
+                                className="p-2 rounded-lg hover:bg-violet-50"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -1147,7 +1147,7 @@ export default function TeacherAssignments() {
                                     value={form.title}
                                     onChange={handleChange}
                                     placeholder="Example: Digital Marketing Case Study"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     required
                                 />
                             </div>
@@ -1166,7 +1166,7 @@ export default function TeacherAssignments() {
                                     onChange={handleChange}
                                     rows={3}
                                     placeholder="Briefly describe the assignment..."
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                                 />
                             </div>
 
@@ -1184,7 +1184,7 @@ export default function TeacherAssignments() {
                                     onChange={handleChange}
                                     rows={5}
                                     placeholder="Write detailed instructions for students..."
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                                 />
                             </div>
 
@@ -1197,7 +1197,7 @@ export default function TeacherAssignments() {
                                     name="targetBatchId"
                                     value={form.targetBatchId}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500"
                                 >
                                     <option value="">
                                         All students in this course
@@ -1218,8 +1218,8 @@ export default function TeacherAssignments() {
                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                                     Attachment (photo or PDF)
                                 </label>
-                                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600 hover:border-purple-400 hover:bg-purple-50/40">
-                                    <Paperclip className="h-5 w-5 shrink-0 text-purple-600" />
+                                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600 hover:border-violet-400 hover:bg-violet-50/40">
+                                    <Paperclip className="h-5 w-5 shrink-0 text-violet-600" />
                                     <span className="min-w-0 flex-1 truncate">
                                         {attachmentFile?.name ||
                                             editingAssignment?.attachment?.name ||
@@ -1236,7 +1236,7 @@ export default function TeacherAssignments() {
                                     />
                                 </label>
                                 {attachmentProgress > 0 && attachmentProgress < 100 && (
-                                    <p className="mt-1.5 text-xs text-purple-600">
+                                    <p className="mt-1.5 text-xs text-violet-600">
                                         Uploading attachment: {attachmentProgress}%
                                     </p>
                                 )}
@@ -1257,7 +1257,7 @@ export default function TeacherAssignments() {
                                         name="dueDate"
                                         value={form.dueDate}
                                         onChange={handleChange}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     />
                                 </div>
 
@@ -1272,7 +1272,7 @@ export default function TeacherAssignments() {
                                         value={form.totalMarks}
                                         onChange={handleChange}
                                         min="1"
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     />
                                 </div>
 
@@ -1295,7 +1295,7 @@ export default function TeacherAssignments() {
                                 <button
                                     type="submit"
                                     disabled={saving}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-700 disabled:opacity-60"
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-700 disabled:opacity-60"
                                 >
                                     {saving ? (
                                         <Loader2 className="w-5 h-5 animate-spin" />
@@ -1342,7 +1342,7 @@ export default function TeacherAssignments() {
                             <button
                                 type="button"
                                 onClick={closeSubmissions}
-                                className="p-2 rounded-lg hover:bg-slate-100"
+                                className="p-2 rounded-lg hover:bg-violet-50"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -1355,7 +1355,7 @@ export default function TeacherAssignments() {
                             {loadingSubmissions ? (
 
                                 <div className="py-12 flex justify-center">
-                                    <Loader2 className="w-7 h-7 animate-spin text-purple-600" />
+                                    <Loader2 className="w-7 h-7 animate-spin text-violet-600" />
                                 </div>
 
                             ) : submissions.length === 0 ? (
@@ -1390,8 +1390,8 @@ export default function TeacherAssignments() {
 
                                                     <div className="flex items-center gap-2">
 
-                                                        <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                                                            <Users className="w-5 h-5 text-purple-600" />
+                                                        <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center">
+                                                            <Users className="w-5 h-5 text-violet-600" />
                                                         </div>
 
                                                         <div>
@@ -1437,7 +1437,7 @@ export default function TeacherAssignments() {
                                                             }
                                                             target="_blank"
                                                             rel="noreferrer"
-                                                            className="mt-3 inline-flex items-center gap-2 text-sm text-purple-600 font-medium hover:underline"
+                                                            className="mt-3 inline-flex items-center gap-2 text-sm text-violet-600 font-medium hover:underline"
                                                         >
                                                             <FileText className="w-4 h-4" />
                                                             View submitted file
@@ -1488,7 +1488,7 @@ export default function TeacherAssignments() {
                                                                 submission
                                                             )
                                                         }
-                                                        className="mt-2 w-full px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700"
+                                                        className="mt-2 w-full px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700"
                                                     >
                                                         {submission.grade !==
                                                             undefined &&
@@ -1547,7 +1547,7 @@ export default function TeacherAssignments() {
                                     setGradingSubmission(null)
                                 }
                                 disabled={grading}
-                                className="p-2 rounded-lg hover:bg-slate-100"
+                                className="p-2 rounded-lg hover:bg-violet-50"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -1578,7 +1578,7 @@ export default function TeacherAssignments() {
                                     }
                                     step="0.01"
                                     placeholder="Enter marks"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     required
                                 />
                             </div>
@@ -1595,7 +1595,7 @@ export default function TeacherAssignments() {
                                     }
                                     rows={5}
                                     placeholder="Write feedback for the student..."
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                                 />
                             </div>
 
@@ -1616,7 +1616,7 @@ export default function TeacherAssignments() {
                                 <button
                                     type="submit"
                                     disabled={grading}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-700 disabled:opacity-60"
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-700 disabled:opacity-60"
                                 >
                                     {grading && (
                                         <Loader2 className="w-5 h-5 animate-spin" />

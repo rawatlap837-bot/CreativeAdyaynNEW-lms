@@ -127,7 +127,7 @@ function uploadFile(
 
         (error) => {
           console.error(
-            "Firebase Storage upload error:",
+            "Supabase Storage upload error:",
             error
           );
 
@@ -151,7 +151,7 @@ function uploadFile(
             case "storage/quota-exceeded":
               reject(
                 new Error(
-                  "Firebase Storage quota has been exceeded."
+                  "Supabase Storage quota has been exceeded."
                 )
               );
               break;
@@ -412,7 +412,7 @@ export async function deleteStorageFile(storagePath) {
     }
 
     console.error(
-      "Firebase Storage delete error:",
+      "Supabase Storage delete error:",
       error
     );
 

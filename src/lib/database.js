@@ -42,6 +42,7 @@ export function resolveReference(reference) {
   }
   if (!tableColumns[table]) throw new Error(`Unsupported data table: ${table}`);
   if (p[0] === "students") filters.push(["role", "student"]);
+  if (p[0] === "instructors") filters.push(["role", "teacher"]);
   return { table, id, filters };
 }
 

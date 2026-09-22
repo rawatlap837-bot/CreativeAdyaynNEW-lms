@@ -41,7 +41,7 @@ import {
  * users/{uid} exists with an email field.
  *
  * The role change itself is only ever a convenience here — the
- * actual security boundary is firestore.rules, which is the only
+ * actual security boundary is Supabase RLS policies, which is the only
  * thing that can't be bypassed from the browser console. This page
  * just gives admins a safer, clearer way to drive that boundary:
  * pick a role explicitly, confirm the change, and can't demote
@@ -185,7 +185,7 @@ export default function Admins() {
   };
 
   // Step 2: confirmed in the modal. This is the only place that
-  // actually writes — firestore.rules is what makes this safe to
+  // actually writes — Supabase RLS policies is what makes this safe to
   // trust, not this function.
   const setRole = async (newRole) => {
     if (!found) return;
@@ -242,7 +242,7 @@ export default function Admins() {
 
     const results = [];
 
-    // Sequential on purpose: keeps writes gentle on Firestore and
+    // Sequential on purpose: keeps writes gentle on Supabase database and
     // lets the list above update one row at a time so admins can
     // watch a big batch progress instead of staring at a spinner.
     for (const email of emails) {
@@ -627,7 +627,7 @@ export default function Admins() {
                   promoting to teacher doesn't require routing
                   through admin first. Clicking a role that isn't
                   the current one opens the confirm modal below —
-                  nothing here writes to Firestore directly.
+                  nothing here writes to Supabase database directly.
               -------------------------------------------------- */}
 
               <div
@@ -829,7 +829,7 @@ export default function Admins() {
       {/* ==========================================================
           BULK ASSIGN ROLES
           Paste many emails at once and push the same role to all
-          of them. Same guardrails and same Firestore write as the
+          of them. Same guardrails and same Supabase database write as the
           single-user flow above — just looped, with each row's
           outcome shown as it lands.
       ========================================================== */}

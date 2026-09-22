@@ -34,8 +34,8 @@ import AuthCallback from "./pages/AuthCallback.jsx";
    AUTH GUARDS
    ============================================================ */
 
-const RequireAuth = lazy(() =>
-  import("./auth/RequireAuth.jsx")
+const RequireStudent = lazy(() =>
+  import("./auth/RequireStudent.jsx")
 );
 
 const RequireAdmin = lazy(() =>
@@ -298,27 +298,27 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <RequireAuth>
+              <RequireStudent>
                 <Dashboard />
-              </RequireAuth>
+              </RequireStudent>
             }
           />
 
           <Route
             path="/dashboard/profile"
             element={
-              <RequireAuth>
+              <RequireStudent>
                 <Profile />
-              </RequireAuth>
+              </RequireStudent>
             }
           />
 
           <Route
             path="/student/courses/:courseId"
             element={
-              <RequireAuth>
+              <RequireStudent>
                 <LearnCourse />
-              </RequireAuth>
+              </RequireStudent>
             }
           />
 

@@ -41,7 +41,7 @@ import { StatCardSkeleton } from "../components/Skeleton";
 
 
 /* ================================================================
-   FIRESTORE COLLECTIONS
+   Supabase database COLLECTIONS
 ================================================================ */
 
 const COLLECTIONS = {
@@ -59,7 +59,7 @@ const COLLECTIONS = {
 ================================================================ */
 
 /**
- * Convert Firestore Timestamp / Date / number / string
+ * Convert Supabase database Timestamp / Date / number / string
  * into a JavaScript Date.
  */
 function toDate(value) {
@@ -369,7 +369,7 @@ export default function AdminDashboard() {
 
 
   /* ================================================================
-     LIVE FIRESTORE LISTENERS
+     LIVE Supabase database LISTENERS
   ================================================================= */
 
   useEffect(() => {
@@ -1969,7 +1969,7 @@ export default function AdminDashboard() {
             />
 
             <span>
-              Connected to live Firestore data
+              Connected to live Supabase database data
             </span>
 
           </div>

@@ -10,7 +10,7 @@ import LiveCourses from "../components/Livecourses";
 import FAQ from "../components/FAQ";
 import { usePublishedCoursesByCategory } from "../services/CourseService";
 
-// Firestore doc -> the exact shape <LiveCourses> already expects via its
+// Supabase database doc -> the exact shape <LiveCourses> already expects via its
 // `coursesByCategory` prop (see Livecourses.jsx's CourseCard). Using the
 // slug (falling back to the raw doc id) as `id` gives friendly
 // /courses/:slug links wherever this feeds into <Link to={`/courses/${id}`}>.

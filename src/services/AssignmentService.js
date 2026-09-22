@@ -276,7 +276,7 @@ export const submitAssignment = async (
             ...submissionData,
             studentId,
 
-            // Always send protected grading fields so Firestore rules can
+            // Always send protected grading fields so Supabase database rules can
             // validate resubmissions consistently, including older records.
             grade: existingData.grade ?? null,
             feedback: existingData.feedback ?? "",

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 import { AT } from "../Admin/AdminUI";
+import "../Admin/adminTheme.css";
 import logo from "../assets/Images/CA2.png";
 
 /* ================================================================
@@ -78,7 +79,7 @@ const NAV = [
 ];
 
 /* ================================================================
- * FIRESTORE COLLECTIONS
+ * Supabase database COLLECTIONS
  * These are used by the admin search.
  * ================================================================ */
 
@@ -908,7 +909,7 @@ const AdminLayout = () => {
   const [payments, setPayments] = useState([]);
 
   /* --------------------------------------------------------------
-   * Live Firestore data
+   * Live Supabase database data
    * -------------------------------------------------------------- */
 
   useEffect(() => {
@@ -1018,7 +1019,7 @@ const AdminLayout = () => {
 
   return (
     <div
-      className="min-h-screen flex"
+      className="admin-shell min-h-screen flex"
       style={{
         background: AT.canvas,
         fontFamily:

@@ -181,7 +181,7 @@ export default function LoginForm() {
     try {
       // signInWithOAuth redirects the whole page to Google, then back to
       // redirectTo — Supabase does not support a popup flow the way
-      // Firebase's signInWithPopup did, so there's no post-redirect code
+      // Supabase's signInWithPopup did, so there's no post-redirect code
       // to run here. The redirect target page below handles routing.
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
