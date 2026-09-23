@@ -355,7 +355,14 @@ export default function Payments() {
               currency:
                 data.currency || "INR",
 
-              status: normalizeStatus(data.status),
+               status: normalizeStatus(data.status),
+
+               paymentMethod:
+                 data.paymentMethod ||
+                 data.payment_mode ||
+                 (String(data.orderId || data.order_id || "").startsWith("offline_")
+                   ? "offline"
+                   : "online"),
 
               paidAt:
                 toDate(data.paidAt) ||
@@ -477,6 +484,14 @@ export default function Payments() {
       paid: paid.length,
       pending: pending.length,
       failed: failed.length,
+
+      onlinePurchases: paid.filter(
+        (payment) => payment.paymentMethod !== "offline"
+      ).length,
+
+      offlinePurchases: paid.filter(
+        (payment) => payment.paymentMethod === "offline"
+      ).length,
     };
   }, [paymentRows]);
 
@@ -545,7 +560,7 @@ export default function Payments() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           title="Recorded revenue"
           value={formatAmount(totals.revenue)}
@@ -567,12 +582,26 @@ export default function Payments() {
           icon={<Clock3 className="h-5 w-5" />}
         />
 
-        <StatCard
-          title="Failed payments"
-          value={totals.failed}
-          color="red"
-          icon={<XCircle className="h-5 w-5" />}
-        />
+          <StatCard
+            title="Failed payments"
+            value={totals.failed}
+            color="red"
+            icon={<XCircle className="h-5 w-5" />}
+          />
+
+          <StatCard
+            title="Online purchases"
+            value={totals.onlinePurchases}
+            color="blue"
+            icon={<CreditCard className="h-5 w-5" />}
+          />
+
+          <StatCard
+            title="Offline purchases"
+            value={totals.offlinePurchases}
+            color="green"
+            icon={<Receipt className="h-5 w-5" />}
+          />
       </div>
 
       <section className="mt-6 overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100">

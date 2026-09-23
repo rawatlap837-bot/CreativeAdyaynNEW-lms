@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import { createPaymentOrder, verifyPayment } from "../services/Payments";
+import { createPaymentOrder, getInstallmentPlan, verifyPayment } from "../services/Payments";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  CreditCard,
   GraduationCap,
   Loader2,
   Lock,
@@ -185,6 +186,10 @@ export default function CourseDetails() {
 
   const [enrollmentError, setEnrollmentError] =
     useState("");
+
+  const [paymentChoice, setPaymentChoice] = useState("one_time");
+  const [emiMonths, setEmiMonths] = useState(3);
+  const [installmentPlan, setInstallmentPlan] = useState(null);
 
 
   /* =========================================================
@@ -402,6 +407,18 @@ export default function CourseDetails() {
     };
   }, [course?.id, user, authReady]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!course?.id || !user) { setInstallmentPlan(null); return undefined; }
+    getInstallmentPlan(course.id).then(({ plan }) => {
+      if (!cancelled) {
+        setInstallmentPlan(plan || null);
+        if (plan && plan.status !== "completed") { setPaymentChoice("emi"); setEmiMonths(Number(plan.installment_count)); }
+      }
+    }).catch(() => { if (!cancelled) setInstallmentPlan(null); });
+    return () => { cancelled = true; };
+  }, [course?.id, user]);
+
 
   /* =========================================================
      COURSE STATS
@@ -438,6 +455,15 @@ export default function CourseDetails() {
 
   const isFree =
     Number(course?.price || 0) === 0;
+
+  const effectivePrice = Number(
+    course?.discountPrice > 0 && course?.discountPrice < course?.price
+      ? course.discountPrice
+      : course?.price || 0
+  );
+  const visibleEmiAmount = Math.ceil((effectivePrice * 100) / emiMonths) / 100;
+  const planIsOpen = installmentPlan && installmentPlan.status !== "completed";
+  const canChoosePayment = !isFree && (!isEnrolled || planIsOpen) && !isPending;
 
 
   /* =========================================================
@@ -491,7 +517,7 @@ export default function CourseDetails() {
        ALREADY ACTIVE
     ------------------------------------------------------- */
 
-    if (isEnrolled) {
+    if (isEnrolled && !planIsOpen) {
       navigate(
         `/student/courses/${course.id}`
       );
@@ -532,7 +558,8 @@ export default function CourseDetails() {
           );
         }
 
-        const order = await createPaymentOrder(course.id);
+        const usingEmi = paymentChoice === "emi";
+        const order = await createPaymentOrder(course.id, usingEmi ? "emi" : "one_time", usingEmi ? emiMonths : null);
 
         const razorpay = new window.Razorpay({
           key: order.keyId,
@@ -540,7 +567,7 @@ export default function CourseDetails() {
           amount: order.amount,
           currency: order.currency,
           name: "Creative Adhyayan",
-          description: course.title,
+          description: usingEmi ? `${course.title} — EMI ${order.installmentNumber} of ${order.installmentCount}` : course.title,
 
           prefill: {
             name: user.displayName || "",
@@ -576,6 +603,10 @@ export default function CourseDetails() {
               const newEnrollment = await verifyPayment({ courseId: course.id, ...response });
 
               setEnrollment(newEnrollment);
+              if (usingEmi) {
+                const { plan } = await getInstallmentPlan(course.id);
+                setInstallmentPlan(plan || null);
+              }
               setEnrollmentMessage(
                 "Payment successful! Your course is now unlocked."
               );
@@ -966,6 +997,19 @@ export default function CourseDetails() {
 
                     </div>
 
+                    {canChoosePayment && (
+                      <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/50 p-4">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-[#2E1A55]"><CreditCard className="h-4 w-4 text-violet-600" />Choose how you want to pay</div>
+                        {planIsOpen ? (
+                          <div className="mt-3 rounded-xl border border-violet-200 bg-white px-3 py-3 text-sm text-[#62567F]"><p className="font-semibold text-[#2E1A55]">Your {installmentPlan.installment_count}-month EMI plan</p><p className="mt-1">{installmentPlan.paid_installments} of {installmentPlan.installment_count} payments completed. Pay EMI {Number(installmentPlan.paid_installments) + 1} to keep access active.</p></div>
+                        ) : <>
+                          <label className={`mt-3 flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${paymentChoice === "one_time" ? "border-violet-500 bg-white shadow-sm" : "border-transparent bg-white/70"}`}><input type="radio" name="payment-choice" checked={paymentChoice === "one_time"} onChange={() => setPaymentChoice("one_time")} className="mt-1 accent-violet-600" /><span><span className="block text-sm font-semibold text-[#2E1A55]">Pay in full</span><span className="block text-xs text-[#7B7194]">One secure Razorpay payment of {formatPrice(effectivePrice)}.</span></span></label>
+                          <label className={`mt-3 flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${paymentChoice === "emi" ? "border-violet-500 bg-white shadow-sm" : "border-transparent bg-white/70"}`}><input type="radio" name="payment-choice" checked={paymentChoice === "emi"} onChange={() => setPaymentChoice("emi")} className="mt-1 accent-violet-600" /><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[#2E1A55]">Pay monthly with EMI</span><span className="block text-xs text-[#7B7194]">Interest-free instalments. The first payment unlocks the course.</span></span></label>
+                          {paymentChoice === "emi" && <div className="mt-3 grid grid-cols-2 gap-2"><select value={emiMonths} onChange={(event) => setEmiMonths(Number(event.target.value))} className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-[#2E1A55] outline-none focus:border-violet-500">{[3, 6, 9, 12].map((months) => <option key={months} value={months}>{months} monthly payments</option>)}</select><div className="rounded-xl bg-white px-3 py-2 text-right text-sm text-[#62567F]">≈ <span className="font-semibold text-[#2E1A55]">{formatPrice(visibleEmiAmount)}</span>/month</div></div>}
+                        </>}
+                      </div>
+                    )}
+
 
                     {/* ENROLLMENT ERROR */}
 
@@ -987,7 +1031,7 @@ export default function CourseDetails() {
 
                     {/* ACTION BUTTON */}
 
-                    {isEnrolled ? (
+                    {isEnrolled && !planIsOpen ? (
 
                       <button
                         type="button"
@@ -1037,9 +1081,7 @@ export default function CourseDetails() {
                           <>
                             <GraduationCap className="h-5 w-5" />
 
-                            {isFree
-                              ? "Enroll for Free"
-                              : "Enroll Now"}
+                            {isFree ? "Enroll for Free" : paymentChoice === "emi" ? planIsOpen ? `Pay EMI ${Number(installmentPlan.paid_installments) + 1}` : `Pay first EMI · ${formatPrice(visibleEmiAmount)}` : "Pay in Full"}
                           </>
                         )}
 
@@ -1058,7 +1100,7 @@ export default function CourseDetails() {
                           ? "Your enrollment is waiting for payment verification."
                           : isFree
                             ? "Create your account and start learning immediately."
-                            : "Secure payment powered by Razorpay."}
+                            : paymentChoice === "emi" ? "Your next EMI is due one month after each successful payment. Payments are processed securely by Razorpay." : "Secure payment powered by Razorpay."}
 
                     </p>
 

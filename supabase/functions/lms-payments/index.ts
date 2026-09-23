@@ -35,26 +35,89 @@ Deno.serve(async (request: Request) => {
     if (authError || !user) return reply({ error: "Your session has expired. Sign in again." }, 401);
     const { data: profile, error: profileError } = await admin.from("lms_profiles").select("status").eq("id", user.id).single();
     if (profileError || profile?.status !== "active") return reply({ error: "Account is not active." }, 403);
-    if (!keyId || !keySecret) return reply({ error: "Online payment is not configured yet." }, 503);
     const body = await request.json();
+    if (body.action === "get-installment-plan") {
+      if (typeof body.courseId !== "string") return reply({ error: "Course is required." }, 400);
+      const { data: plan, error } = await admin.from("lms_installment_plans").select("*").eq("student_id", user.id).eq("course_id", body.courseId).maybeSingle();
+      if (error) throw error;
+      if (plan?.status === "active" && plan.next_due_at && new Date(plan.next_due_at).getTime() < Date.now()) {
+        const { data: overduePlan, error: overdueError } = await admin.from("lms_installment_plans").update({ status: "overdue", updated_at: new Date().toISOString() }).eq("id", plan.id).select().single();
+        if (overdueError) throw overdueError;
+        await admin.from("lms_enrollments").update({ status: "payment_due", updated_at: new Date().toISOString() }).eq("student_id", user.id).eq("course_id", body.courseId).eq("payment_status", "emi");
+        return reply({ plan: overduePlan });
+      }
+      return reply({ plan });
+    }
+    if (body.action === "sync-emi-reminders") {
+      const { data: plans, error } = await admin.from("lms_installment_plans").select("*,lms_courses(title)").eq("student_id", user.id).in("status", ["active", "overdue"]);
+      if (error) throw error;
+      const reminders = [];
+      for (const plan of plans || []) {
+        if (!plan.next_due_at || new Date(plan.next_due_at).getTime() > Date.now()) continue;
+        const installmentNumber = Number(plan.paid_installments) + 1;
+        const courseTitle = plan.lms_courses?.title || "your course";
+        const message = `EMI ${installmentNumber} of ${plan.installment_count} for ${courseTitle} is due. Pay now to continue learning.`;
+        const { error: planUpdateError } = await admin.from("lms_installment_plans").update({ status: "overdue", updated_at: new Date().toISOString() }).eq("id", plan.id);
+        if (planUpdateError) throw planUpdateError;
+        const { error: enrollmentError } = await admin.from("lms_enrollments").update({ status: "payment_due", updated_at: new Date().toISOString() }).eq("student_id", user.id).eq("course_id", plan.course_id).eq("payment_status", "emi");
+        if (enrollmentError) throw enrollmentError;
+        const { error: notificationError } = await admin.from("lms_notifications").upsert({
+          id: `emi_due_${plan.id}_${installmentNumber}`, recipient_id: user.id, course_id: plan.course_id,
+          title: "EMI payment due", message, type: "payment_due", read: false,
+          action_url: `/courses/${plan.course_id}`,
+          metadata: { body: message, actionUrl: `/courses/${plan.course_id}`, planId: plan.id, installmentNumber },
+        }, { onConflict: "id", ignoreDuplicates: true });
+        if (notificationError) throw notificationError;
+        reminders.push({ planId: plan.id, courseId: plan.course_id, installmentNumber });
+      }
+      return reply({ reminders });
+    }
+    if (!keyId || !keySecret) return reply({ error: "Online payment is not configured yet." }, 503);
     if (body.action === "create-order") {
       if (typeof body.courseId !== "string") return reply({ error: "Course is required." }, 400);
       const { data: course, error } = await admin.from("lms_courses").select("id,title,price,discount_price,currency,status").eq("id", body.courseId).single();
       if (error || course.status !== "published") return reply({ error: "Course is unavailable." }, 404);
       const { data: enrollment, error: enrollmentError } = await admin.from("lms_enrollments").select("id,status").eq("student_id", user.id).eq("course_id", course.id).maybeSingle();
       if (enrollmentError) throw enrollmentError;
-      if (enrollment?.status === "active") return reply({ error: "You are already enrolled. Refresh this page." }, 409);
+      const paymentMode = body.paymentMode === "emi" ? "emi" : "one_time";
+      const { data: activePlan, error: activePlanError } = await admin.from("lms_installment_plans").select("id,status").eq("student_id", user.id).eq("course_id", course.id).maybeSingle();
+      if (activePlanError) throw activePlanError;
+      if (activePlan && activePlan.status !== "completed" && paymentMode !== "emi") return reply({ error: "You already have an EMI plan for this course. Pay the next EMI instead." }, 409);
+      if (enrollment?.status === "active" && paymentMode !== "emi") return reply({ error: "You are already enrolled. Refresh this page." }, 409);
       const { count, error: countError } = await admin.from("lms_payments").select("id", { count: "exact", head: true }).eq("student_id", user.id).gte("created_at", new Date(Date.now() - 60000).toISOString());
       if (countError) throw countError;
       if ((count || 0) >= 5) return reply({ error: "Please wait a minute before retrying payment." }, 429);
-      const amount = payableAmount(course);
-      const order = await razorpay("orders", { amount, currency: course.currency || "INR", receipt: crypto.randomUUID(), notes: { courseId: course.id, studentId: user.id } });
+      const totalAmount = payableAmount(course);
+      let amount = totalAmount;
+      let planId: string | null = null;
+      let installmentNumber: number | null = null;
+      let installmentCount: number | null = null;
+      if (paymentMode === "emi") {
+        const { data: existingPlan, error: planError } = await admin.from("lms_installment_plans").select("*").eq("student_id", user.id).eq("course_id", course.id).maybeSingle();
+        if (planError) throw planError;
+        let plan = existingPlan;
+        if (!plan) {
+          const selectedCount = Number(body.installmentCount);
+          if (![3, 6, 9, 12].includes(selectedCount)) return reply({ error: "Choose a 3, 6, 9, or 12 month EMI plan." }, 400);
+          const { data: newPlan, error: createPlanError } = await admin.from("lms_installment_plans").insert({ student_id: user.id, course_id: course.id, total_amount: totalAmount, installment_count: selectedCount, installment_amount: Math.ceil(totalAmount / selectedCount), next_due_at: new Date().toISOString(), status: "active" }).select().single();
+          if (createPlanError) throw createPlanError;
+          plan = newPlan;
+        }
+        if (plan.status === "completed" || Number(plan.paid_installments) >= Number(plan.installment_count)) return reply({ error: "Your EMI plan is already complete." }, 409);
+        if (plan.status === "cancelled") return reply({ error: "This EMI plan is no longer available." }, 409);
+        installmentNumber = Number(plan.paid_installments) + 1;
+        installmentCount = Number(plan.installment_count);
+        const baseAmount = Math.floor(Number(plan.total_amount) / installmentCount);
+        amount = baseAmount + (installmentNumber <= Number(plan.total_amount) % installmentCount ? 1 : 0);
+        planId = plan.id;
+      }
+      const order = await razorpay("orders", { amount, currency: course.currency || "INR", receipt: crypto.randomUUID(), notes: { courseId: course.id, studentId: user.id, paymentMode, planId: planId || "", installmentNumber: String(installmentNumber || "") } });
       const { error: insertError } = await admin.from("lms_payments").insert({
         id: order.id, order_id: order.id, student_id: user.id, course_id: course.id,
-        amount, currency: order.currency, status: "created",
+        amount, currency: order.currency, status: "created", payment_mode: paymentMode, plan_id: planId, installment_number: installmentNumber, installment_count: installmentCount, due_at: paymentMode === "emi" ? new Date().toISOString() : null,
       });
       if (insertError) throw insertError;
-      return reply({ keyId, orderId: order.id, amount, currency: order.currency });
+      return reply({ keyId, orderId: order.id, amount, currency: order.currency, paymentMode, planId, installmentNumber, installmentCount });
     }
     if (body.action === "verify") {
       if (!/^order_[a-zA-Z0-9]+$/.test(body.razorpay_order_id || "") || !/^pay_[a-zA-Z0-9]+$/.test(body.razorpay_payment_id || "")) return reply({ error: "Invalid payment reference." }, 400);

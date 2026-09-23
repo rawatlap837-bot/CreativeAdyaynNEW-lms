@@ -62,6 +62,8 @@ import {
   getMyAssignments,
 } from "../services/AssignmentService";
 
+import { syncEmiReminders } from "../services/Payments";
+
 /* =========================================================
    DESIGN
 ========================================================= */
@@ -803,8 +805,11 @@ export default function Dashboard() {
                     "Notification",
 
                   body:
-                    data.body ||
+                    data.body || data.message ||
                     "",
+
+                  actionUrl:
+                    data.actionUrl || data.action_url || "",
 
                   time:
                     timeAgo(
@@ -1143,6 +1148,11 @@ export default function Dashboard() {
       );
 
     return unsubscribe;
+  }, [uid]);
+
+  useEffect(() => {
+    if (!uid) return;
+    syncEmiReminders().catch((error) => console.warn("EMI reminder check failed:", error));
   }, [uid]);
   */
 
@@ -1967,6 +1977,16 @@ export default function Dashboard() {
                                 notification.time
                               }
                             </p>
+
+                            {notification.actionUrl && (
+                              <button
+                                type="button"
+                                onClick={() => navigate(notification.actionUrl)}
+                                className="mt-2 text-[10px] font-semibold text-[#5227FF] hover:underline"
+                              >
+                                Pay EMI now
+                              </button>
+                            )}
 
                           </div>
 

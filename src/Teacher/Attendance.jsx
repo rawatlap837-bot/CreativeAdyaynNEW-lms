@@ -20,6 +20,10 @@ import {
 
 import { auth, db } from "../lib/backend";
 import { getCourseAttendance } from "../services/AttendanceService";
+import {
+  getBatchesForTeacher,
+  getBatchRoster,
+} from "../services/BatchService";
 
 /* ============================================================
    DATE FORMAT
@@ -224,22 +228,11 @@ export default function Attendance() {
 
         if (cancelled) return;
 
-        const courseMap = new Map(
-          courses.map((course) => [
-            course.id,
-            course,
-          ])
+        const enriched = await enrichAttendanceRecords(
+          records,
+          courses,
+          teacher.uid
         );
-
-        const enriched =
-          records.map((record) => ({
-            ...record,
-
-            course:
-              courseMap.get(
-                record.courseId
-              ) || null,
-          }));
 
         setAttendance(enriched);
       } catch (err) {
@@ -291,7 +284,7 @@ export default function Attendance() {
             "";
 
           return (
-            record.studentId
+            record.studentName
               ?.toLowerCase()
               .includes(term) ||
             courseName
@@ -300,7 +293,7 @@ export default function Attendance() {
             record.status
               ?.toLowerCase()
               .includes(term) ||
-            record.sessionId
+            record.batchName
               ?.toLowerCase()
               .includes(term)
           );
@@ -356,22 +349,12 @@ export default function Attendance() {
 
         const records = results.flat();
 
-        const courseMap = new Map(
-          courses.map((course) => [
-            course.id,
-            course,
-          ])
-        );
-
         setAttendance(
-          records.map((record) => ({
-            ...record,
-
-            course:
-              courseMap.get(
-                record.courseId
-              ) || null,
-          }))
+          await enrichAttendanceRecords(
+            records,
+            courses,
+            teacher.uid
+          )
         );
       } catch (err) {
         console.error(
@@ -527,7 +510,7 @@ export default function Attendance() {
           onChange={(e) =>
             setSearch(e.target.value)
           }
-          placeholder="Search student, course, session..."
+          placeholder="Search student, course, batch..."
           className="w-full min-w-0 rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-medium text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 sm:pl-11"
         />
 
@@ -583,7 +566,7 @@ export default function Attendance() {
                 </th>
 
                 <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Session
+                  Batch
                 </th>
 
                 <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -690,12 +673,12 @@ function MobileAttendanceCard({
           <div className="min-w-0">
 
             <p className="truncate text-sm font-bold text-slate-900">
-              {record.studentId ||
+              {record.studentName ||
                 "Unknown student"}
             </p>
 
             <p className="mt-0.5 text-xs text-slate-500">
-              Student ID
+              Student
             </p>
 
           </div>
@@ -735,7 +718,7 @@ function MobileAttendanceCard({
 
         </div>
 
-        {/* SESSION */}
+        {/* BATCH */}
 
         <div className="flex items-start gap-2.5 sm:gap-3">
 
@@ -744,11 +727,11 @@ function MobileAttendanceCard({
           <div className="min-w-0">
 
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              Session
+              Batch
             </p>
 
-            <p className="mt-0.5 break-all text-xs font-medium text-slate-600">
-              {record.sessionId ||
+            <p className="mt-0.5 break-words text-sm font-medium text-slate-600">
+              {record.batchName ||
                 "—"}
             </p>
 
@@ -805,7 +788,7 @@ function DesktopAttendanceRow({
       <td className="px-5 py-4">
 
         <p className="text-sm font-semibold text-slate-900">
-          {record.studentId ||
+          {record.studentName ||
             "Unknown student"}
         </p>
 
@@ -824,15 +807,15 @@ function DesktopAttendanceRow({
 
       </td>
 
-      {/* SESSION */}
+      {/* BATCH */}
 
       <td className="px-5 py-4">
 
         <p
-          title={record.sessionId}
-          className="max-w-[220px] truncate text-xs font-medium text-slate-500"
+          title={record.batchName}
+          className="max-w-[220px] truncate text-sm font-medium text-slate-600"
         >
-          {record.sessionId || "—"}
+          {record.batchName || "Individual attendance"}
         </p>
 
       </td>
@@ -967,4 +950,41 @@ function SummaryCard({
 
     </div>
   );
+}
+
+async function enrichAttendanceRecords(records, courses, teacherId) {
+  const courseMap = new Map(courses.map((course) => [course.id, course]));
+  const batches = await getBatchesForTeacher(teacherId);
+  const batchMap = new Map(batches.map((batch) => [batch.id, batch]));
+  const batchIds = [...new Set(records.map((record) => record.batchId).filter(Boolean))];
+  const rosters = await Promise.all(
+    batchIds.map(async (batchId) => {
+      try {
+        const { students } = await getBatchRoster(batchId);
+        return [batchId, students];
+      } catch {
+        return [batchId, []];
+      }
+    })
+  );
+  const studentsByBatch = new Map();
+
+  rosters.forEach(([batchId, students]) => {
+    students.forEach((student) => {
+      studentsByBatch.set(
+        `${batchId}:${student.uid}`,
+        student.name || student.email || ""
+      );
+    });
+  });
+
+  return records.map((record) => ({
+    ...record,
+    course: courseMap.get(record.courseId) || null,
+    batchName: batchMap.get(record.batchId)?.name || "Individual attendance",
+    studentName:
+      studentsByBatch.get(`${record.batchId}:${record.studentId}`) ||
+      record.studentName ||
+      "Unknown student",
+  }));
 }

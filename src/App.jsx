@@ -122,6 +122,10 @@ const TeacherAttendance = lazy(() =>
   import("./Teacher/Attendance.jsx")
 );
 
+const TeacherOfflineEnrollments = lazy(() =>
+  import("./Teacher/OfflineEnrollments.jsx")
+);
+
 const TeacherBatchList = lazy(() =>
   import("./Teacher/BatchList.jsx")
 );
@@ -397,6 +401,11 @@ function App() {
             <Route
               path="attendance"
               element={<TeacherAttendance />}
+            />
+
+            <Route
+              path="offline-enrollments"
+              element={<TeacherOfflineEnrollments />}
             />
 
             <Route

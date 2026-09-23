@@ -10,7 +10,9 @@ async function invoke(action, payload) {
   if (data?.error) throw new Error(data.error);
   return data;
 }
-export const createPaymentOrder = (courseId) => invoke("create-order", { courseId });
+export const createPaymentOrder = (courseId, paymentMode = "one_time", installmentCount = null) => invoke("create-order", { courseId, paymentMode, installmentCount });
+export const getInstallmentPlan = (courseId) => invoke("get-installment-plan", { courseId });
+export const syncEmiReminders = () => invoke("sync-emi-reminders", {});
 export async function verifyPayment(payment) {
   const result = await invoke("verify", payment);
   return fromRow("enrollments", result.enrollment);

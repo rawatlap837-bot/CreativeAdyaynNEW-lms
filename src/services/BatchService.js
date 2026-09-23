@@ -22,6 +22,8 @@ import { auth, db } from "../lib/backend";
 
 const BATCHES_COLLECTION = "batches";
 const ATTENDANCE_COLLECTION = "batch_attendance";
+const ATTENDANCE_SESSIONS_COLLECTION = "attendanceSessions";
+const ATTENDANCE_RECORDS_COLLECTION = "attendance";
 const ENROLLMENTS_COLLECTION = "enrollments";
 const STUDENTS_COLLECTION = "students";
 const USERS_COLLECTION = "users";
@@ -637,6 +639,43 @@ export async function markAttendance(
   };
 
   await setDoc(attendanceRef, attendanceData);
+
+  // Batch attendance is also written to the canonical attendance tables.
+  // Teacher Attendance and the student dashboard read those tables, so this
+  // keeps one saved attendance mark visible everywhere in the LMS.
+  const sessionId = `batch_${batchId}_${date}`;
+  await setDoc(
+    doc(db, ATTENDANCE_SESSIONS_COLLECTION, sessionId),
+    {
+      courseId: batch.courseId,
+      teacherId: ownerId,
+      title: `${batch.name || "Batch"} attendance`,
+      date,
+      status: "closed",
+      batchId,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  await Promise.all(
+    Object.entries(records).map(([studentId, status]) =>
+      setDoc(
+        doc(db, ATTENDANCE_RECORDS_COLLECTION, `${sessionId}_${studentId}`),
+        {
+          sessionId,
+          studentId,
+          courseId: batch.courseId,
+          teacherId: ownerId,
+          date,
+          status,
+          batchId,
+          markedAt: serverTimestamp(),
+        },
+        { merge: true }
+      )
+    )
+  );
 
   return {
     id: attendanceId,
