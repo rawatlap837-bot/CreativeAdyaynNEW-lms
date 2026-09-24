@@ -23,6 +23,7 @@ import {
   Circle,
   ShieldCheck,
   Megaphone,
+  FileDown,
 } from "lucide-react";
 
 import { AT } from "../Admin/AdminUI";
@@ -59,6 +60,11 @@ const NAV = [
     to: "/admin/analytics",
     label: "Analytics",
     icon: BarChart3,
+  },
+  {
+    to: "/admin/exports",
+    label: "Export Reports",
+    icon: FileDown,
   },
 
   /* --------------------------------------------------------------

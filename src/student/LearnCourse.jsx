@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import { auth, db } from "../lib/backend";
+import CourseCommunityPanel from "../components/CourseCommunityPanel";
 
 import {
   getEnrollment,
@@ -1594,6 +1595,7 @@ export default function LearnCourse() {
         ================================================= */}
 
         <main className="min-w-0 flex-1">
+          {hasAccess && <div className="p-4 sm:p-6"><CourseCommunityPanel courseId={course.id} /></div>}
 
           {!selectedLesson ? (
             <div className="flex min-h-[70vh] items-center justify-center px-6">

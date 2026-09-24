@@ -16,6 +16,7 @@ import {
   Send,
   Trash2,
   Video,
+  MessageCircle,
   X,
 } from "lucide-react";
 
@@ -39,6 +40,7 @@ import {
 
 import { auth, db, storage } from "../lib/backend";
 import { publishCourse } from "../services/CourseService";
+import { getCourseCommunity, getCommunityJoinClickCount, removeCourseCommunity, saveCourseCommunity, validateWhatsAppInvite } from "../services/CourseCommunityService";
 
 const STATUS = {
   DRAFT: "draft",
@@ -100,6 +102,14 @@ export default function CourseContent() {
   });
 
   const [videoLinkInput, setVideoLinkInput] = useState("");
+  const [activeTab, setActiveTab] = useState("curriculum");
+  const [community, setCommunity] = useState(null);
+  const [communityForm, setCommunityForm] = useState({ whatsappUrl: "", liveClassUrl: "", groupRules: "" });
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communitySaving, setCommunitySaving] = useState(false);
+  const [communityError, setCommunityError] = useState("");
+  const [communitySuccess, setCommunitySuccess] = useState("");
+  const [joinClickCount, setJoinClickCount] = useState(0);
 
   useEffect(() => {
     loadCourse();
@@ -148,6 +158,21 @@ export default function CourseContent() {
 
       setCourse(courseData);
 
+      try {
+        setCommunityLoading(true);
+        const [savedCommunity, clickCount] = await Promise.all([
+          getCourseCommunity(courseId),
+          getCommunityJoinClickCount(courseId),
+        ]);
+        setCommunity(savedCommunity);
+        setJoinClickCount(clickCount);
+        setCommunityForm({ whatsappUrl: savedCommunity?.whatsapp_url || "", liveClassUrl: savedCommunity?.live_class_url || "", groupRules: savedCommunity?.group_rules || "" });
+      } catch (communityLoadError) {
+        setCommunityError(communityLoadError?.message || "Unable to load community settings.");
+      } finally {
+        setCommunityLoading(false);
+      }
+
       await loadModules();
 
       /*
@@ -167,6 +192,44 @@ export default function CourseContent() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveCommunity = async (event) => {
+    event.preventDefault();
+    setCommunityError("");
+    setCommunitySuccess("");
+    if (!validateWhatsAppInvite(communityForm.whatsappUrl)) {
+      setCommunityError("Enter a valid link starting with https://chat.whatsapp.com/ followed by the invite code.");
+      return;
+    }
+    try {
+      setCommunitySaving(true);
+      const saved = await saveCourseCommunity(courseId, communityForm);
+      setCommunity(saved);
+      setCommunityForm({ whatsappUrl: saved.whatsapp_url || "", liveClassUrl: saved.live_class_url || "", groupRules: saved.group_rules || "" });
+      setCommunitySuccess("Community settings saved.");
+    } catch (err) {
+      setCommunityError(err?.message || "Unable to save community settings.");
+    } finally {
+      setCommunitySaving(false);
+    }
+  };
+
+  const clearCommunity = async () => {
+    if (!window.confirm("Remove the WhatsApp group and community details for this course?")) return;
+    setCommunityError("");
+    setCommunitySuccess("");
+    try {
+      setCommunitySaving(true);
+      await removeCourseCommunity(courseId);
+      setCommunity(null);
+      setCommunityForm({ whatsappUrl: "", liveClassUrl: "", groupRules: "" });
+      setCommunitySuccess("Community details removed.");
+    } catch (err) {
+      setCommunityError(err?.message || "Unable to remove community details.");
+    } finally {
+      setCommunitySaving(false);
     }
   };
 
@@ -1098,6 +1161,24 @@ export default function CourseContent() {
 
       {/* MAIN */}
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="Course management sections">
+          <button type="button" role="tab" aria-selected={activeTab === "curriculum"} onClick={() => setActiveTab("curriculum")} className={`rounded-xl px-4 py-2.5 text-sm font-semibold ${activeTab === "curriculum" ? "bg-violet-600 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>Curriculum</button>
+          <button type="button" role="tab" aria-selected={activeTab === "community"} onClick={() => setActiveTab("community")} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold ${activeTab === "community" ? "bg-violet-600 text-white" : "border border-slate-200 bg-white text-slate-700"}`}><MessageCircle className="h-4 w-4" />Community</button>
+        </div>
+        {activeTab === "community" ? (
+          <section role="tabpanel" className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+            <div className="mb-6"><h2 className="text-xl font-bold text-slate-900">Course WhatsApp Group</h2><p className="mt-1 text-sm text-slate-500">Create the WhatsApp group, then share its invite link with active students.</p></div>
+            {communityError && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{communityError}</div>}
+            {communitySuccess && <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{communitySuccess}</div>}
+            {communityLoading ? <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Loading community settings…</div> : <form onSubmit={saveCommunity} className="space-y-5">
+              <div><label htmlFor="community-whatsapp" className="mb-2 block text-sm font-medium text-slate-700">WhatsApp invite link</label><input id="community-whatsapp" type="url" value={communityForm.whatsappUrl} onChange={(event) => { setCommunityForm((current) => ({ ...current, whatsappUrl: event.target.value })); setCommunityError(""); setCommunitySuccess(""); }} placeholder="https://chat.whatsapp.com/yourInviteCode" disabled={communitySaving || isLocked} aria-invalid={Boolean(communityForm.whatsappUrl && !validateWhatsAppInvite(communityForm.whatsappUrl))} className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50" />{communityForm.whatsappUrl && !validateWhatsAppInvite(communityForm.whatsappUrl) && <p className="mt-1 text-sm text-red-600">Use a WhatsApp invite link beginning with https://chat.whatsapp.com/.</p>}</div>
+              <div><label htmlFor="community-live-class" className="mb-2 block text-sm font-medium text-slate-700">Live class link <span className="font-normal text-slate-400">(optional)</span></label><input id="community-live-class" type="url" value={communityForm.liveClassUrl} onChange={(event) => setCommunityForm((current) => ({ ...current, liveClassUrl: event.target.value }))} placeholder="https://meet.google.com/... or https://zoom.us/..." disabled={communitySaving || isLocked} className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50" /></div>
+              <div><label htmlFor="community-rules" className="mb-2 block text-sm font-medium text-slate-700">Group rules</label><textarea id="community-rules" rows={4} value={communityForm.groupRules} onChange={(event) => setCommunityForm((current) => ({ ...current, groupRules: event.target.value }))} placeholder="Share notes, be respectful, and keep messages course-related…" disabled={communitySaving || isLocked} className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50" /></div>
+              <div className="flex flex-wrap items-center gap-3"><button type="submit" disabled={communitySaving || isLocked || Boolean(communityForm.whatsappUrl && !validateWhatsAppInvite(communityForm.whatsappUrl))} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{communitySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Save</button><button type="button" disabled={!communityForm.whatsappUrl || !validateWhatsAppInvite(communityForm.whatsappUrl)} onClick={() => window.open(communityForm.whatsappUrl, "_blank", "noopener,noreferrer")} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50">Test link</button><button type="button" disabled={!community || communitySaving || isLocked} onClick={clearCommunity} className="rounded-xl border border-red-200 px-5 py-3 text-sm font-semibold text-red-700 disabled:opacity-50">Remove</button></div>
+              <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-500"><span>Join button clicks: <strong className="text-slate-800">{joinClickCount}</strong></span><span>Last updated: <strong className="text-slate-800">{community?.updated_at ? new Date(community.updated_at).toLocaleString() : "Never"}</strong></span></div>
+            </form>}
+          </section>
+        ) : <>
         {course.status === STATUS.PENDING && (
           <div role="status" className="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5 text-violet-800">
             <h2 className="font-semibold">Ready to publish</h2>
@@ -1443,6 +1524,7 @@ export default function CourseContent() {
             <span>{success}</span>
           </div>
         )}
+        </>}
       </main>
 
       {/* MODULE MODAL */}

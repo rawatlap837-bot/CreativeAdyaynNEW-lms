@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 import { payableAmount, validSignature, assertCapturedPayment } from "../_shared/payments.js";
+import { sendPaymentReceipt } from "../_shared/receipts.js";
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 const keyId = Deno.env.get("RAZORPAY_KEY_ID") || "";
@@ -140,7 +141,17 @@ Deno.serve(async (request: Request) => {
       assertCapturedPayment(payment, order);
       const { data: enrollment, error: confirmError } = await admin.rpc("lms_confirm_payment", { order_ref: order.order_id, payment_ref: payment.id });
       if (confirmError) throw confirmError;
-      return reply({ enrollment });
+      const [{ data: course }, { data: profile }] = await Promise.all([
+        admin.from("lms_courses").select("title").eq("id", order.course_id).maybeSingle(),
+        admin.from("lms_profiles").select("name,email").eq("id", user.id).maybeSingle(),
+      ]);
+      const receiptEmail = await sendPaymentReceipt({
+        payment: { ...order, ...payment, payment_id: payment.id, payment_mode: order.payment_mode, installment_number: order.installment_number },
+        courseTitle: course?.title || "Course",
+        recipientEmail: user.email || profile?.email || "",
+        recipientName: profile?.name || user.user_metadata?.name || user.user_metadata?.full_name || "Student",
+      });
+      return reply({ enrollment, receiptEmail });
     }
     return reply({ error: "Unknown payment action." }, 400);
   } catch (error) {

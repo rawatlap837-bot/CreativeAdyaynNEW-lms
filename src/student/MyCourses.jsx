@@ -30,6 +30,7 @@ import {
 } from "../lib/database";
 
 import { getMyEnrollments } from "../services/EnrollmentService";
+import CourseCommunityPanel from "../components/CourseCommunityPanel";
 
 
 /* =========================================================
@@ -1040,6 +1041,8 @@ function StudentCourseCard({
           </div>
 
         )}
+
+        {isActive && <div className="mt-4"><CourseCommunityPanel courseId={course.id} compact /></div>}
 
 
         {/* =================================================

@@ -43,6 +43,7 @@ import {
   Globe2,
   GraduationCap,
   AlertTriangle,
+  CreditCard,
 } from "lucide-react";
 
 import {
@@ -63,6 +64,7 @@ import {
 } from "../services/AssignmentService";
 
 import { syncEmiReminders } from "../services/Payments";
+import StudentPayments from "./Payments.jsx";
 
 /* =========================================================
    DESIGN
@@ -141,6 +143,11 @@ const DASHBOARD_TABS = [
     key: "assignments",
     label: "Assignments",
     icon: GraduationCap,
+  },
+  {
+    key: "payments",
+    label: "Payments",
+    icon: CreditCard,
   },
   {
     key: "certificates",
@@ -1486,7 +1493,10 @@ export default function Dashboard() {
             CERTIFICATES
         ================================================= */}
 
-        {activeTab ===
+        {activeTab === "payments" ? (
+          <StudentPayments />
+
+        ) : activeTab ===
           "certificates" ? (
           <Certificates />
 

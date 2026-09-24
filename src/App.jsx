@@ -14,6 +14,7 @@ import {
 
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
+import { MessageCircle } from "lucide-react";
 
 /* ============================================================
    PUBLIC PAGES
@@ -92,6 +93,10 @@ const AdminCourses = lazy(() =>
 
 const AdminPayments = lazy(() =>
   import("./Admin/Payments.jsx")
+);
+
+const ExportReports = lazy(() =>
+  import("./Admin/ExportReports.jsx")
 );
 
 const Analytics = lazy(() =>
@@ -369,7 +374,7 @@ function App() {
             path="/dashboard/payments"
             element={
               <Navigate
-                to="/dashboard/profile?tab=payments"
+                to="/dashboard?tab=payments"
                 replace
               />
             }
@@ -496,6 +501,11 @@ function App() {
             />
 
             <Route
+              path="exports"
+              element={<ExportReports />}
+            />
+
+            <Route
               path="analytics"
               element={<Analytics />}
             />
@@ -529,6 +539,18 @@ function App() {
         />
 
       </Routes>
+
+      <a
+        href="https://wa.me/919910232927?text=Hello%2C%20I%20need%20help%20with%20Creative%20Adhyayan."
+        target="_blank"
+        rel="noreferrer"
+        aria-label="WhatsApp customer support at +91 99102 32927"
+        className="fixed bottom-5 right-4 z-[100] inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-xl transition hover:scale-105 hover:bg-[#1fb95a] sm:bottom-6 sm:right-6"
+      >
+        <MessageCircle className="h-5 w-5" />
+        <span className="hidden sm:inline">WhatsApp support</span>
+        <span className="sm:hidden">Support</span>
+      </a>
 
     </Suspense>
   );

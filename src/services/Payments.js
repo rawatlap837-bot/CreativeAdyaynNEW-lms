@@ -15,5 +15,8 @@ export const getInstallmentPlan = (courseId) => invoke("get-installment-plan", {
 export const syncEmiReminders = () => invoke("sync-emi-reminders", {});
 export async function verifyPayment(payment) {
   const result = await invoke("verify", payment);
-  return fromRow("enrollments", result.enrollment);
+  return {
+    enrollment: fromRow("enrollments", result.enrollment),
+    receiptEmail: result.receiptEmail || { sent: false, reason: "email_not_configured" },
+  };
 }

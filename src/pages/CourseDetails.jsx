@@ -616,16 +616,16 @@ export default function CourseDetails() {
                 "Payment received. Enrolling you in the course..."
               );
 
-              const newEnrollment = await verifyPayment({ courseId: course.id, ...response });
+              const { enrollment: newEnrollment, receiptEmail } = await verifyPayment({ courseId: course.id, ...response });
 
               setEnrollment(newEnrollment);
               if (usingEmi) {
                 const { plan } = await getInstallmentPlan(course.id);
                 setInstallmentPlan(plan || null);
               }
-              setEnrollmentMessage(
-                "Payment successful! Your course is now unlocked."
-              );
+              setEnrollmentMessage(receiptEmail?.sent
+                ? `Payment successful! Your course is now unlocked. The receipt was sent to ${user.email}.`
+                : "Payment successful! Your course is now unlocked. The receipt could not be emailed right now; you can still view your payment record in your dashboard.");
 
               setTimeout(() => {
                 navigate(`/student/courses/${course.id}`);

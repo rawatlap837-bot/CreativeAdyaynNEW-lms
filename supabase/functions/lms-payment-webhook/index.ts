@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 import { validSignature, assertCapturedPayment } from "../_shared/payments.js";
+import { sendPaymentReceipt } from "../_shared/receipts.js";
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
@@ -19,6 +20,16 @@ Deno.serve(async (request: Request) => {
     assertCapturedPayment(payment, order);
     const { error: confirmError } = await admin.rpc("lms_confirm_payment", { order_ref: order.order_id, payment_ref: payment.id });
     if (confirmError) throw confirmError;
+    const [{ data: student }, { data: course }] = await Promise.all([
+      admin.from("lms_profiles").select("name,email").eq("id", order.student_id).maybeSingle(),
+      admin.from("lms_courses").select("title").eq("id", order.course_id).maybeSingle(),
+    ]);
+    await sendPaymentReceipt({
+      payment: { ...order, ...payment, payment_id: payment.id, payment_mode: order.payment_mode, installment_number: order.installment_number },
+      courseTitle: course?.title || "Course",
+      recipientEmail: student?.email || "",
+      recipientName: student?.name || "Student",
+    });
     return new Response("OK");
   } catch {
     return new Response("Unable to process payment; retry delivery", { status: 500 });
