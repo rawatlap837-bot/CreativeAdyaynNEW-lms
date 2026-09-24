@@ -4,8 +4,14 @@ create table if not exists public.lms_installment_plans (
   student_id uuid not null references public.lms_profiles(id) on delete cascade,
   course_id text not null references public.lms_courses(id) on delete cascade,
   total_amount bigint not null check (total_amount > 0),
-  installment_count integer not null check (installment_count in (3,6,9,12)),
+  -- The schedule is derived from the course duration by the payment function.
+  -- Keep this range aligned with 202609230006_duration_based_emi.sql so a
+  -- fresh install can create plans for any supported duration immediately.
+  installment_count integer not null check (installment_count >= 1 and installment_count <= 120),
   installment_amount bigint not null check (installment_amount > 0),
+  registration_amount bigint not null default 0 check (registration_amount >= 0),
+  remaining_amount bigint not null default 0 check (remaining_amount >= 0),
+  registration_paid boolean not null default false,
   paid_installments integer not null default 0 check (paid_installments >= 0),
   next_due_at timestamptz,
   status text not null default 'active' check (status in ('active','completed','overdue','cancelled')),

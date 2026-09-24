@@ -117,6 +117,7 @@ const SHOW_VIDEO_WATERMARK = true;
   ALLOW_SKIP_AHEAD to true to let students skip anywhere. Lessons the
   student has already finished are always freely skippable.
 */
+const YT_ORIGIN = "https://www.youtube-nocookie.com";
 const SEEK_STEP_SECONDS = 10;
 const ALLOW_SKIP_AHEAD = false;
 
@@ -215,6 +216,11 @@ export default function LearnCourse() {
   const [youtubeEnded, setYoutubeEnded] = useState(false);
   const ytIframeRef = useRef(null);
   const furthestWatchedRef = useRef(0);
+
+  // True once the YouTube player has answered. Commands are only sent after
+  // that, so nothing is posted to an iframe that is still loading.
+  const [ytReady, setYtReady] = useState(false);
+  const ytReadyRef = useRef(false);
   const [ytTime, setYtTime] = useState({ current: 0, duration: 0 });
 
   // Save back-off: if the backend rejects a watch save (e.g. the RPC is
@@ -315,6 +321,8 @@ export default function LearnCourse() {
     setYoutubeEnded(false);
     setYtTime({ current: 0, duration: 0 });
     furthestWatchedRef.current = 0;
+    ytReadyRef.current = false;
+    setYtReady(false);
 
     return () => {
       flushWatchProgress();
@@ -464,33 +472,62 @@ export default function LearnCourse() {
   // onPlay/onPause/onEnded — no bridge needed. YouTube's iframe embed
   // requires the postMessage-based IFrame API bridge below instead.
   const connectYouTubePlayer = (event) => {
-    const player = event.currentTarget?.contentWindow;
-    if (!player) return;
+    const frame = event.currentTarget;
+    if (!frame?.contentWindow) return;
 
-    const send = (message) => {
-      player.postMessage(
-        JSON.stringify(message),
-        "https://www.youtube-nocookie.com"
-      );
+    const handshake = () => {
+      // Stop once YouTube has answered, or if this iframe is gone.
+      if (ytReadyRef.current || ytIframeRef.current !== frame) return;
+
+      try {
+        frame.contentWindow.postMessage(
+          JSON.stringify({ event: "listening" }),
+          YT_ORIGIN
+        );
+        frame.contentWindow.postMessage(
+          JSON.stringify({
+            event: "command",
+            func: "addEventListener",
+            args: ["onStateChange"],
+          }),
+          YT_ORIGIN
+        );
+      } catch {
+        // Frame not ready yet; retried below.
+      }
     };
 
-    send({ event: "listening" });
+    [0, 300, 900, 2000].forEach((delay) => window.setTimeout(handshake, delay));
+
+    // If YouTube never answers, unlock the play button anyway.
     window.setTimeout(() => {
-      send({ event: "command", func: "addEventListener", args: ["onStateChange"] });
-    }, 250);
+      if (ytIframeRef.current === frame) {
+        ytReadyRef.current = true;
+        setYtReady(true);
+      }
+    }, 3000);
   };
 
   // Sends a player command (play, pause, seek) to the YouTube iframe.
   const sendYouTubeCommand = (func, args = []) => {
-    ytIframeRef.current?.contentWindow?.postMessage(
-      JSON.stringify({ event: "command", func, args }),
-      "https://www.youtube-nocookie.com"
-    );
+    const frame = ytIframeRef.current;
+    if (!frame?.contentWindow || !ytReadyRef.current) return;
+
+    try {
+      frame.contentWindow.postMessage(
+        JSON.stringify({ event: "command", func, args }),
+        YT_ORIGIN
+      );
+    } catch {
+      // Player not reachable right now; ignore.
+    }
   };
 
   // The shield sitting over the iframe is the only thing the student can
   // click, so it doubles as the play / pause / replay control.
   const handleShieldClick = () => {
+    if (!ytReadyRef.current) return;
+
     if (youtubeEnded) {
       sendYouTubeCommand("seekTo", [0, true]);
       sendYouTubeCommand("playVideo");
@@ -515,6 +552,11 @@ export default function LearnCourse() {
         } catch {
           return;
         }
+      }
+
+      if (!ytReadyRef.current) {
+        ytReadyRef.current = true;
+        setYtReady(true);
       }
 
       const info = payload?.event === "infoDelivery" ? payload.info : null;
@@ -1667,18 +1709,22 @@ export default function LearnCourse() {
                             {!videoPlaying && (
                               <>
                                 <span className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-600 text-white shadow-xl ring-4 ring-white/20 transition hover:bg-violet-500">
-                                  {youtubeEnded ? (
+                                  {!ytReady ? (
+                                    <Loader2 className="h-7 w-7 animate-spin" />
+                                  ) : youtubeEnded ? (
                                     <RotateCcw className="h-7 w-7" />
                                   ) : (
                                     <Play className="h-7 w-7 translate-x-0.5" />
                                   )}
                                 </span>
                                 <span className="mt-3 text-xs font-medium text-white/80">
-                                  {youtubeEnded
-                                    ? "Watch again"
-                                    : ytTime.current > 1
-                                      ? "Resume"
-                                      : "Play lesson"}
+                                  {!ytReady
+                                    ? "Loading video..."
+                                    : youtubeEnded
+                                      ? "Watch again"
+                                      : ytTime.current > 1
+                                        ? "Resume"
+                                        : "Play lesson"}
                                 </span>
                               </>
                             )}
@@ -1961,8 +2007,8 @@ function SeekButton({ label, disabled = false, onClick, children }) {
         }
       }}
       className={`pointer-events-auto flex h-8 select-none items-center gap-1 rounded-full px-3 text-xs font-semibold text-white outline-none transition focus-visible:ring-2 focus-visible:ring-violet-400 ${disabled
-        ? "cursor-not-allowed opacity-35"
-        : "cursor-pointer hover:bg-white/20"
+          ? "cursor-not-allowed opacity-35"
+          : "cursor-pointer hover:bg-white/20"
         }`}
       style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
     >

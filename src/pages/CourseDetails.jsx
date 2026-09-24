@@ -637,6 +637,11 @@ export default function CourseDetails() {
               );
 
               setEnrolling(false);
+            } finally {
+              // Razorpay can leave its checkout overlay open while the server
+              // verifies/captures a payment. Always release the page state so
+              // a slow or failed Supabase request cannot strand the CTA.
+              setEnrolling(false);
             }
           },
         });
