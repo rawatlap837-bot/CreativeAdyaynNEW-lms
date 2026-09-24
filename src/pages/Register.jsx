@@ -5,6 +5,7 @@ import Cubes from "../Animiations/Cubes";
 import { supabase } from "../lib/supabase";
 import {
   Mail,
+  Phone,
   Lock,
   User,
   Eye,
@@ -47,12 +48,13 @@ function isInAppBrowser() {
 function supabaseAuthErrorMessage(error) {
   const msg = (error?.message || "").toLowerCase();
   if (msg.includes("already registered") || msg.includes("already exists")) {
-    return "An account already exists with this email.";
+    return "An account already exists with this mobile number.";
   }
   if (msg.includes("password") && msg.includes("least")) {
     return "Choose a stronger password (at least 6 characters).";
   }
   if (msg.includes("invalid") && msg.includes("email")) return "That email address doesn't look right.";
+  if (msg.includes("invalid") && msg.includes("phone")) return "That mobile number doesn't look right.";
   if (msg.includes("too many requests") || msg.includes("rate limit")) {
     return "Too many attempts. Please wait a moment and try again.";
   }
@@ -74,7 +76,7 @@ function passwordStrength(password) {
 const STRENGTH_LABEL = ["Too short", "Weak", "Okay", "Good", "Strong"];
 
 export default function RegisterForm() {
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
+  const [form, setForm] = useState({ name: "", phone: "", email: "", password: "", confirm: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -102,7 +104,7 @@ export default function RegisterForm() {
 
   const pulseCubesFor = (fieldName, value) => {
     const col = Math.min(CUBE_GRID_SIZE - 1, value.length % (CUBE_GRID_SIZE + 3));
-    const rowByField = { name: 0.5, email: 2.5, password: 4.5, confirm: 6.5 };
+    const rowByField = { name: 0.5, phone: 2.5, email: 4.5, password: 6.5 };
     cubesRef.current?.pulse(rowByField[fieldName] ?? 3.5, col);
   };
 
@@ -117,12 +119,17 @@ export default function RegisterForm() {
 
   const validate = () => {
     if (!form.name.trim()) return "Enter your name to continue.";
+    if (!/^\d{10}$/.test(form.phone.replace(/\D/g, "").replace(/^91/, ""))) return "Enter a valid 10-digit mobile number.";
     if (!form.email) return "Enter your email to continue.";
     if (!form.password) return "Choose a password to continue.";
     if (form.password.length < 6) return "Password must be at least 6 characters.";
-    if (form.password !== form.confirm) return "Passwords don't match.";
     if (!agreed) return "Please agree to the Terms and Privacy Policy.";
     return "";
+  };
+
+  const indianPhone = (value) => {
+    const digits = value.replace(/\D/g, "").replace(/^91/, "");
+    return `+91${digits}`;
   };
 
   const handleSubmit = async (e) => {
@@ -143,11 +150,10 @@ export default function RegisterForm() {
       // handle_new_user trigger (see supabase_schema.sql) — we pass name
       // through raw_user_meta_data so that trigger can read it.
       const { data, error } = await supabase.auth.signUp({
-        email: form.email,
+        phone: indianPhone(form.phone),
         password: form.password,
         options: {
-          data: { name: form.name.trim() },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: { name: form.name.trim(), contactEmail: form.email.trim().toLowerCase() },
         },
       });
       if (error) throw error;
@@ -156,10 +162,7 @@ export default function RegisterForm() {
       // data.session will be null here — the person isn't logged in yet
       // until they click the confirmation link. Handle both cases.
       if (!data.session) {
-        setStatus("idle");
-        setErrorMsg("");
-        navigate("/login", { state: { justRegistered: true } });
-        return;
+        throw new Error("Phone confirmation is enabled in Supabase. Disable phone confirmation to sign users in immediately.");
       }
 
       setStatus("idle");
@@ -284,6 +287,28 @@ export default function RegisterForm() {
               </div>
 
               <div>
+                <label htmlFor="phone" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
+                  Mobile number
+                </label>
+                <div className="relative">
+                  <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A79BC4]" />
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    placeholder="9876543210"
+                    value={form.phone}
+                    onChange={handleChange}
+                    onFocus={handleFocus}
+                    className="w-full rounded-xl border border-violet-100 bg-white py-3 pl-10 pr-4 text-sm text-[#1F1533] placeholder:text-[#A79BC4] outline-none transition-colors focus:border-[#6D3FC0] focus:ring-2 focus:ring-[#6D3FC0]/20"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-[#8A7CA8]">Indian mobile number; +91 is added automatically.</p>
+              </div>
+
+              <div>
                 <label htmlFor="email" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                   Email
                 </label>
@@ -346,7 +371,7 @@ export default function RegisterForm() {
                 )}
               </div>
 
-              <div>
+              <div className="hidden">
                 <label htmlFor="confirm" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                   Confirm password
                 </label>

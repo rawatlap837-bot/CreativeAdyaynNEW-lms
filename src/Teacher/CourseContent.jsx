@@ -1527,6 +1527,11 @@ export default function CourseContent() {
           wide
         >
           <div className="space-y-5">
+            {error && (
+              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">
+                <span className="font-semibold">Lesson was not saved.</span> {error}
+              </div>
+            )}
             {/* Title */}
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -1736,6 +1741,11 @@ export default function CourseContent() {
             </div>
           </div>
         </Modal>
+      )}
+      {(success || (!showLessonModal && error)) && (
+        <div role="status" className={`fixed bottom-5 right-5 z-[100] max-w-sm rounded-xl border px-4 py-3 text-sm font-medium shadow-xl ${success ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>
+          {success || error}
+        </div>
       )}
     </div>
   );

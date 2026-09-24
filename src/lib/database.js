@@ -133,7 +133,10 @@ function operation(kind, reference, values = {}) {
 }
 async function commit(operations, reads = []) {
   const { data, error } = await supabase.rpc("lms_write_records", { operations, reads });
-  if (error) throw error;
+  if (error) {
+    const details = [error.message, error.details, error.hint].filter(Boolean).join(" — ");
+    throw new Error(details || "The database rejected this change. Please try again.");
+  }
   return data;
 }
 export const setDoc = (reference, values) => commit([operation("set", reference, values)]);

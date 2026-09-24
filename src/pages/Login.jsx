@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Cubes from "../Animiations/Cubes";
 import { supabase } from "../lib/supabase";
 import {
-  Mail,
+  Phone,
   Lock,
   Eye,
   EyeOff,
@@ -39,9 +39,9 @@ function isInAppBrowser() {
 
 function supabaseAuthErrorMessage(error) {
   const msg = (error?.message || "").toLowerCase();
-  if (msg.includes("invalid login credentials")) return "Incorrect email or password.";
-  if (msg.includes("email not confirmed")) return "Please confirm your email before logging in.";
-  if (msg.includes("user not found")) return "Incorrect email or password.";
+  if (msg.includes("invalid login credentials")) return "Incorrect mobile number or password.";
+  if (msg.includes("phone not confirmed")) return "Phone confirmation is enabled. Ask the administrator to disable it for instant access.";
+  if (msg.includes("user not found")) return "Incorrect mobile number or password.";
   if (msg.includes("too many requests") || msg.includes("rate limit")) {
     return "Too many attempts. Please wait a moment and try again.";
   }
@@ -76,7 +76,7 @@ async function resolvePostLoginRoute(userId) {
 }
 
 export default function LoginForm() {
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ phone: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [status, setStatus] = useState("idle");
@@ -109,7 +109,7 @@ export default function LoginForm() {
 
   const pulseCubesFor = (fieldName, value) => {
     const col = Math.min(CUBE_GRID_SIZE - 1, value.length % (CUBE_GRID_SIZE + 3));
-    const row = fieldName === "email" ? 1.5 : 4.5;
+    const row = fieldName === "phone" ? 1.5 : 4.5;
     cubesRef.current?.pulse(row, col);
   };
 
@@ -127,9 +127,9 @@ export default function LoginForm() {
     scrollToTop();
     setErrorMsg("");
 
-    if (!form.email || !form.password) {
+    if (!form.phone || !form.password) {
       setStatus("error");
-      setErrorMsg("Enter both your email and password to continue.");
+      setErrorMsg("Enter both your mobile number and password to continue.");
       return;
     }
 
@@ -142,7 +142,7 @@ export default function LoginForm() {
       // sessionStorage instead — simplest correct approach is to just
       // sign out on window unload when remember is false.
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: form.email,
+        phone: `+91${form.phone.replace(/\D/g, "").replace(/^91/, "")}`,
         password: form.password,
       });
       if (error) throw error;
@@ -261,21 +261,21 @@ export default function LoginForm() {
               </a>
             </p>
 
-            {location.state?.justRegistered && <p role="status" className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">Check your email and confirm your account before signing in.</p>}
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
               <div>
-                <label htmlFor="email" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
-                  Email
+                <label htmlFor="phone" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
+                  Mobile number
                 </label>
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A79BC4]" />
+                  <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A79BC4]" />
                   <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    value={form.email}
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    placeholder="9876543210"
+                    value={form.phone}
                     onChange={handleChange}
                     onFocus={handleFocus}
                     className="w-full rounded-xl border border-violet-100 bg-white py-3 pl-10 pr-4 text-sm text-[#1F1533] placeholder:text-[#A79BC4] outline-none transition-colors focus:border-[#6D3FC0] focus:ring-2 focus:ring-[#6D3FC0]/20"
@@ -288,9 +288,6 @@ export default function LoginForm() {
                   <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                     Password
                   </label>
-                  <a href="/forgot-password" className="text-xs font-semibold text-[#6D3FC0] hover:underline">
-                    Forgot password?
-                  </a>
                 </div>
                 <div className="relative">
                   <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A79BC4]" />

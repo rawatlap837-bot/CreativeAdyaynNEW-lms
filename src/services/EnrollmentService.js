@@ -7,7 +7,6 @@ import {
   getDocs,
   query,
   where,
-  setDoc,
   updateDoc,
   serverTimestamp,
 } from "../lib/database";
@@ -15,10 +14,13 @@ import {
 import { auth, db } from "../lib/backend";
 
 /* =========================================================
-   COLLECTION
+   CONSTANTS
 ========================================================= */
 
 const ENROLLMENTS_COLLECTION = "enrollments";
+
+// The database also clamps this. Keeping it here avoids wasted requests.
+const MAX_WATCH_CHUNK_SECONDS = 15;
 
 /* =========================================================
    HELPERS
@@ -38,6 +40,40 @@ function getEnrollmentId(uid, courseId) {
   return `${uid}_${courseId}`;
 }
 
+/**
+ * Loads an enrollment document and makes sure it belongs to the
+ * logged-in student. Optionally requires the enrollment to be active.
+ */
+async function getOwnedEnrollment(
+  enrollmentId,
+  { requireActive = false } = {}
+) {
+  const user = requireUser();
+
+  if (!enrollmentId) {
+    throw new Error("Enrollment ID is required.");
+  }
+
+  const enrollmentRef = doc(db, ENROLLMENTS_COLLECTION, enrollmentId);
+  const snapshot = await getDoc(enrollmentRef);
+
+  if (!snapshot.exists()) {
+    return { ref: enrollmentRef, snapshot, data: null };
+  }
+
+  const data = snapshot.data();
+
+  if (data.uid !== user.uid) {
+    throw new Error("You cannot access this enrollment.");
+  }
+
+  if (requireActive && data.status !== "active") {
+    throw new Error("Your enrollment is not active.");
+  }
+
+  return { ref: enrollmentRef, snapshot, data };
+}
+
 /* =========================================================
    GET MY ENROLLMENTS
 ========================================================= */
@@ -45,20 +81,9 @@ function getEnrollmentId(uid, courseId) {
 export async function getMyEnrollments() {
   const user = requireUser();
 
-  const enrollmentsRef = collection(
-    db,
-    ENROLLMENTS_COLLECTION
-  );
+  const enrollmentsRef = collection(db, ENROLLMENTS_COLLECTION);
 
-  /*
-    IMPORTANT:
-
-    We only use ONE where() condition.
-
-    There is intentionally NO orderBy().
-    This avoids requiring a composite Supabase database index.
-  */
-
+  // One where() and no orderBy() on purpose: no composite index needed.
   const enrollmentsQuery = query(
     enrollmentsRef,
     where("uid", "==", user.uid)
@@ -71,17 +96,10 @@ export async function getMyEnrollments() {
     ...document.data(),
   }));
 
-  /*
-    Sort on the client instead of using Supabase database orderBy().
-  */
-
+  // Newest first, sorted on the client.
   enrollments.sort((a, b) => {
-    const aTime =
-      a.enrolledAt?.toMillis?.() || 0;
-
-    const bTime =
-      b.enrolledAt?.toMillis?.() || 0;
-
+    const aTime = a.enrolledAt?.toMillis?.() || 0;
+    const bTime = b.enrolledAt?.toMillis?.() || 0;
     return bTime - aTime;
   });
 
@@ -89,13 +107,10 @@ export async function getMyEnrollments() {
 }
 
 /* =========================================================
-   GET SINGLE ENROLLMENT
+   GET SINGLE ENROLLMENT (by student + course)
 ========================================================= */
 
-export async function getEnrollment(
-  uid,
-  courseId
-) {
+export async function getEnrollment(uid, courseId) {
   const user = requireUser();
 
   if (!courseId) {
@@ -104,36 +119,28 @@ export async function getEnrollment(
 
   const studentId = uid || user.uid;
 
-  /*
-    A student can only access their own enrollment.
-  */
-
+  // A student can only access their own enrollment.
   if (studentId !== user.uid) {
-    throw new Error(
-      "You are not allowed to access this enrollment."
-    );
+    throw new Error("You are not allowed to access this enrollment.");
   }
 
-  const enrollmentId = getEnrollmentId(
-    studentId,
-    courseId
-  );
+  return getEnrollmentById(getEnrollmentId(studentId, courseId));
+}
 
-  const enrollmentRef = doc(
-    db,
-    ENROLLMENTS_COLLECTION,
-    enrollmentId
-  );
+/* =========================================================
+   GET ENROLLMENT BY ID
+========================================================= */
 
-  const snapshot = await getDoc(enrollmentRef);
+export async function getEnrollmentById(enrollmentId) {
+  const { snapshot, data } = await getOwnedEnrollment(enrollmentId);
 
-  if (!snapshot.exists()) {
+  if (!data) {
     return null;
   }
 
   return {
     id: snapshot.id,
-    ...snapshot.data(),
+    ...data,
   };
 }
 
@@ -143,21 +150,43 @@ export async function getEnrollment(
 
 export async function enrollStudent({ courseId, paymentStatus = "free" }) {
   requireUser();
+
   if (!courseId) throw new Error("Course ID is required.");
-  if (paymentStatus !== "free") throw new Error("Paid enrollment must be verified by the payment server.");
-  const { data, error } = await supabase.rpc("lms_enroll_free", { course: courseId });
+
+  if (paymentStatus !== "free") {
+    throw new Error("Paid enrollment must be verified by the payment server.");
+  }
+
+  const { data, error } = await supabase.rpc("lms_enroll_free", {
+    course: courseId,
+  });
+
   if (error) throw error;
+
   return fromRow("enrollments", data);
 }
 
 /* =========================================================
    MARK LESSON COMPLETE
+   The server rejects video lessons whose video has not ended
+   (checked inline inside lms_complete_lesson — see
+   supabase/migrations/202609230005_lesson_watch_progress.sql).
 ========================================================= */
 
 export async function markLessonComplete(enrollmentId, lessonId) {
   requireUser();
-  const { data, error } = await supabase.rpc("lms_complete_lesson", { enrollment: enrollmentId, lesson: lessonId });
+
+  if (!enrollmentId || !lessonId) {
+    throw new Error("Enrollment ID and lesson ID are required.");
+  }
+
+  const { data, error } = await supabase.rpc("lms_complete_lesson", {
+    enrollment: enrollmentId,
+    lesson: lessonId,
+  });
+
   if (error) throw error;
+
   return fromRow("enrollments", data);
 }
 
@@ -165,100 +194,87 @@ export async function markLessonComplete(enrollmentId, lessonId) {
    UPDATE LAST ACCESSED LESSON
 ========================================================= */
 
-export async function updateLastLesson(
-  enrollmentId,
-  lessonId
-) {
-  const user = requireUser();
+export async function updateLastLesson(enrollmentId, lessonId) {
+  const { ref } = await getOwnedEnrollment(enrollmentId, {
+    requireActive: true,
+  });
 
-  if (!enrollmentId) {
-    throw new Error(
-      "Enrollment ID is required."
-    );
-  }
-
-  const enrollmentRef = doc(
-    db,
-    ENROLLMENTS_COLLECTION,
-    enrollmentId
-  );
-
-  const snapshot =
-    await getDoc(enrollmentRef);
-
-  if (!snapshot.exists()) {
-    throw new Error(
-      "Enrollment not found."
-    );
-  }
-
-  const enrollment =
-    snapshot.data();
-
-  if (enrollment.uid !== user.uid) {
-    throw new Error(
-      "You cannot update this enrollment."
-    );
-  }
-
-  if (enrollment.status !== "active") {
-    throw new Error(
-      "Your enrollment is not active."
-    );
-  }
-
-  await updateDoc(
-    enrollmentRef,
-    {
-      lastLessonId:
-        lessonId || "",
-      lastAccessedAt:
-        serverTimestamp(),
-      updatedAt:
-        serverTimestamp(),
-    }
-  );
+  await updateDoc(ref, {
+    lastLessonId: lessonId || "",
+    lastAccessedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 /* =========================================================
-   GET ENROLLMENT BY ID
+   LESSON WATCH PROGRESS
+
+   Both functions below call the lms_record_lesson_watch /
+   lms_get_lesson_watch_progress RPCs (not the table directly —
+   there is intentionally no client-writable/readable policy on
+   lms_lesson_watch_progress itself, only on what these two
+   security-definer functions allow). Parameter names here MUST
+   match the SQL function signatures exactly:
+
+     lms_record_lesson_watch(enrollment text, lesson text,
+                              watched_seconds integer, video_ended boolean)
+     lms_get_lesson_watch_progress(enrollment text)
+
+   If you change one side, change the other in the same edit —
+   a silent name mismatch here shows up as a 404 PGRST202 error
+   at runtime, not a build-time error.
 ========================================================= */
 
-export async function getEnrollmentById(
-  enrollmentId
-) {
-  const user = requireUser();
+/**
+ * Returns every saved watch row for this enrollment:
+ * [{ lessonId, watchedSeconds, videoEnded }]
+ */
+export async function getLessonWatchProgress(enrollmentId) {
+  requireUser();
 
   if (!enrollmentId) {
-    throw new Error(
-      "Enrollment ID is required."
-    );
+    throw new Error("Enrollment ID is required.");
   }
 
-  const enrollmentRef = doc(
-    db,
-    ENROLLMENTS_COLLECTION,
-    enrollmentId
+  const { data, error } = await supabase.rpc(
+    "lms_get_lesson_watch_progress",
+    { enrollment: enrollmentId }
   );
 
-  const snapshot =
-    await getDoc(enrollmentRef);
+  if (error) throw error;
 
-  if (!snapshot.exists()) {
-    return null;
+  return (data || []).map((row) => fromRow("lesson_watch_progress", row));
+}
+
+/**
+ * Adds watched seconds for a lesson and/or flags the video as ended.
+ * Returns { watchedSeconds, videoEnded } for that lesson.
+ */
+export async function recordLessonWatch(
+  enrollmentId,
+  lessonId,
+  seconds = 0,
+  videoEnded = false
+) {
+  requireUser();
+
+  if (!enrollmentId || !lessonId) {
+    throw new Error("Enrollment ID and lesson ID are required.");
   }
 
-  const enrollment =
-    snapshot.data();
+  const safeSeconds = Math.min(
+    MAX_WATCH_CHUNK_SECONDS,
+    Math.max(0, Math.floor(Number(seconds) || 0))
+  );
 
-  if (enrollment.uid !== user.uid) {
-    throw new Error(
-      "You cannot access this enrollment."
-    );
-  }
+  const { data, error } = await supabase.rpc("lms_record_lesson_watch", {
+    enrollment: enrollmentId,
+    lesson: lessonId,
+    watched_seconds: safeSeconds,
+    video_ended: Boolean(videoEnded),
+  });
 
-  return {
-    id: snapshot.id,
-    ...enrollment,
-  };
+  if (error) throw error;
+
+  return fromRow("lesson_watch_progress", data);
 }
