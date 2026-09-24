@@ -84,7 +84,9 @@ Deno.serve(async (request: Request) => {
       const paymentMode = body.paymentMode === "emi" ? "emi" : "one_time";
       const { data: activePlan, error: activePlanError } = await admin.from("lms_installment_plans").select("id,status").eq("student_id", user.id).eq("course_id", course.id).maybeSingle();
       if (activePlanError) throw activePlanError;
-      if (activePlan && activePlan.status !== "completed" && paymentMode !== "emi") return reply({ error: "You already have an EMI plan for this course. Pay the next EMI instead." }, 409);
+      // Let students with an open EMI plan switch to a one-time payoff. The
+      // confirmation RPC marks the enrollment paid; the completed plan no
+      // longer blocks course access or future enrollment checks.
       if (enrollment?.status === "active" && paymentMode !== "emi") return reply({ error: "You are already enrolled. Refresh this page." }, 409);
       const { count, error: countError } = await admin.from("lms_payments").select("id", { count: "exact", head: true }).eq("student_id", user.id).gte("created_at", new Date(Date.now() - 60000).toISOString());
       if (countError) throw countError;
