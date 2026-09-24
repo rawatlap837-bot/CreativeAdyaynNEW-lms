@@ -56,7 +56,7 @@ begin
   elsif p_category='enrollments_payments' then
     return query
       select q.created_at,q.payload from (
-        select pay.created_at, jsonb_build_object('record_type','payment','student',coalesce(nullif(sp.name,''),sp.email),'student_email',sp.email,'course',c.title,'teacher',coalesce(nullif(tp.name,''),c.instructor_name,tp.email),'amount',case when pay.metadata->>'paymentMethod'='offline' then pay.amount::numeric else pay.amount::numeric/100 end,'currency',pay.currency,'payment_status',pay.status,'enrollment_status',e.status,'payment_mode',pay.payment_mode,'payment_id',pay.payment_id,'order_id',pay.order_id,'date',pay.created_at) payload
+        select pay.created_at, jsonb_build_object('record_type','payment','student',coalesce(nullif(sp.name,''),sp.email),'student_email',sp.email,'course',c.title,'teacher',coalesce(nullif(tp.name,''),c.instructor_name,tp.email),'amount',case when pay.metadata->>'paymentMethod'='offline' then pay.amount::numeric else pay.amount::numeric/100 end,'currency',pay.currency,'payment_status',pay.status,'enrollment_status',e.status,'payment_mode',coalesce(pay.metadata->>'paymentMode', pay.metadata->>'paymentMethod'),'payment_id',pay.payment_id,'order_id',pay.order_id,'date',pay.created_at) payload
         from public.lms_payments pay
         join public.lms_profiles sp on sp.id=pay.student_id
         join public.lms_courses c on c.id=pay.course_id
@@ -131,9 +131,35 @@ begin
       (select count(*) from public.lms_enrollments e join public.lms_courses c on c.id=e.course_id join public.lms_profiles sp on sp.id=e.student_id where (p_from is null or e.created_at>=p_from) and (p_to is null or e.created_at<=p_to) and (p_course_id is null or c.id=p_course_id) and (p_teacher_id is null or c.instructor_id=p_teacher_id) and (p_student_status is null or (p_student_status='__non_active__' and sp.status<>'active') or (p_student_status<>'__non_active__' and sp.status=p_student_status)) and (p_payment_status is null or (p_payment_status='paid' and e.payment_status in ('paid','offline_paid','emi')) or (p_payment_status='free' and e.payment_status='free') or (p_payment_status='pending' and e.status in ('pending','payment_due'))));
 end $$;
 
+-- Return a scalar count using a normal RPC response instead of a HEAD request.
+create or replace function public.lms_admin_export_count(
+  p_category text,
+  p_course_id text default null,
+  p_teacher_id uuid default null,
+  p_payment_status text default null,
+  p_student_status text default null,
+  p_from timestamptz default null,
+  p_to timestamptz default null
+)
+returns bigint
+language plpgsql stable security definer set search_path=''
+as $$
+declare result_count bigint;
+begin
+  if not public.lms_admin() then raise exception 'Admin access required' using errcode='42501'; end if;
+  select count(*) into result_count
+  from public.lms_admin_export_rows(p_category,p_course_id,p_teacher_id,p_payment_status,p_student_status,p_from,p_to) as report_rows;
+  return result_count;
+end $$;
+
 revoke all on function public.lms_admin_export_rows(text,text,uuid,text,text,timestamptz,timestamptz) from public,anon;
 revoke all on function public.lms_admin_export_summary(timestamptz,timestamptz,text,uuid,text,text) from public,anon;
+revoke all on function public.lms_admin_export_count(text,text,uuid,text,text,timestamptz,timestamptz) from public,anon;
 grant execute on function public.lms_admin_export_rows(text,text,uuid,text,text,timestamptz,timestamptz) to authenticated;
 grant execute on function public.lms_admin_export_summary(timestamptz,timestamptz,text,uuid,text,text) to authenticated;
+grant execute on function public.lms_admin_export_count(text,text,uuid,text,text,timestamptz,timestamptz) to authenticated;
+
+-- Refresh PostgREST's function signature cache so it sees the replaced RPC.
+notify pgrst, 'reload schema';
 
 commit;

@@ -26,6 +26,13 @@ const flatten = (value) => value && typeof value === "object" ? JSON.stringify(v
 const slug = (value) => String(value || "all").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
 const inr = (paise) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(paise || 0) / 100);
 
+function errorText(error) {
+  if (typeof error === "string") return error;
+  const parts = [error?.message, error?.details, error?.hint, error?.code && `Code: ${error.code}`].filter(Boolean);
+  if (parts.length) return parts.join(" · ");
+  try { return JSON.stringify(error); } catch { return "Unknown database error."; }
+}
+
 function categoryArgs(category, filters) {
   const courseCategories = ["students", "courses", "enrollments_payments", "attendance", "notifications"];
   const teacherCategories = ["students", "courses", "enrollments_payments", "attendance", "notifications"];
@@ -80,10 +87,9 @@ async function readRows(category, filters, bounds) {
 
 async function exactCount(category, filters, bounds) {
   if (category === "revenue_summary") return 1;
-  const query = supabase.rpc("lms_admin_export_rows", exportArgs(category, filters, bounds), { count: "exact", head: true });
-  const { count, error } = await query;
+  const { data, error } = await supabase.rpc("lms_admin_export_count", exportArgs(category, filters, bounds));
   if (error) throw error;
-  return Number(count || 0);
+  return Number(data || 0);
 }
 
 function formatPeriod(bounds, filters) {
@@ -149,9 +155,17 @@ export default function ExportReports() {
     setCountLoading(true); setError(""); setCounts(null);
     try {
       const bounds = dateBounds(filters);
-      const result = await Promise.all(selected.map(async (id) => [id, await exactCount(id, filters, bounds)]));
+      const result = [];
+      for (const id of selected) {
+        try {
+          result.push([id, await exactCount(id, filters, bounds)]);
+        } catch (err) {
+          const label = CATEGORIES.find((item) => item.id === id)?.label || id;
+          throw new Error(`${label}: ${errorText(err)}`);
+        }
+      }
       setCounts(Object.fromEntries(result));
-    } catch (err) { setError(err?.message || "Unable to count matching records."); }
+    } catch (err) { setError(errorText(err) || "Unable to count matching records."); }
     finally { setCountLoading(false); }
   }
 
