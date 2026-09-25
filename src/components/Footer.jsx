@@ -16,7 +16,7 @@ const isExternalHref = (href) => typeof href === "string" && /^https?:\/\//.test
 const DEFAULT_COURSE_LINKS = [
   { label: "Live Courses", to: "/?category=Live%20Courses#live-courses" },
   { label: "Recorded Courses", to: "/?category=Recorded%20Courses#live-courses" },
-  { label: "Short Term Courses", to: "/short-courses" },
+  { label: "Short Term Courses", to: "/ShortCourses" },
 ];
 
 const DEFAULT_OTHER_LINKS = [
@@ -24,6 +24,7 @@ const DEFAULT_OTHER_LINKS = [
   { label: "Contact Us", to: "/contact" },
   { label: "Privacy Policies", to: "/privacy-policy" },
   { label: "Terms & Conditions", to: "/terms" },
+  { label: "Refund Policy", to: "/refund-policy" },
 ];
 
 const DEFAULT_SOCIAL_LINKS = [

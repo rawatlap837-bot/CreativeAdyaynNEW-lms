@@ -890,9 +890,11 @@ export default function LearnCourse() {
         }
 
         if (moduleData.length > 0) {
-          setOpenModules({
-            [moduleData[0].id]: true,
-          });
+          // Keep earlier modules visible so learners can quickly revisit
+          // completed lessons for revision, including on the mobile drawer.
+          setOpenModules(
+            Object.fromEntries(moduleData.map((module) => [module.id, true]))
+          );
         }
       } catch (err) {
         // The two inner try/catch blocks above already logged
@@ -1046,6 +1048,7 @@ export default function LearnCourse() {
       moduleId: module.id,
       moduleTitle: module.title,
     });
+    setOpenModules((previous) => ({ ...previous, [module.id]: true }));
 
     setSidebarOpen(false);
   };
@@ -1146,6 +1149,7 @@ export default function LearnCourse() {
     }
 
     setSelectedLesson(nextLesson);
+    setOpenModules((previous) => ({ ...previous, [nextLesson.moduleId]: true }));
   };
 
 
@@ -1176,6 +1180,7 @@ export default function LearnCourse() {
     }
 
     setSelectedLesson(previousLesson);
+    setOpenModules((previous) => ({ ...previous, [previousLesson.moduleId]: true }));
   };
 
 
@@ -1262,21 +1267,23 @@ export default function LearnCourse() {
 
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => selectedIndex > 0 ? handlePreviousLesson() : navigate(-1)}
               className="-ml-1.5 flex shrink-0 items-center gap-1.5 rounded-lg p-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 sm:gap-2 sm:px-2.5"
-              aria-label="Go back"
+              aria-label={selectedIndex > 0 ? "Go to previous lesson" : "Go back"}
+              title={selectedIndex > 0 ? "Previous lesson (including earlier modules)" : "Go back"}
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back</span>
+              <span className="hidden sm:inline">{selectedIndex > 0 ? "Previous lesson" : "Back"}</span>
             </button>
 
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 lg:hidden"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 sm:gap-2 sm:px-3 lg:hidden"
               aria-label="Open course content"
             >
-              <Menu className="h-5 w-5" />
+              <BookOpen className="h-4 w-4" />
+              <span>Lessons</span>
             </button>
 
             <div className="hidden h-5 w-px bg-slate-200 sm:block" />
@@ -1422,6 +1429,20 @@ export default function LearnCourse() {
             )}
 
 
+            {/* COURSE CURRICULUM */}
+
+            {!contentLoading && !contentError && modules.length > 0 && (
+              <div className="mb-3 flex items-center justify-between gap-2 px-1">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">Course curriculum</h2>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Revisit any lesson in your enrolled course</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                  {modules.length} {modules.length === 1 ? "module" : "modules"} · {allLessons.length} lessons
+                </span>
+              </div>
+            )}
+
             {/* MODULES */}
 
             {contentLoading ? (
@@ -1535,7 +1556,7 @@ export default function LearnCourse() {
                                   >
                                     <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
                                       {completed ? (
-                                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                                       ) : locked ? (
                                         <Lock className="h-3.5 w-3.5 text-slate-400" />
                                       ) : lesson.type === "video" ? (
@@ -1570,6 +1591,11 @@ export default function LearnCourse() {
                                         {lesson.isPreview && (
                                           <span className="rounded bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">
                                             Preview
+                                          </span>
+                                        )}
+                                        {completed && (
+                                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
+                                            Completed · review
                                           </span>
                                         )}
                                       </div>

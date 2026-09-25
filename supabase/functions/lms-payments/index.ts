@@ -8,6 +8,29 @@ const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET") || "";
 const allowedOrigins = (Deno.env.get("APP_ORIGINS") || "http://localhost:5173").split(",").map((value) => value.trim());
 const REGISTRATION_FEE = 200000;
 
+async function applyProcessedRefund(order: Record<string, any>, refund: Record<string, any>, requestedBy: string) {
+  const now = new Date().toISOString();
+  const metadata = {
+    ...(order.metadata || {}),
+    refundId: refund.id,
+    refundStatus: refund.status,
+    refundAmount: Number(refund.amount || order.amount),
+    refundRequestedAt: order.metadata?.refundRequestedAt || now,
+    refundProcessedAt: now,
+    refundRequestedBy: requestedBy || order.metadata?.refundRequestedBy || "razorpay_webhook",
+  };
+  const { error: paymentError } = await admin.from("lms_payments")
+    .update({ status: "refunded", metadata, updated_at: now })
+    .eq("id", order.id);
+  if (paymentError) throw paymentError;
+
+  const { error: enrollmentError } = await admin.from("lms_enrollments")
+    .update({ status: "refunded", payment_status: "refunded", updated_at: now })
+    .eq("student_id", order.student_id)
+    .eq("course_id", order.course_id);
+  if (enrollmentError) throw enrollmentError;
+}
+
 function durationMonths(value: unknown) {
   const text = String(value || "").toLowerCase();
   const match = text.match(/(\d+(?:\.\d+)?)\s*(year|month|week|day)/);
@@ -39,9 +62,63 @@ Deno.serve(async (request: Request) => {
     if (!token) return reply({ error: "Sign in before paying." }, 401);
     const { data: { user }, error: authError } = await admin.auth.getUser(token);
     if (authError || !user) return reply({ error: "Your session has expired. Sign in again." }, 401);
-    const { data: profile, error: profileError } = await admin.from("lms_profiles").select("status").eq("id", user.id).single();
+    const { data: profile, error: profileError } = await admin.from("lms_profiles").select("status,role").eq("id", user.id).single();
     if (profileError || profile?.status !== "active") return reply({ error: "Account is not active." }, 403);
     const body = await request.json();
+
+    if (body.action === "refund-payment") {
+      if (profile.role !== "admin") return reply({ error: "Only an administrator can issue refunds." }, 403);
+      if (typeof body.paymentId !== "string" || !body.paymentId.trim()) return reply({ error: "Payment is required." }, 400);
+      const { data: order, error: orderError } = await admin.from("lms_payments").select("*").eq("id", body.paymentId.trim()).single();
+      if (orderError || !order) return reply({ error: "Payment record was not found." }, 404);
+      if (order.status === "refunded") return reply({ payment: order, alreadyRefunded: true });
+      if (order.status === "refund_pending") return reply({ error: "This refund is already being processed." }, 409);
+      if (order.status !== "paid") return reply({ error: "Only a paid transaction can be refunded." }, 409);
+      if (order.payment_mode === "emi") return reply({ error: "EMI refunds require a manual plan review and cannot be issued here." }, 409);
+      if (String(order.order_id || "").startsWith("offline_") || !/^pay_[a-zA-Z0-9]+$/.test(order.payment_id || "")) {
+        return reply({ error: "Offline payments must be refunded and recorded manually." }, 409);
+      }
+      const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 250) : "Admin-approved course refund";
+      const now = new Date().toISOString();
+      const pendingMetadata = {
+        ...(order.metadata || {}),
+        refundStatus: "requested",
+        refundAmount: Number(order.amount),
+        refundReason: reason,
+        refundRequestedAt: now,
+        refundRequestedBy: user.id,
+      };
+      // Claim the payment before contacting Razorpay. The status condition
+      // prevents two administrators from submitting duplicate refunds.
+      const { data: claimed, error: claimError } = await admin.from("lms_payments")
+        .update({ status: "refund_pending", metadata: pendingMetadata, updated_at: now })
+        .eq("id", order.id)
+        .eq("status", "paid")
+        .select("id")
+        .maybeSingle();
+      if (claimError) throw claimError;
+      if (!claimed) return reply({ error: "This payment changed while the refund was being requested. Refresh and try again." }, 409);
+      const refund = await razorpay(`payments/${order.payment_id}/refund`, {
+        amount: Number(order.amount),
+        speed: "normal",
+        notes: { lmsPaymentId: order.id, requestedBy: user.id, reason },
+      });
+      if (refund.status === "processed") {
+        await applyProcessedRefund({ ...order, metadata: pendingMetadata }, refund, user.id);
+      } else {
+        const metadata = {
+          ...pendingMetadata,
+          refundId: refund.id,
+          refundStatus: refund.status || "pending",
+          refundAmount: Number(refund.amount || order.amount),
+        };
+        const { error: updateError } = await admin.from("lms_payments")
+          .update({ status: "refund_pending", metadata, updated_at: now })
+          .eq("id", order.id);
+        if (updateError) throw updateError;
+      }
+      return reply({ refund: { id: refund.id, status: refund.status, amount: refund.amount } });
+    }
 
     if (body.action === "get-installment-plan") {
       if (typeof body.courseId !== "string") return reply({ error: "Course is required." }, 400);

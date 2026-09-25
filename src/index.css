@@ -21,13 +21,6 @@
   font-display: swap;
 }
 @font-face {
-  font-family: 'Allura';
-  src: url('./assets/Allura/Allura-Regular.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
   font-family: 'Telma';
   src: url('./assets/Telma/Telma_Complete/Fonts/TTF/Telma-Variable.ttf') format('truetype-variations');
   font-weight: 100 900;

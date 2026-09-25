@@ -137,6 +137,19 @@ await test("capture validation checks status, amount, currency, and order", () =
   assertCapturedPayment({ ...order, status: "captured" }, order);
   for (const change of [{ status: "authorized" }, { amount: 1 }, { currency: "USD" }, { order_id: "other" }]) assert.throws(() => assertCapturedPayment({ ...order, status: "captured", ...change }, order));
 });
+await test("refund flow is admin-only and claims a paid payment before calling Razorpay", async () => {
+  const source = await readFile(new URL("../supabase/functions/lms-payments/index.ts", import.meta.url), "utf8");
+  assert.ok(source.includes('body.action === "refund-payment"'));
+  assert.ok(source.includes('profile.role !== "admin"'));
+  assert.ok(source.includes('.eq("status", "paid")'));
+  assert.ok(source.indexOf('.update({ status: "refund_pending"') < source.indexOf('payments/${order.payment_id}/refund'));
+  assert.ok(source.includes('order.payment_mode === "emi"'));
+});
+await test("refund webhook finalizes access revocation only after processing", async () => {
+  const source = await readFile(new URL("../supabase/functions/lms-payment-webhook/index.ts", import.meta.url), "utf8");
+  assert.ok(source.includes('event.event === "refund.processed"'));
+  assert.ok(source.includes('status: "refunded", payment_status: "refunded"'));
+});
 await test("SQL contains every table used by the repository", async () => {
   const sql = await readFile(new URL("../supabase/migrations/202609200001_lms.sql", import.meta.url), "utf8");
   for (const table of Object.keys(tableColumns)) assert.ok(sql.includes(`create table if not exists public.lms_${table} (`), table);

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "../lib/database";
 import { db } from "../lib/backend";
+import { refundPayment } from "../services/Payments";
 
 import {
   AlertCircle,
@@ -11,6 +12,7 @@ import {
   IndianRupee,
   Loader2,
   Receipt,
+  RotateCcw,
   Search,
   UserRound,
   X,
@@ -72,10 +74,14 @@ function normalizeStatus(status) {
   if (
     value === "pending" ||
     value === "processing" ||
-    value === "created"
+    value === "created" ||
+    value === "refund_pending"
   ) {
-    return "pending";
+    return value === "refund_pending" ? "refund_pending" : "pending";
   }
+
+  if (value === "refunded") return "refunded";
+  if (value === "refund_failed") return "refund_failed";
 
   return "failed";
 }
@@ -83,6 +89,9 @@ function normalizeStatus(status) {
 function statusLabel(status) {
   if (status === "paid") return "Paid";
   if (status === "pending") return "Pending";
+  if (status === "refund_pending") return "Refund pending";
+  if (status === "refunded") return "Refunded";
+  if (status === "refund_failed") return "Refund failed";
 
   return "Failed";
 }
@@ -92,9 +101,11 @@ function statusClasses(status) {
     return "bg-emerald-50 text-emerald-700";
   }
 
-  if (status === "pending") {
+  if (status === "pending" || status === "refund_pending") {
     return "bg-amber-50 text-amber-700";
   }
+
+  if (status === "refunded") return "bg-violet-50 text-violet-700";
 
   return "bg-red-50 text-red-700";
 }
@@ -120,7 +131,42 @@ function PaymentDetailsModal({
   payment,
   onClose,
 }) {
+  const [refundReason, setRefundReason] = useState("");
+  const [refunding, setRefunding] = useState(false);
+  const [refundMessage, setRefundMessage] = useState("");
+
+  useEffect(() => {
+    setRefundReason("");
+    setRefundMessage("");
+    setRefunding(false);
+  }, [payment?.id]);
+
   if (!payment) return null;
+
+  const canRefund = payment.status === "paid" &&
+    payment.paymentMethod !== "offline" &&
+    payment.paymentMode !== "emi" &&
+    /^pay_[a-zA-Z0-9]+$/.test(payment.razorpayPaymentId || "");
+
+  const handleRefund = async () => {
+    if (!canRefund || refunding) return;
+    if (!refundReason.trim()) {
+      setRefundMessage("Enter the reason for this refund.");
+      return;
+    }
+    if (!window.confirm(`Issue a full refund of ${formatAmount(payment.amount, payment.currency)} and revoke this student's course access?`)) return;
+    setRefunding(true);
+    setRefundMessage("");
+    try {
+      const result = await refundPayment(payment.id, refundReason.trim());
+      const status = result?.refund?.status || "processed";
+      setRefundMessage(status === "processed" ? "Refund processed. Course access has been revoked." : "Refund submitted to Razorpay and is pending processing.");
+    } catch (refundError) {
+      setRefundMessage(refundError.message || "Refund could not be processed.");
+    } finally {
+      setRefunding(false);
+    }
+  };
 
   return (
     <div
@@ -207,16 +253,43 @@ function PaymentDetailsModal({
             />
           </div>
 
-          <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
-            This record was created by the current client-side
-            payment flow. A server/webhook is needed to independently
-            verify Razorpay payments.
-          </p>
+          {canRefund && (
+            <div className="space-y-3 rounded-xl border border-red-100 bg-red-50 p-3">
+              <label className="block text-xs font-semibold text-red-900" htmlFor="refund-reason">Refund reason</label>
+              <textarea
+                id="refund-reason"
+                value={refundReason}
+                onChange={(event) => setRefundReason(event.target.value)}
+                maxLength={250}
+                rows={3}
+                placeholder="Reason recorded with the refund"
+                className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+              />
+              <button
+                type="button"
+                onClick={handleRefund}
+                disabled={refunding}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {refunding ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                {refunding ? "Processing refund..." : "Issue full refund"}
+              </button>
+            </div>
+          )}
+
+          {payment.status === "paid" && !canRefund && (
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+              Automatic refunds are available only for captured online one-time payments. EMI and offline refunds require manual review.
+            </p>
+          )}
+
+          {refundMessage && <p role="status" className="rounded-xl bg-slate-100 px-3 py-2 text-xs leading-5 text-slate-700">{refundMessage}</p>}
 
           <button
             type="button"
             onClick={onClose}
             className="w-full rounded-full bg-[#0F172A] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1E293B]"
+            disabled={refunding}
           >
             Close
           </button>
@@ -318,6 +391,10 @@ export default function Payments() {
           (paymentDoc) => {
             const data = paymentDoc.data();
 
+            const paymentMethod = data.paymentMethod || data.payment_mode ||
+              (String(data.orderId || data.order_id || "").startsWith("offline_") ? "offline" : "online");
+            const rawAmount = Number(data.amount ?? data.paymentAmount ?? 0) || 0;
+
             return {
               id: paymentDoc.id,
 
@@ -345,24 +422,15 @@ export default function Payments() {
                 data.courseTitle ||
                 "Untitled course",
 
-              amount:
-                Number(
-                  data.amount ??
-                  data.paymentAmount ??
-                  0
-                ) || 0,
+              amount: paymentMethod === "offline" ? rawAmount : rawAmount / 100,
 
               currency:
                 data.currency || "INR",
 
                status: normalizeStatus(data.status),
 
-               paymentMethod:
-                 data.paymentMethod ||
-                 data.payment_mode ||
-                 (String(data.orderId || data.order_id || "").startsWith("offline_")
-                   ? "offline"
-                   : "online"),
+              paymentMethod,
+              paymentMode: data.paymentMode || data.payment_mode || "one_time",
 
               paidAt:
                 toDate(data.paidAt) ||
@@ -372,6 +440,7 @@ export default function Payments() {
                 data.razorpayPaymentId ||
                 data.razorpay_payment_id ||
                 paymentDoc.id,
+              refundId: data.refundId || "",
             };
           }
         );
@@ -471,8 +540,10 @@ export default function Payments() {
     );
 
     const failed = paymentRows.filter(
-      (payment) => payment.status === "failed"
+      (payment) => payment.status === "failed" || payment.status === "refund_failed"
     );
+
+    const refunded = paymentRows.filter((payment) => payment.status === "refunded");
 
     return {
       revenue: paid.reduce(
@@ -484,6 +555,7 @@ export default function Payments() {
       paid: paid.length,
       pending: pending.length,
       failed: failed.length,
+      refunded: refunded.length,
 
       onlinePurchases: paid.filter(
         (payment) => payment.paymentMethod !== "offline"
@@ -590,6 +662,13 @@ export default function Payments() {
           />
 
           <StatCard
+            title="Refunded payments"
+            value={totals.refunded}
+            color="amber"
+            icon={<RotateCcw className="h-5 w-5" />}
+          />
+
+          <StatCard
             title="Online purchases"
             value={totals.onlinePurchases}
             color="blue"
@@ -657,6 +736,9 @@ export default function Payments() {
               <option value="failed">
                 Failed
               </option>
+              <option value="refund_pending">Refund pending</option>
+              <option value="refunded">Refunded</option>
+              <option value="refund_failed">Refund failed</option>
             </select>
           </div>
         </div>

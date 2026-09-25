@@ -48,7 +48,7 @@ function isInAppBrowser() {
 function supabaseAuthErrorMessage(error) {
   const msg = (error?.message || "").toLowerCase();
   if (msg.includes("already registered") || msg.includes("already exists")) {
-    return "An account already exists with this mobile number.";
+    return "An account already exists with this email address.";
   }
   if (msg.includes("password") && msg.includes("least")) {
     return "Choose a stronger password (at least 6 characters).";
@@ -123,6 +123,7 @@ export default function RegisterForm() {
     if (!form.email) return "Enter your email to continue.";
     if (!form.password) return "Choose a password to continue.";
     if (form.password.length < 6) return "Password must be at least 6 characters.";
+    if (form.password !== form.confirm) return "Passwords do not match.";
     if (!agreed) return "Please agree to the Terms and Privacy Policy.";
     return "";
   };
@@ -150,10 +151,14 @@ export default function RegisterForm() {
       // handle_new_user trigger (see supabase_schema.sql) — we pass name
       // through raw_user_meta_data so that trigger can read it.
       const { data, error } = await supabase.auth.signUp({
-        phone: indianPhone(form.phone),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
         options: {
-          data: { name: form.name.trim(), contactEmail: form.email.trim().toLowerCase() },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            name: form.name.trim(),
+            phone: indianPhone(form.phone),
+          },
         },
       });
       if (error) throw error;
@@ -162,7 +167,9 @@ export default function RegisterForm() {
       // data.session will be null here — the person isn't logged in yet
       // until they click the confirmation link. Handle both cases.
       if (!data.session) {
-        throw new Error("Phone confirmation is enabled in Supabase. Disable phone confirmation to sign users in immediately.");
+        setStatus("success");
+        setErrorMsg("Check your email and open the confirmation link to activate your account.");
+        return;
       }
 
       setStatus("idle");
@@ -413,7 +420,7 @@ export default function RegisterForm() {
                   I agree to the{" "}
                   <a href="/terms" className="font-semibold text-[#6D3FC0] hover:underline">Terms</a>{" "}
                   and{" "}
-                  <a href="/privacy" className="font-semibold text-[#6D3FC0] hover:underline">Privacy Policy</a>
+                  <a href="/privacy-policy" className="font-semibold text-[#6D3FC0] hover:underline">Privacy Policy</a>
                 </span>
               </label>
 
@@ -427,15 +434,26 @@ export default function RegisterForm() {
                 </motion.p>
               )}
 
+              {status === "success" && errorMsg && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  role="status"
+                  className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700"
+                >
+                  {errorMsg}
+                </motion.p>
+              )}
+
               <button
                 type="submit"
-                disabled={status === "submitting"}
+                disabled={status === "submitting" || status === "success"}
                 className="group/btn relative flex w-full items-center justify-between overflow-hidden rounded-full p-1 pl-5 text-sm font-bold text-white shadow-lg shadow-violet-900/20 transition-transform active:scale-[0.98] disabled:opacity-70"
                 style={{ background: "linear-gradient(135deg, #6D3FC0, #2E1A55)" }}
               >
                 <span className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/2 -skew-x-12 bg-white/20 opacity-0 transition-all duration-500 group-hover/btn:left-full group-hover/btn:opacity-100" />
                 <span className="relative z-10">
-                  {status === "submitting" ? "Creating account…" : "Create account"}
+                  {status === "submitting" ? "Creating account…" : status === "success" ? "Check your email" : "Create account"}
                 </span>
                 <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#2E1A55] transition-transform duration-300 group-hover/btn:translate-x-0.5 group-hover/btn:rotate-45">
                   {status === "submitting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" strokeWidth={2.5} />}
@@ -472,7 +490,7 @@ export default function RegisterForm() {
               By creating an account, you agree to our{" "}
               <a href="/terms" className="font-medium text-[#6D3FC0] hover:underline">Terms</a>{" "}
               and{" "}
-              <a href="/privacy" className="font-medium text-[#6D3FC0] hover:underline">Privacy Policy</a>.
+              <a href="/privacy-policy" className="font-medium text-[#6D3FC0] hover:underline">Privacy Policy</a>.
             </p>
           </motion.div>
         </div>

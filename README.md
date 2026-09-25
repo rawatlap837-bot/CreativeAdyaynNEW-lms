@@ -24,4 +24,17 @@ Successful online payments send a receipt through Resend from the `lms-payments`
 
 Deploy both `lms-payments` and `lms-payment-webhook` so receipts send whether the student completes checkout in the open browser or Razorpay reports capture through its webhook. If email delivery is unavailable, payment verification and course enrollment still succeed, and the checkout displays that the receipt is available in the student dashboard.
 
+## Admin refunds
+
+Administrators can issue a full refund for a captured online one-time payment from **Admin -> Payments -> View**. The server claims the payment before contacting Razorpay to prevent duplicate refund requests. Course access is revoked only after Razorpay reports that the refund was processed. EMI and offline refunds require manual review and are intentionally unavailable from the automatic refund button.
+
+After deploying the current functions:
+
+1. In Razorpay, configure the webhook URL as `https://YOUR_PROJECT_REF.supabase.co/functions/v1/lms-payment-webhook`.
+2. Subscribe it to `payment.captured`, `refund.processed`, and `refund.failed`.
+3. Keep the matching webhook secret in the Supabase Edge Function secret `RAZORPAY_WEBHOOK_SECRET`.
+4. Deploy both functions again whenever their code changes.
+
+Test refunds with a controlled Razorpay test-mode payment before enabling live-mode refunds. An administrator must confirm the destructive access-revocation step in the UI.
+
 Never commit `.env.local`, service-role keys, or payment secrets.

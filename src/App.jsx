@@ -38,6 +38,9 @@ import Register from "./pages/Register.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
 import AuthCallback from "./pages/AuthCallback.jsx";
+import Terms from "./pages/Terms.jsx";
+import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
+import RefundPolicy from "./pages/RefundPolicy.jsx";
 
 /* ============================================================
    AUTH GUARDS
@@ -312,6 +315,11 @@ function App() {
             path="/register"
             element={<Register />}
           />
+
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/refund-policy" element={<RefundPolicy />} />
 
           {/* Forgot password page */}
 

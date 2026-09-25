@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import Cubes from "../Animiations/Cubes";
 import { supabase } from "../lib/supabase";
 import {
-  Phone,
   Mail,
   Lock,
   Eye,
@@ -40,9 +39,8 @@ function isInAppBrowser() {
 
 function supabaseAuthErrorMessage(error) {
   const msg = (error?.message || "").toLowerCase();
-  if (msg.includes("invalid login credentials")) return "Incorrect email or mobile number, or password.";
-  if (msg.includes("phone not confirmed")) return "Phone confirmation is enabled. Ask the administrator to disable it for instant access.";
-  if (msg.includes("user not found")) return "Incorrect email or mobile number, or password.";
+  if (msg.includes("invalid login credentials")) return "Incorrect email address or password.";
+  if (msg.includes("user not found")) return "Incorrect email address or password.";
   if (msg.includes("too many requests") || msg.includes("rate limit")) {
     return "Too many attempts. Please wait a moment and try again.";
   }
@@ -77,8 +75,7 @@ async function resolvePostLoginRoute(userId) {
 }
 
 export default function LoginForm() {
-  const [loginMethod, setLoginMethod] = useState("phone");
-  const [form, setForm] = useState({ phone: "", email: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [status, setStatus] = useState("idle");
@@ -111,7 +108,7 @@ export default function LoginForm() {
 
   const pulseCubesFor = (fieldName, value) => {
     const col = Math.min(CUBE_GRID_SIZE - 1, value.length % (CUBE_GRID_SIZE + 3));
-    const row = fieldName === "phone" || fieldName === "email" ? 1.5 : 4.5;
+    const row = fieldName === "email" ? 1.5 : 4.5;
     cubesRef.current?.pulse(row, col);
   };
 
@@ -129,14 +126,14 @@ export default function LoginForm() {
     scrollToTop();
     setErrorMsg("");
 
-    const identifier = loginMethod === "phone" ? form.phone.trim() : form.email.trim();
+    const identifier = form.email.trim();
     if (!identifier || !form.password) {
       setStatus("error");
-      setErrorMsg(`Enter both your ${loginMethod === "phone" ? "mobile number" : "email address"} and password to continue.`);
+      setErrorMsg("Enter both your email address and password to continue.");
       return;
     }
 
-    if (loginMethod === "email" && !/^\S+@\S+\.\S+$/.test(identifier)) {
+    if (!/^\S+@\S+\.\S+$/.test(identifier)) {
       setStatus("error");
       setErrorMsg("Enter a valid email address.");
       return;
@@ -150,9 +147,7 @@ export default function LoginForm() {
       // session on tab close by storing a flag and relying on
       // sessionStorage instead — simplest correct approach is to just
       // sign out on window unload when remember is false.
-      const credentials = loginMethod === "phone"
-        ? { phone: `+91${identifier.replace(/\D/g, "").replace(/^91/, "")}`, password: form.password }
-        : { email: identifier.toLowerCase(), password: form.password };
+      const credentials = { email: identifier.toLowerCase(), password: form.password };
       const { data, error } = await supabase.auth.signInWithPassword(credentials);
       if (error) throw error;
 
@@ -270,43 +265,21 @@ export default function LoginForm() {
               </a>
             </p>
 
-            <div className="mt-6 grid grid-cols-2 rounded-xl bg-violet-50 p-1" role="group" aria-label="Choose login method">
-              <button
-                type="button"
-                onClick={() => { setLoginMethod("phone"); setErrorMsg(""); }}
-                aria-pressed={loginMethod === "phone"}
-                className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${loginMethod === "phone" ? "bg-white text-[#4A267E] shadow-sm" : "text-[#6b5f87] hover:text-[#4A267E]"}`}
-              >
-                Phone number
-              </button>
-              <button
-                type="button"
-                onClick={() => { setLoginMethod("email"); setErrorMsg(""); }}
-                aria-pressed={loginMethod === "email"}
-                className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${loginMethod === "email" ? "bg-white text-[#4A267E] shadow-sm" : "text-[#6b5f87] hover:text-[#4A267E]"}`}
-              >
-                Email
-              </button>
-            </div>
-
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
               <div>
-                <label htmlFor={loginMethod === "phone" ? "phone" : "email"} className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
-                  {loginMethod === "phone" ? "Mobile number" : "Email address"}
+                <label htmlFor="email" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
+                  Email address
                 </label>
                 <div className="relative">
-                  {loginMethod === "phone"
-                    ? <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A79BC4]" />
-                    : <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A79BC4]" />}
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A79BC4]" />
                   <input
-                    key={loginMethod}
-                    id={loginMethod === "phone" ? "phone" : "email"}
-                    name={loginMethod}
-                    type={loginMethod === "phone" ? "tel" : "email"}
-                    inputMode={loginMethod === "phone" ? "numeric" : "email"}
-                    autoComplete={loginMethod === "phone" ? "tel" : "email"}
-                    placeholder={loginMethod === "phone" ? "9876543210" : "you@example.com"}
-                    value={form[loginMethod]}
+                    id="email"
+                    name="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={form.email}
                     onChange={handleChange}
                     onFocus={handleFocus}
                     className="w-full rounded-xl border border-violet-100 bg-white py-3 pl-10 pr-4 text-sm text-[#1F1533] placeholder:text-[#A79BC4] outline-none transition-colors focus:border-[#6D3FC0] focus:ring-2 focus:ring-[#6D3FC0]/20"
@@ -409,7 +382,7 @@ export default function LoginForm() {
               By logging in, you agree to our{" "}
               <a href="/terms" className="font-medium text-[#6D3FC0] hover:underline">Terms</a>{" "}
               and{" "}
-              <a href="/privacy" className="font-medium text-[#6D3FC0] hover:underline">Privacy Policy</a>.
+              <a href="/privacy-policy" className="font-medium text-[#6D3FC0] hover:underline">Privacy Policy</a>.
             </p>
           </motion.div>
         </div>
