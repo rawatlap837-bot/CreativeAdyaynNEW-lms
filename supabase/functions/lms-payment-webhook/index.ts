@@ -44,8 +44,16 @@ Deno.serve(async (request: Request) => {
     }
     if (event.event !== "payment.captured") return new Response("Ignored", { status: 200 });
     const payment = event.payload?.payment?.entity;
-    const { data: order, error } = await admin.from("lms_payments").select("*").eq("order_id", payment?.order_id).single();
-    if (error || !order) throw new Error("Order not found; retry delivery.");
+    const { data: order, error } = await admin.from("lms_payments").select("*").eq("order_id", payment?.order_id).maybeSingle();
+    if (error) throw error;
+    if (!order) {
+      const { data: installment, error: installmentError } = await admin.from("lms_emi_installments").select("amount").eq("razorpay_order_id", payment?.order_id).single();
+      if (installmentError || !installment) throw new Error("Order not found; retry delivery.");
+      if (payment.status !== "captured" || Number(payment.amount) !== Number(installment.amount)) throw new Error("Captured payment does not match installment.");
+      const { error: confirmInstallmentError } = await admin.rpc("lms_confirm_emi_installment", { order_ref: payment.order_id, payment_ref: payment.id });
+      if (confirmInstallmentError) throw confirmInstallmentError;
+      return new Response("OK");
+    }
     assertCapturedPayment(payment, order);
     const { error: confirmError } = await admin.rpc("lms_confirm_payment", { order_ref: order.order_id, payment_ref: payment.id });
     if (confirmError) throw confirmError;

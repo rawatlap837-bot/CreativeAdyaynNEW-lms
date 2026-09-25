@@ -6,3 +6,14 @@ verify_jwt = true
 [functions.lms-payment-webhook]
 # Razorpay sends an HMAC signature, not a Supabase user JWT.
 verify_jwt = false
+
+[functions.lms-emi-create-order]
+verify_jwt = true
+
+[functions.lms-emi-webhook]
+# Razorpay sends an HMAC signature, not a Supabase user JWT.
+verify_jwt = false
+
+[functions.lms-emi-cron]
+# Protected by the CRON_SECRET bearer token inside the function.
+verify_jwt = false

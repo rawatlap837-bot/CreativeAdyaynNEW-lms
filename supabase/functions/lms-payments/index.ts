@@ -1,6 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
-import { payableAmount, validSignature, assertCapturedPayment } from "../_shared/payments.js";
-import { sendPaymentReceipt } from "../_shared/receipts.js";
+import { payableAmount } from "../_shared/payments.js";
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 const keyId = Deno.env.get("RAZORPAY_KEY_ID") || "";
@@ -189,8 +188,10 @@ Deno.serve(async (request: Request) => {
           plan = newPlan;
         }
         if (plan.status === "completed") return reply({ error: "Your EMI plan is already complete." }, 409);
-        if (plan.status === "cancelled") return reply({ error: "This EMI plan is no longer available." }, 409);
+        if (plan.status === "cancelled" || plan.status === "defaulted") return reply({ error: "This EMI plan is no longer available. Contact support." }, 409);
         planId = plan.id;
+        const { error: prepareError } = await admin.rpc("lms_prepare_emi_plan", { p_plan_id: plan.id });
+        if (prepareError) throw prepareError;
         installmentCount = Number(plan.installment_count);
         if (!plan.registration_paid) { amount = Number(plan.registration_amount); installmentNumber = 0; paymentLabel = "₹2,000 registration fee"; }
         else {
@@ -204,31 +205,15 @@ Deno.serve(async (request: Request) => {
       }
       if (!Number.isSafeInteger(amount) || amount <= 0) return reply({ error: "No payment is due for this course." }, 409);
       const order = await razorpay("orders", { amount, currency: course.currency || "INR", receipt: crypto.randomUUID(), notes: { courseId: course.id, studentId: user.id, paymentMode, planId: planId || "", installmentNumber: String(installmentNumber || ""), paymentLabel } });
+      if (paymentMode === "emi" && planId !== null && installmentNumber !== null) {
+        const { error: installmentError } = await admin.from("lms_emi_installments")
+          .update({ razorpay_order_id: order.id, status: "created", updated_at: new Date().toISOString() })
+          .eq("plan_id", planId).eq("installment_number", installmentNumber).in("status", ["unpaid", "overdue", "created"]);
+        if (installmentError) throw installmentError;
+      }
       const { error: insertError } = await admin.from("lms_payments").insert({ id: order.id, order_id: order.id, student_id: user.id, course_id: course.id, amount, currency: order.currency, status: "created", payment_mode: paymentMode, plan_id: planId, installment_number: installmentNumber, installment_count: installmentCount, due_at: paymentMode === "emi" ? new Date().toISOString() : null });
       if (insertError) throw insertError;
       return reply({ keyId, orderId: order.id, amount, currency: order.currency, paymentMode, planId, installmentNumber, installmentCount, paymentLabel });
-    }
-    if (body.action === "verify") {
-      if (!/^order_[a-zA-Z0-9]+$/.test(body.razorpay_order_id || "") || !/^pay_[a-zA-Z0-9]+$/.test(body.razorpay_payment_id || "")) return reply({ error: "Invalid payment reference." }, 400);
-      const { data: order, error } = await admin.from("lms_payments").select("*").eq("order_id", body.razorpay_order_id).eq("student_id", user.id).eq("course_id", body.courseId).single();
-      if (error || !order) return reply({ error: "Payment order not found." }, 404);
-      if (!await validSignature(keySecret, `${order.order_id}|${body.razorpay_payment_id}`, body.razorpay_signature)) return reply({ error: "Payment verification failed." }, 400);
-      let payment = await razorpay(`payments/${body.razorpay_payment_id}`);
-      if (payment.status === "authorized" && payment.order_id === order.order_id && Number(payment.amount) === Number(order.amount) && payment.currency === order.currency) payment = await razorpay(`payments/${body.razorpay_payment_id}/capture`, { amount: Number(order.amount), currency: order.currency });
-      assertCapturedPayment(payment, order);
-      const { data: enrollment, error: confirmError } = await admin.rpc("lms_confirm_payment", { order_ref: order.order_id, payment_ref: payment.id });
-      if (confirmError) throw confirmError;
-      const [{ data: course }, { data: profile }] = await Promise.all([
-        admin.from("lms_courses").select("title").eq("id", order.course_id).maybeSingle(),
-        admin.from("lms_profiles").select("name,email").eq("id", user.id).maybeSingle(),
-      ]);
-      const receiptEmail = await sendPaymentReceipt({
-        payment: { ...order, ...payment, payment_id: payment.id, payment_mode: order.payment_mode, installment_number: order.installment_number },
-        courseTitle: course?.title || "Course",
-        recipientEmail: user.email || profile?.email || "",
-        recipientName: profile?.name || user.user_metadata?.name || user.user_metadata?.full_name || "Student",
-      });
-      return reply({ enrollment, receiptEmail });
     }
     return reply({ error: "Unknown payment action." }, 400);
   } catch (error) {

@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import { createPaymentOrder, getInstallmentPlan, verifyPayment } from "../services/Payments";
+import { createPaymentOrder, getInstallmentPlan } from "../services/Payments";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -611,40 +611,11 @@ export default function CourseDetails() {
           },
 
           handler: async (response) => {
-            try {
-              setEnrollmentMessage(
-                "Payment received. Enrolling you in the course..."
-              );
-
-              const { enrollment: newEnrollment, receiptEmail } = await verifyPayment({ courseId: course.id, ...response });
-
-              setEnrollment(newEnrollment);
-              if (usingEmi) {
-                const { plan } = await getInstallmentPlan(course.id);
-                setInstallmentPlan(plan || null);
-              }
-              setEnrollmentMessage(receiptEmail?.sent
-                ? `Payment successful! Your course is now unlocked. The receipt was sent to ${user.email}.`
-                : "Payment successful! Your course is now unlocked. The receipt could not be emailed right now; you can still view your payment record in your dashboard.");
-
-              setTimeout(() => {
-                navigate(`/student/courses/${course.id}`);
-              }, 800);
-            } catch (err) {
-              console.error("Enrollment failed after payment:", err);
-
-              setEnrollmentError(
-                err?.message ||
-                "Payment was successful, but enrollment could not be completed. Please contact the institute with your Razorpay payment ID."
-              );
-
-              setEnrolling(false);
-            } finally {
-              // Razorpay can leave its checkout overlay open while the server
-              // verifies/captures a payment. Always release the page state so
-              // a slow or failed Supabase request cannot strand the CTA.
-              setEnrolling(false);
-            }
+            // Checkout success is informational only. The signed Razorpay
+            // webhook is the sole authority that confirms payment and unlocks.
+            setEnrollmentMessage(`Payment submitted. We are securely confirming it with Razorpay. Payment ID: ${response.razorpay_payment_id}`);
+            setEnrolling(false);
+            setTimeout(() => navigate("/student/payments"), 1200);
           },
         });
 

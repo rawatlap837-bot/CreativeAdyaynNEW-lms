@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import { auth, db } from "../lib/backend";
+import { supabase } from "../lib/supabase";
 import CourseCommunityPanel from "../components/CourseCommunityPanel";
 
 import {
@@ -811,6 +812,12 @@ export default function LearnCourse() {
           throw err;
         }
 
+        const { data: accessRows, error: accessError } = auth.currentUser
+          ? await supabase.from("lms_module_access").select("module_id,unlocked,scheduled_for").eq("student_id", auth.currentUser.uid).eq("course_id", course.id)
+          : { data: [], error: null };
+        if (accessError) throw accessError;
+        const accessByModule = Object.fromEntries((accessRows || []).map((row) => [row.module_id, row]));
+
         const moduleData = await Promise.all(
           modulesSnapshot.docs.map(
             async (moduleDoc) => {
@@ -859,6 +866,8 @@ export default function LearnCourse() {
 
               return {
                 ...module,
+                access: accessByModule[module.id] || null,
+                locked: hasAccess && !accessByModule[module.id]?.unlocked,
                 lessons,
               };
             }
@@ -883,7 +892,7 @@ export default function LearnCourse() {
                   moduleTitle: module.title,
                 })
               )
-            )[0];
+            ).find((lesson) => !moduleData.find((item) => item.id === lesson.moduleId)?.locked);
 
         if (firstLesson) {
           setSelectedLesson(firstLesson);
@@ -918,7 +927,7 @@ export default function LearnCourse() {
     return () => {
       cancelled = true;
     };
-  }, [course?.id]);
+  }, [course?.id, enrollment?.status]);
 
 
   /* =====================================================
@@ -1491,15 +1500,14 @@ export default function LearnCourse() {
                             </p>
 
                             <p className="mt-0.5 text-[11px] text-slate-500">
-                              {moduleLessonCount}{" "}
-                              {moduleLessonCount === 1
+                              {module.locked ? `Unlocks ${module.access?.scheduled_for ? new Date(`${module.access.scheduled_for}T00:00:00`).toLocaleDateString() : "after payment and its scheduled class"}` : `${moduleLessonCount} ${moduleLessonCount === 1
                                 ? "lesson"
-                                : "lessons"}
+                                : "lessons"}`}
                             </p>
                           </div>
                         </div>
 
-                        {isOpen ? (
+                        {module.locked ? <Lock className="h-4 w-4 shrink-0 text-amber-600" /> : isOpen ? (
                           <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
                         ) : (
                           <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
@@ -1527,7 +1535,7 @@ export default function LearnCourse() {
                                   );
 
                                 const locked =
-                                  !lesson.isPreview && !hasAccess;
+                                  !lesson.isPreview && (!hasAccess || module.locked);
 
                                 return (
                                   <button
