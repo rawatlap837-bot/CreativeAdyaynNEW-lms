@@ -10,6 +10,7 @@ async function invoke(action, payload) {
   return data;
 }
 export const createPaymentOrder = (courseId, paymentMode = "one_time", installmentCount = null) => invoke("create-order", { courseId, paymentMode, installmentCount });
+export const verifyPayment = ({ orderId, paymentId, signature }) => invoke("verify-payment", { orderId, paymentId, signature });
 export const getInstallmentPlan = (courseId) => invoke("get-installment-plan", { courseId });
 export const syncEmiReminders = () => invoke("sync-emi-reminders", {});
 export const refundPayment = (paymentId, reason) => invoke("refund-payment", { paymentId, reason });

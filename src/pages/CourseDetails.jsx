@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import { createPaymentOrder, getInstallmentPlan } from "../services/Payments";
+import { createPaymentOrder, getInstallmentPlan, verifyPayment } from "../services/Payments";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -611,11 +611,26 @@ export default function CourseDetails() {
           },
 
           handler: async (response) => {
-            // Checkout success is informational only. The signed Razorpay
-            // webhook is the sole authority that confirms payment and unlocks.
-            setEnrollmentMessage(`Payment submitted. We are securely confirming it with Razorpay. Payment ID: ${response.razorpay_payment_id}`);
-            setEnrolling(false);
-            setTimeout(() => navigate("/student/payments"), 1200);
+            try {
+              setEnrollmentMessage("Payment received. Activating your course...");
+              const result = await verifyPayment({
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              });
+              if (result?.enrollment) setEnrollment(result.enrollment);
+              setEnrollmentMessage("Payment verified. Your course is ready.");
+              navigate("/dashboard?tab=courses", { replace: true });
+            } catch (verificationError) {
+              console.error("Payment verification failed:", verificationError);
+              setEnrollmentError(
+                verificationError?.message ||
+                "Your payment was received but course access is still being confirmed. Check Payments or contact support with your payment ID."
+              );
+              setEnrollmentMessage(`Payment ID: ${response.razorpay_payment_id}`);
+            } finally {
+              setEnrolling(false);
+            }
           },
         });
 

@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
-import { payableAmount } from "../_shared/payments.js";
+import { assertCapturedPayment, payableAmount, validSignature } from "../_shared/payments.js";
+import { sendPaymentReceipt } from "../_shared/receipts.js";
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 const keyId = Deno.env.get("RAZORPAY_KEY_ID") || "";
@@ -45,7 +46,7 @@ function durationMonths(value: unknown) {
 async function razorpay(path: string, body?: Record<string, unknown>) {
   const response = await fetch(`https://api.razorpay.com/v1/${path}`, { method: body ? "POST" : "GET", headers: { Authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`, "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
   const data = await response.json();
-  if (!response.ok) throw new Error("Payment provider is unavailable. Please try again.");
+  if (!response.ok) throw new Error(data?.error?.description || data?.error?.reason || "Payment provider is unavailable. Please try again.");
   return data;
 }
 
@@ -152,6 +153,54 @@ Deno.serve(async (request: Request) => {
     }
 
     if (!keyId || !keySecret) return reply({ error: "Online payment is not configured yet." }, 503);
+    if (body.action === "verify-payment") {
+      if (typeof body.orderId !== "string" || typeof body.paymentId !== "string" || typeof body.signature !== "string") {
+        return reply({ error: "Payment verification details are incomplete." }, 400);
+      }
+      const { data: order, error: orderError } = await admin.from("lms_payments")
+        .select("*")
+        .eq("order_id", body.orderId)
+        .eq("student_id", user.id)
+        .maybeSingle();
+      if (orderError) throw orderError;
+      if (!order) return reply({ error: "This payment order was not found for your account." }, 404);
+      if (!await validSignature(keySecret, `${body.orderId}|${body.paymentId}`, body.signature)) {
+        return reply({ error: "Payment signature verification failed." }, 401);
+      }
+      let payment = await razorpay(`payments/${encodeURIComponent(body.paymentId)}`);
+      // Depending on the Razorpay account capture setting, Checkout can return
+      // a valid payment while it is still authorized. Capture it here before
+      // granting access; the amount and currency are checked immediately below.
+      if (payment.status === "authorized") {
+        payment = await razorpay(`payments/${encodeURIComponent(body.paymentId)}/capture`, {
+          amount: Number(order.amount),
+          currency: order.currency,
+        });
+      }
+      assertCapturedPayment(payment, order);
+      const { data: enrollment, error: confirmError } = await admin.rpc("lms_confirm_payment", {
+        order_ref: order.order_id,
+        payment_ref: payment.id,
+      });
+      if (confirmError) throw confirmError;
+      const [{ data: student }, { data: paidCourse }] = await Promise.all([
+        admin.from("lms_profiles").select("name,email").eq("id", order.student_id).maybeSingle(),
+        admin.from("lms_courses").select("title").eq("id", order.course_id).maybeSingle(),
+      ]);
+      try {
+        await sendPaymentReceipt({
+          payment: { ...order, ...payment, payment_id: payment.id },
+          courseTitle: paidCourse?.title || "Course",
+          recipientEmail: student?.email || "",
+          recipientName: student?.name || "Student",
+        });
+      } catch (receiptError) {
+        // Enrollment must not fail after a verified charge just because the
+        // optional receipt provider is temporarily unavailable.
+        console.error("Payment receipt delivery failed", receiptError instanceof Error ? receiptError.message : "unknown");
+      }
+      return reply({ enrollment, courseId: order.course_id });
+    }
     if (body.action === "create-order") {
       if (typeof body.courseId !== "string") return reply({ error: "Course is required." }, 400);
       const { data: course, error } = await admin.from("lms_courses").select("id,title,price,discount_price,currency,status,duration").eq("id", body.courseId).single();
@@ -217,7 +266,12 @@ Deno.serve(async (request: Request) => {
     }
     return reply({ error: "Unknown payment action." }, 400);
   } catch (error) {
-    console.error("Payment operation failed", error instanceof Error ? error.message : "unknown");
-    return reply({ error: error instanceof Error ? error.message : "Payment could not be completed. If charged, keep your payment ID and contact the institute." }, 400);
+    const message = error instanceof Error
+      ? error.message
+      : typeof error === "object" && error !== null && "message" in error
+        ? String(error.message)
+        : "Payment could not be completed. If charged, keep your payment ID and contact the institute.";
+    console.error("Payment operation failed", message);
+    return reply({ error: message }, 400);
   }
 });
