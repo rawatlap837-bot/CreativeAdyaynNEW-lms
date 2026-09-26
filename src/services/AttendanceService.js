@@ -12,6 +12,8 @@ import {
 } from "../lib/database";
 
 import { auth, db } from "../lib/backend";
+import { supabase } from "../lib/supabase";
+import { fromRow } from "../lib/records";
 
 const ATTENDANCE_COLLECTION = "attendance";
 const ATTENDANCE_SESSIONS_COLLECTION = "attendanceSessions";
@@ -38,6 +40,27 @@ function requireUser() {
 
 function getAttendanceId(sessionId, studentId) {
   return `${sessionId}_${studentId}`;
+}
+
+/* ==================================================
+   AUTOMATIC COURSE ENGAGEMENT ATTENDANCE
+================================================== */
+
+export async function markCourseEngagementAttendance(courseId) {
+  requireUser();
+
+  if (!courseId) {
+    throw new Error("Course ID is required.");
+  }
+
+  const { data, error } = await supabase.rpc(
+    "lms_mark_course_engagement_attendance",
+    { course: courseId }
+  );
+
+  if (error) throw error;
+
+  return fromRow("attendance_records", data);
 }
 
 /* ==================================================

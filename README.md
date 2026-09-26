@@ -17,10 +17,20 @@ React and Tailwind LMS backed by Supabase.
 
 ## Payment receipts by email
 
-Successful online payments send a receipt through Resend from the `lms-payments` Edge Function. Configure these Supabase Edge Function secrets before deploying:
+Successful online payments send a transactional receipt through Brevo from the `lms-payments` Edge Function. Configure and verify a sender/domain in Brevo, then set these Supabase Edge Function secrets before deploying:
 
-- `RESEND_API_KEY`: a Resend API key.
-- `PAYMENT_RECEIPT_FROM`: a sender address on a domain verified in Resend, for example `Creative Adhyayan <receipts@your-verified-domain.com>`.
+- `BREVO_API_KEY`: a Brevo API v3 key. Keep it only in Supabase Edge Function secrets.
+- `PAYMENT_RECEIPT_FROM_EMAIL`: the sender address registered and verified in Brevo, for example `receipts@your-verified-domain.com`.
+- `PAYMENT_RECEIPT_FROM_NAME`: optional display name; defaults to `Creative Adhyayan`.
+- `PAYMENT_RECEIPT_REPLY_TO`: optional reply-to address; defaults to the sender address.
+
+Example configuration and deployment:
+
+```sh
+supabase secrets set BREVO_API_KEY=xkeysib-your-key PAYMENT_RECEIPT_FROM_EMAIL=receipts@example.com PAYMENT_RECEIPT_FROM_NAME="Creative Adhyayan" PAYMENT_RECEIPT_REPLY_TO=support@example.com
+supabase functions deploy lms-payments
+supabase functions deploy lms-payment-webhook --no-verify-jwt
+```
 
 Deploy both `lms-payments` and `lms-payment-webhook` so receipts send whether the student completes checkout in the open browser or Razorpay reports capture through its webhook. If email delivery is unavailable, payment verification and course enrollment still succeed, and the checkout displays that the receipt is available in the student dashboard.
 

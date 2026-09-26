@@ -38,6 +38,7 @@ import {
   markLessonComplete,
   recordLessonWatch,
 } from "../services/EnrollmentService";
+import { markCourseEngagementAttendance } from "../services/AttendanceService";
 
 
 /* =========================================================
@@ -941,6 +942,26 @@ export default function LearnCourse() {
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [selectedLesson?.id]);
+
+  // Opening an accessible lesson is course engagement. The server records at
+  // most one present mark for this student/course/day, even across refreshes.
+  useEffect(() => {
+    if (
+      !course?.id ||
+      enrollment?.status !== "active" ||
+      !selectedLesson?.id
+    ) {
+      return;
+    }
+
+    markCourseEngagementAttendance(course.id).catch((attendanceError) => {
+      // Attendance must never interrupt learning if the network is unavailable.
+      console.warn(
+        "Automatic attendance could not be recorded:",
+        attendanceError?.message || attendanceError
+      );
+    });
+  }, [course?.id, enrollment?.status, selectedLesson?.id]);
 
 
   /* =====================================================
