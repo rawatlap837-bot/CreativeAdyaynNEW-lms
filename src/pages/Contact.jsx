@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useEffect, useState } from "react";
 import { MapPin, Mail, Phone, Send, Loader2, ArrowRight } from "lucide-react";
+import { toast } from "react-toastify";
 
 /**
  * Contact Us section — Creative Adhyayan (advanced layout)
@@ -9,6 +10,13 @@ import { MapPin, Mail, Phone, Send, Loader2, ArrowRight } from "lucide-react";
  * form card that overlaps down into the map below it → a solid CTA bar under the map.
  * Content is unchanged from the previous version — only the structure/finish is upgraded.
  */
+
+// Google Apps Script web app endpoint that logs submissions to a Google Sheet.
+// Content-Type is deliberately "text/plain" below (not "application/json") —
+// Apps Script doesn't handle CORS preflight requests, and text/plain avoids
+// triggering one while the script still JSON.parses the body just fine.
+const SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbx_cuxwBSk4MHGQASnrfQQ2Jw3Fdw5cGXHYqA96DEUPcBah2tgm-CYFKOKz0RQ152bS/exec";
 
 const CONTACT_POINTS = [
   {
@@ -50,8 +58,24 @@ const FIELD_CLASS_DARK =
 const FIELD_CLASS_LIGHT =
   "w-full rounded-xl border border-violet-100 bg-white px-4 py-3 text-sm text-[#1F1533] placeholder:text-[#A79BC4] outline-none transition-colors focus:border-[#6D3FC0] focus:ring-2 focus:ring-[#6D3FC0]/20";
 
-function scrollToTopSmooth() {
-  window.scrollTo({ top: 0, behavior: "smooth" });
+// Posts JSON to the Apps Script endpoint. Throws on network failure or on
+// an { ok: false } response so callers can drive their own error state.
+async function submitToSheet(payload) {
+  const res = await fetch(SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Request failed with status ${res.status}`);
+  }
+
+  const result = await res.json();
+  if (!result.ok) {
+    throw new Error(result.error || "Submission was rejected");
+  }
+  return result;
 }
 
 // Coordinates computed once at module load rather than on every DotGrid render.
@@ -126,9 +150,11 @@ const ContactPoint = memo(function ContactPoint({ icon: Icon, label, lines }) {
 
 export default function ContactSection() {
   const [form, setForm] = useState(EMPTY_FORM);
-  const [status, setStatus] = useState("idle"); // idle | sending | sent
+  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+  const [errorMessage, setErrorMessage] = useState("");
   const [newsletterEmail, setNewsletterEmail] = useState("");
-  const [newsletterStatus, setNewsletterStatus] = useState("idle");
+  const [newsletterStatus, setNewsletterStatus] = useState("idle"); // idle | sending | sent | error
+  const [newsletterError, setNewsletterError] = useState("");
 
   // Scroll to the very top whenever this page mounts — e.g. when the user
   // clicks "Contact" in the navbar from somewhere scrolled down on another
@@ -149,28 +175,49 @@ export default function ContactSection() {
     setNewsletterEmail(e.target.value);
   }, []);
 
-  const handleSubmit = useCallback(async (e) => {
-    e.preventDefault();
-    scrollToTopSmooth();
-    setStatus("sending");
-    // TODO: wire this up to your actual endpoint / API call
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    setStatus("sent");
-    setForm(EMPTY_FORM);
-    setTimeout(() => setStatus("idle"), 3000);
-  }, []);
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setStatus("sending");
+      setErrorMessage("");
+
+      try {
+        await submitToSheet({ type: "contact", ...form });
+        setStatus("sent");
+        setForm(EMPTY_FORM);
+        toast.success("Message sent! We'll get back to you soon.");
+        setTimeout(() => setStatus("idle"), 3000);
+      } catch (err) {
+        setStatus("error");
+        const message = "Something went wrong — please try again or email us directly.";
+        setErrorMessage(message);
+        toast.error(message);
+        setTimeout(() => setStatus("idle"), 4000);
+      }
+    },
+    [form]
+  );
 
   const handleNewsletter = useCallback(
     async (e) => {
       e.preventDefault();
       if (!newsletterEmail) return;
-      scrollToTopSmooth();
       setNewsletterStatus("sending");
-      // TODO: wire this up to your actual newsletter endpoint
-      await new Promise((resolve) => setTimeout(resolve, 700));
-      setNewsletterStatus("sent");
-      setNewsletterEmail("");
-      setTimeout(() => setNewsletterStatus("idle"), 3000);
+      setNewsletterError("");
+
+      try {
+        await submitToSheet({ type: "newsletter", email: newsletterEmail });
+        setNewsletterStatus("sent");
+        setNewsletterEmail("");
+        toast.success("Subscribed! You'll hear from us about new batches.");
+        setTimeout(() => setNewsletterStatus("idle"), 3000);
+      } catch (err) {
+        setNewsletterStatus("error");
+        const message = "Couldn't subscribe — please try again.";
+        setNewsletterError(message);
+        toast.error(message);
+        setTimeout(() => setNewsletterStatus("idle"), 4000);
+      }
     },
     [newsletterEmail]
   );
@@ -258,6 +305,8 @@ export default function ContactSection() {
                     </>
                   ) : status === "sent" ? (
                     "Message sent ✓"
+                  ) : status === "error" ? (
+                    "Try again"
                   ) : (
                     <>
                       Send message
@@ -265,6 +314,12 @@ export default function ContactSection() {
                     </>
                   )}
                 </button>
+
+                {status === "error" && (
+                  <p className="mt-3 text-sm text-red-300" role="alert">
+                    {errorMessage}
+                  </p>
+                )}
               </form>
             </div>
           </div>
@@ -299,36 +354,45 @@ export default function ContactSection() {
             </p>
           </div>
 
-          <div className="flex w-full max-w-md items-center gap-2 rounded-xl bg-white/10 p-1.5 backdrop-blur-sm">
-            <label htmlFor="newsletter-email" className="sr-only">
-              Email address
-            </label>
-            <input
-              id="newsletter-email"
-              type="email"
-              required
-              placeholder="Your email address"
-              value={newsletterEmail}
-              onChange={handleNewsletterEmailChange}
-              className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/50 outline-none"
-            />
-            <button
-              type="submit"
-              disabled={newsletterStatus === "sending"}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#2E1A55] transition-transform active:scale-[0.97] disabled:opacity-70"
-              style={amberButtonStyle}
-            >
-              {newsletterStatus === "sending" ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : newsletterStatus === "sent" ? (
-                "Done ✓"
-              ) : (
-                <>
-                  Submit
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </>
-              )}
-            </button>
+          <div className="flex w-full max-w-md flex-col gap-2">
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 p-1.5 backdrop-blur-sm">
+              <label htmlFor="newsletter-email" className="sr-only">
+                Email address
+              </label>
+              <input
+                id="newsletter-email"
+                type="email"
+                required
+                placeholder="Your email address"
+                value={newsletterEmail}
+                onChange={handleNewsletterEmailChange}
+                className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/50 outline-none"
+              />
+              <button
+                type="submit"
+                disabled={newsletterStatus === "sending"}
+                className="flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#2E1A55] transition-transform active:scale-[0.97] disabled:opacity-70"
+                style={amberButtonStyle}
+              >
+                {newsletterStatus === "sending" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : newsletterStatus === "sent" ? (
+                  "Done ✓"
+                ) : newsletterStatus === "error" ? (
+                  "Retry"
+                ) : (
+                  <>
+                    Submit
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </>
+                )}
+              </button>
+            </div>
+            {newsletterStatus === "error" && (
+              <p className="text-sm text-red-200" role="alert">
+                {newsletterError}
+              </p>
+            )}
           </div>
         </form>
       </div>
