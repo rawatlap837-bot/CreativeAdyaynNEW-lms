@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useToastState } from "../hooks/useToastState";
 import CourseCategorySelect from "./CourseCategorySelect";
 import {
   ArrowLeft,
@@ -44,8 +45,8 @@ export default function EditCourse() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useToastState("", "error");
+  const [success, setSuccess] = useToastState("", "success");
 
   useEffect(() => {
     loadCourse();
@@ -440,29 +441,6 @@ export default function EditCourse() {
               </p>
             </div>
           )}
-
-        {/* Error */}
-        {error && (
-          <div className="mb-6 flex items-start justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            <span>{error}</span>
-
-            <button
-              type="button"
-              onClick={() => setError("")}
-              className="shrink-0"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Success */}
-        {success && (
-          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-            <Check className="h-5 w-5" />
-            {success}
-          </div>
-        )}
 
         <form onSubmit={handleSave}>
           <div className="space-y-6">

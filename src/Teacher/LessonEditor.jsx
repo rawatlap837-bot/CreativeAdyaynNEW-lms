@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useToastState } from "../hooks/useToastState";
 import {
   ArrowLeft,
   BookOpen,
@@ -145,8 +146,8 @@ const LessonEditor = () => {
   const [thumbnailProgress, setThumbnailProgress] = useState(0);
   const [resourceProgress, setResourceProgress] = useState(0);
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useToastState("", "error");
+  const [success, setSuccess] = useToastState("", "success");
 
   // "upload" = file uploaded to storage, "link" = pasted YouTube / Vimeo / direct URL
   const [videoMode, setVideoMode] = useState("upload");
@@ -773,22 +774,6 @@ const LessonEditor = () => {
           </div>
         </div>
       </div>
-
-      {/* ALERTS */}
-
-      {error && (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <X size={18} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-          <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
-          <span>{success}</span>
-        </div>
-      )}
 
       <form onSubmit={handleSave} className="space-y-6">
 

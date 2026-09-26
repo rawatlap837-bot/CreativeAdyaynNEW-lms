@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Search, UserPlus } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { getMyCourses } from "../services/CourseService";
+import { useToastState } from "../hooks/useToastState";
 
 export default function OfflineEnrollments() {
   const [courses, setCourses] = useState([]);
@@ -12,8 +13,8 @@ export default function OfflineEnrollments() {
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useToastState("", "success");
+  const [error, setError] = useToastState("", "error");
 
   const selectedCourse = useMemo(
     () => courses.find((course) => course.id === courseId),
@@ -97,9 +98,6 @@ export default function OfflineEnrollments() {
       </div>
 
       <form onSubmit={grantAccess} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        {error && <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
-        {message && <p className="mb-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" />{message}</p>}
-
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="text-sm font-medium text-slate-700">Course
             <select value={courseId} onChange={chooseCourse} disabled={loading} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-violet-500">

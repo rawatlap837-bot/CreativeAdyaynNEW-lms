@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "../lib/database";
 import { db } from "../lib/backend";
 import { refundPayment } from "../services/Payments";
+import { useToastState } from "../hooks/useToastState";
 
 import {
   AlertCircle,
@@ -370,7 +371,7 @@ export default function Payments() {
   const [payments, setPayments] = useState([]);
   const [usersById, setUsersById] = useState({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastState("", "error");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] =

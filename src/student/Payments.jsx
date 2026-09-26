@@ -3,6 +3,7 @@ import { AlertCircle, CalendarClock, CheckCircle2, CreditCard, Loader2, RefreshC
 import { supabase } from "../lib/supabase";
 import { auth } from "../lib/backend";
 import { createEmiInstallmentOrder } from "../services/Payments";
+import { useToastState } from "../hooks/useToastState";
 
 const money = (minor, currency = "INR") => new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 2 }).format(Number(minor || 0) / 100);
 const date = (value) => value ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -20,9 +21,9 @@ export default function StudentPayments() {
   const [plans, setPlans] = useState([]);
   const [courses, setCourses] = useState({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastState("", "error");
   const [paying, setPaying] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useToastState("", "success");
 
   async function load() {
     if (!auth.currentUser) { setError("Sign in to view your payment records."); setLoading(false); return; }
@@ -77,8 +78,6 @@ export default function StudentPayments() {
   return (
     <section className="mx-auto max-w-5xl space-y-6">
       <header><p className="text-xs font-bold uppercase tracking-[0.15em] text-violet-600">Account</p><h1 className="mt-1 text-2xl font-black text-slate-900 sm:text-3xl">Payments and EMIs</h1><p className="mt-2 text-sm text-slate-600">Your recorded transactions, installment progress, and upcoming payments.</p></header>
-      {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{message}</div>}
-
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="flex items-center gap-2 font-bold text-slate-900"><CalendarClock className="h-5 w-5 text-violet-600" />EMI plans</h2>

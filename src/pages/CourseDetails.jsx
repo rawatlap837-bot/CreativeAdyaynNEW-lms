@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
 import { createPaymentOrder, getInstallmentPlan, verifyPayment } from "../services/Payments";
+import { useToastState } from "../hooks/useToastState";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -154,7 +155,7 @@ export default function CourseDetails() {
   const [course, setCourse] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastState("", "error");
 
 
   /* =========================================================

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useToastState } from "../hooks/useToastState";
 
 import {
   AlertCircle,
@@ -97,8 +98,8 @@ export default function Attendance() {
 
   const [markingSessionId, setMarkingSessionId] = useState(null);
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useToastState("", "error");
+  const [success, setSuccess] = useToastState("", "success");
 
   const today = useMemo(() => getTodayDate(), []);
 
@@ -490,20 +491,6 @@ export default function Attendance() {
             </button>
           </div>
         </div>
-
-        {error && (
-          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-6 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-700">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-            <p className="text-sm">{success}</p>
-          </div>
-        )}
 
         {/* TODAY'S ATTENDANCE */}
         <section className="mb-8">

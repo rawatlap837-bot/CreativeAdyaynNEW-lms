@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CourseCategorySelect from "./CourseCategorySelect";
+import { useToastState } from "../hooks/useToastState";
 
 import {
   ArrowLeft,
@@ -18,6 +19,7 @@ import { auth } from "../lib/backend";
 import {
   createCourse,
   getCourseById,
+  publishCourse,
   updateCourse,
   uploadCourseThumbnail,
 } from "../services/CourseService";
@@ -73,10 +75,10 @@ export default function CreateCourse() {
     useState(0);
 
   const [error, setError] =
-    useState("");
+    useToastState("", "error");
 
   const [success, setSuccess] =
-    useState("");
+    useToastState("", "success");
 
   /* ============================================================
      AUTH CHECK
@@ -278,6 +280,9 @@ export default function CreateCourse() {
   ) {
     event.preventDefault();
 
+    const publishImmediately =
+      event.nativeEvent?.submitter?.value === "publish";
+
     if (creating || uploading) {
       return;
     }
@@ -396,6 +401,10 @@ export default function CreateCourse() {
         );
       }
 
+      if (publishImmediately) {
+        await publishCourse(createdCourse.id);
+      }
+
       /* ========================================================
          STEP 4 — VERIFY COURSE
          ======================================================== */
@@ -416,7 +425,9 @@ export default function CreateCourse() {
       setUploadProgress(100);
 
       setSuccess(
-        "Course created successfully."
+        publishImmediately
+          ? "Course created and published successfully."
+          : "Course saved as a draft."
       );
 
       /* ========================================================
@@ -425,7 +436,9 @@ export default function CreateCourse() {
 
       setTimeout(() => {
         navigate(
-          `/teacher/courses/edit/${createdCourse.id}`
+          publishImmediately
+            ? "/teacher/courses"
+            : `/teacher/courses/edit/${createdCourse.id}`
         );
       }, 500);
     } catch (err) {
@@ -502,40 +515,6 @@ export default function CreateCourse() {
             </p>
           </div>
         </div>
-
-        {/* ======================================================
-           ERROR
-           ====================================================== */}
-
-        {error && (
-          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <X
-              size={18}
-              className="mt-0.5 shrink-0"
-            />
-
-            <span>
-              {error}
-            </span>
-          </div>
-        )}
-
-        {/* ======================================================
-           SUCCESS
-           ====================================================== */}
-
-        {success && (
-          <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            <CheckCircle2
-              size={18}
-              className="mt-0.5 shrink-0"
-            />
-
-            <span>
-              {success}
-            </span>
-          </div>
-        )}
 
         <form
           onSubmit={
@@ -1161,11 +1140,13 @@ export default function CreateCourse() {
 
               <button
                 type="submit"
+                name="createAction"
+                value="draft"
                 disabled={
                   creating ||
                   uploading
                 }
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-6 py-3 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {creating ||
                 uploading ? (
@@ -1185,7 +1166,27 @@ export default function CreateCourse() {
                       size={17}
                     />
 
-                    Create Course
+                    Save as Draft
+                  </>
+                )}
+              </button>
+
+              <button
+                type="submit"
+                name="createAction"
+                value="publish"
+                disabled={creating || uploading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {creating || uploading ? (
+                  <>
+                    <Loader2 size={17} className="animate-spin" />
+                    {uploading ? "Uploading..." : "Publishing..."}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={17} />
+                    Create &amp; Publish
                   </>
                 )}
               </button>

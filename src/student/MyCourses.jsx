@@ -492,7 +492,7 @@ export default function MyCourses() {
             </p>
 
             <Link
-              to="/courses"
+              to="/#live-courses"
               className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 sm:w-auto"
             >
               Explore Courses

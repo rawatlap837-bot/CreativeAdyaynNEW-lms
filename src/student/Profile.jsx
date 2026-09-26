@@ -7,6 +7,7 @@ import { ref, uploadBytes, getDownloadURL } from "../lib/storage";
 import { auth, db, storage } from "../lib/backend";
 import { Camera, Pencil, Check, X, Award, BookOpen, Calendar, KeyRound, LogOut, Loader2, ShieldCheck, Sparkles, ChevronRight } from "lucide-react";
 import { Skeleton } from "../components/Skeleton"; // adjust path
+import { useToastState } from "../hooks/useToastState";
 
 const ACCENT = "#5227FF";
 const AMBER = "#E8A33D";
@@ -43,8 +44,8 @@ export default function Profile() {
   const [courseCount, setCourseCount] = useState(0);
   const [certCount, setCertCount] = useState(0);
 
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useToastState("", "success");
+  const [error, setError] = useToastState("", "error");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -212,17 +213,6 @@ export default function Profile() {
         </div>
         <div className="flex items-center gap-2 rounded-full border border-violet-100 bg-white/80 px-3 py-2 text-xs font-bold text-[#62567F] shadow-sm"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Account secured</div>
       </motion.div>
-      {message && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-600">
-          {message}
-        </motion.div>
-      )}
-      {error && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-4 rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-600">
-          {error}
-        </motion.div>
-      )}
-
       <motion.div variants={fadeUp} initial="hidden" animate="show" custom={1} className={`relative overflow-hidden rounded-[2rem] border border-white/80 bg-white/90 p-6 sm:p-8 ${cardShadow}`}>
         <div
           aria-hidden="true"

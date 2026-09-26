@@ -1,6 +1,7 @@
 // src/Admin/Courses.jsx
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useToastState } from "../hooks/useToastState";
 
 import {
   AlertCircle,
@@ -45,6 +46,10 @@ import {
 } from "../services/AdminCourseService";
 
 import { db } from "../lib/backend";
+
+// Course publication belongs to the owning teacher. Admins keep catalogue
+// oversight and emergency unpublish controls, but cannot publish/approve.
+const ADMIN_CAN_PUBLISH = false;
 
 // ============================================================
 // HELPERS
@@ -194,7 +199,7 @@ export default function Courses() {
 
   const [loading, setLoading] = useState(true);
 
-  const [error, setError] = useState("");
+  const [error, setError] = useToastState("", "error");
 
   const [search, setSearch] = useState("");
 
@@ -228,7 +233,7 @@ export default function Courses() {
     useState("");
 
   const [actionError, setActionError] =
-    useState("");
+    useToastState("", "error");
 
   // ==========================================================
   // LOAD COURSES
@@ -1513,7 +1518,7 @@ export default function Courses() {
                 Close
               </GhostButton>
 
-              {selectedCourse.status ===
+              {ADMIN_CAN_PUBLISH && selectedCourse.status ===
                 "draft" && (
                   <PrimaryButton
                     disabled={
@@ -1531,7 +1536,7 @@ export default function Courses() {
                   </PrimaryButton>
                 )}
 
-              {selectedCourse.status ===
+              {ADMIN_CAN_PUBLISH && selectedCourse.status ===
                 "pending" && (
                   <>
                     <GhostButton
@@ -1934,7 +1939,7 @@ function CourseActions({
 
       {/* Publish */}
 
-      {course.status === "draft" && (
+      {ADMIN_CAN_PUBLISH && course.status === "draft" && (
         <button
           title="Publish"
           disabled={
@@ -1955,7 +1960,7 @@ function CourseActions({
 
       {/* Approve */}
 
-      {course.status === "pending" && (
+      {ADMIN_CAN_PUBLISH && course.status === "pending" && (
         <button
           title="Approve"
           disabled={
@@ -1976,7 +1981,7 @@ function CourseActions({
 
       {/* Reject */}
 
-      {course.status === "pending" && (
+      {ADMIN_CAN_PUBLISH && course.status === "pending" && (
         <button
           title="Reject"
           onClick={onReject}
@@ -2211,7 +2216,7 @@ function MobileCourseCard({
 
         <div className="flex items-center gap-1.5">
 
-          {course.status === "draft" && (
+          {ADMIN_CAN_PUBLISH && course.status === "draft" && (
             <button
               onClick={onPublish}
               disabled={
@@ -2230,7 +2235,7 @@ function MobileCourseCard({
             </button>
           )}
 
-          {course.status === "pending" && (
+          {ADMIN_CAN_PUBLISH && course.status === "pending" && (
             <>
               <button
                 onClick={onApprove}

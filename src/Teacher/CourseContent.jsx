@@ -40,6 +40,7 @@ import {
 
 import { auth, db, storage } from "../lib/backend";
 import { publishCourse } from "../services/CourseService";
+import { useToastState } from "../hooks/useToastState";
 import { getCourseCommunity, getCommunityJoinClickCount, removeCourseCommunity, saveCourseCommunity, validateWhatsAppInvite } from "../services/CourseCommunityService";
 
 const STATUS = {
@@ -78,8 +79,8 @@ export default function CourseContent() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useToastState("", "error");
+  const [success, setSuccess] = useToastState("", "success");
 
   const [expandedModules, setExpandedModules] = useState({});
 
@@ -88,6 +89,7 @@ export default function CourseContent() {
   const [moduleTitle, setModuleTitle] = useState("");
 
   const [showLessonModal, setShowLessonModal] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const [editingLesson, setEditingLesson] = useState(null);
   const [activeModuleId, setActiveModuleId] = useState(null);
 
@@ -107,8 +109,8 @@ export default function CourseContent() {
   const [communityForm, setCommunityForm] = useState({ whatsappUrl: "", liveClassUrl: "", groupRules: "" });
   const [communityLoading, setCommunityLoading] = useState(false);
   const [communitySaving, setCommunitySaving] = useState(false);
-  const [communityError, setCommunityError] = useState("");
-  const [communitySuccess, setCommunitySuccess] = useState("");
+  const [communityError, setCommunityError] = useToastState("", "error");
+  const [communitySuccess, setCommunitySuccess] = useToastState("", "success");
   const [joinClickCount, setJoinClickCount] = useState(0);
 
   useEffect(() => {
@@ -987,14 +989,13 @@ export default function CourseContent() {
       return;
     }
 
-    const confirmed = window.confirm(
-      "Publish this course now? It will become visible to students."
-    );
+    setShowPublishModal(true);
+  };
 
-    if (!confirmed) return;
-
+  const confirmPublishCourse = async () => {
     try {
       setSubmitting(true);
+      setShowPublishModal(false);
       clearMessages();
 
       await publishCourse(courseId);
@@ -1168,8 +1169,6 @@ export default function CourseContent() {
         {activeTab === "community" ? (
           <section role="tabpanel" className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             <div className="mb-6"><h2 className="text-xl font-bold text-slate-900">Course WhatsApp Group</h2><p className="mt-1 text-sm text-slate-500">Create the WhatsApp group, then share its invite link with active students.</p></div>
-            {communityError && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{communityError}</div>}
-            {communitySuccess && <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{communitySuccess}</div>}
             {communityLoading ? <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Loading community settings…</div> : <form onSubmit={saveCommunity} className="space-y-5">
               <div><label htmlFor="community-whatsapp" className="mb-2 block text-sm font-medium text-slate-700">WhatsApp invite link</label><input id="community-whatsapp" type="url" value={communityForm.whatsappUrl} onChange={(event) => { setCommunityForm((current) => ({ ...current, whatsappUrl: event.target.value })); setCommunityError(""); setCommunitySuccess(""); }} placeholder="https://chat.whatsapp.com/yourInviteCode" disabled={communitySaving || isLocked} aria-invalid={Boolean(communityForm.whatsappUrl && !validateWhatsAppInvite(communityForm.whatsappUrl))} className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50" />{communityForm.whatsappUrl && !validateWhatsAppInvite(communityForm.whatsappUrl) && <p className="mt-1 text-sm text-red-600">Use a WhatsApp invite link beginning with https://chat.whatsapp.com/.</p>}</div>
               <div><label htmlFor="community-live-class" className="mb-2 block text-sm font-medium text-slate-700">Live class link <span className="font-normal text-slate-400">(optional)</span></label><input id="community-live-class" type="url" value={communityForm.liveClassUrl} onChange={(event) => setCommunityForm((current) => ({ ...current, liveClassUrl: event.target.value }))} placeholder="https://meet.google.com/... or https://zoom.us/..." disabled={communitySaving || isLocked} className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50" /></div>
@@ -1502,30 +1501,55 @@ export default function CourseContent() {
           })}
         </div>
 
-        {/* MESSAGES */}
-        {error && (
-          <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <X
-              size={17}
-              className="mt-0.5 shrink-0"
-            />
-
-            <span>{error}</span>
-          </div>
-        )}
-
-        {success && (
-          <div className="mt-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            <Check
-              size={17}
-              className="mt-0.5 shrink-0"
-            />
-
-            <span>{success}</span>
-          </div>
-        )}
         </>}
       </main>
+
+      {showPublishModal && (
+        <Modal
+          title="Publish course?"
+          onClose={() => setShowPublishModal(false)}
+          disabled={submitting}
+        >
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+              <Send size={20} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-900">
+                Make “{course.title}” visible to students
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                The course will appear in the public catalogue immediately.
+                You can continue updating its content after publishing.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Confirm that the course details, pricing, modules and published lessons are ready for learners.
+          </div>
+
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setShowPublishModal(false)}
+              disabled={submitting}
+              className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              Keep as Draft
+            </button>
+            <button
+              type="button"
+              onClick={confirmPublishCourse}
+              disabled={submitting}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60"
+            >
+              {submitting ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+              {submitting ? "Publishing..." : "Publish Course"}
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {/* MODULE MODAL */}
       {showModuleModal && (
@@ -1609,11 +1633,6 @@ export default function CourseContent() {
           wide
         >
           <div className="space-y-5">
-            {error && (
-              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">
-                <span className="font-semibold">Lesson was not saved.</span> {error}
-              </div>
-            )}
             {/* Title */}
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -1823,11 +1842,6 @@ export default function CourseContent() {
             </div>
           </div>
         </Modal>
-      )}
-      {(success || (!showLessonModal && error)) && (
-        <div role="status" className={`fixed bottom-5 right-5 z-[100] max-w-sm rounded-xl border px-4 py-3 text-sm font-medium shadow-xl ${success ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>
-          {success || error}
-        </div>
       )}
     </div>
   );

@@ -252,6 +252,38 @@ Deno.serve(async (request: Request) => {
           paymentLabel = `Monthly EMI ${installmentNumber} of ${installmentCount}`;
         }
       }
+      if (paymentMode === "emi" && planId !== null && installmentNumber !== null) {
+        const { data: installment, error: installmentLookupError } = await admin.from("lms_emi_installments")
+          .select("status,razorpay_order_id")
+          .eq("plan_id", planId)
+          .eq("installment_number", installmentNumber)
+          .single();
+        if (installmentLookupError) throw installmentLookupError;
+        if (installment.status === "paid") {
+          return reply({ error: "This installment is already paid. Refresh your dashboard before making another payment." }, 409);
+        }
+        if (installment.status === "created" && installment.razorpay_order_id) {
+          const { data: existingPayment, error: existingPaymentError } = await admin.from("lms_payments")
+            .select("order_id,amount,currency,status")
+            .eq("order_id", installment.razorpay_order_id)
+            .eq("student_id", user.id)
+            .maybeSingle();
+          if (existingPaymentError) throw existingPaymentError;
+          if (existingPayment?.status === "created") {
+            return reply({
+              keyId,
+              orderId: existingPayment.order_id,
+              amount: existingPayment.amount,
+              currency: existingPayment.currency,
+              paymentMode,
+              planId,
+              installmentNumber,
+              installmentCount,
+              paymentLabel,
+            });
+          }
+        }
+      }
       if (!Number.isSafeInteger(amount) || amount <= 0) return reply({ error: "No payment is due for this course." }, 409);
       const order = await razorpay("orders", { amount, currency: course.currency || "INR", receipt: crypto.randomUUID(), notes: { courseId: course.id, studentId: user.id, paymentMode, planId: planId || "", installmentNumber: String(installmentNumber || ""), paymentLabel } });
       if (paymentMode === "emi" && planId !== null && installmentNumber !== null) {
