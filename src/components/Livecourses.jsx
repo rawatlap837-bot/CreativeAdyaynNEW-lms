@@ -136,62 +136,6 @@ function AmbientBackground({ className = "" }) {
   );
 }
 
-/* ========================================================================
-   TRUST BAR
-   ======================================================================== */
-
-function TrustBar() {
-  const trustPoints = [
-    {
-      icon: Users,
-      label: "Expert Instructors",
-      sub: "Learn from experienced professionals",
-    },
-    {
-      icon: Radio,
-      label: "Live Learning",
-      sub: "Interactive classes & guidance",
-    },
-    {
-      icon: CheckCircle2,
-      label: "Certificates",
-      sub: "Earn recognized completion certificates",
-    },
-    {
-      icon: BookOpen,
-      label: "Lifetime Access",
-      sub: "Learn at your own pace",
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-      {trustPoints.map(({ icon: Icon, label, sub }) => (
-        <div
-          key={label}
-          className="flex items-center gap-2.5 rounded-xl border border-violet-100 bg-white/70 px-3 py-2.5 backdrop-blur-sm sm:gap-3 sm:px-4 sm:py-3"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[#5227FF] sm:h-9 sm:w-9">
-            <Icon
-              className="h-4 w-4"
-              strokeWidth={2.2}
-            />
-          </span>
-
-          <span className="min-w-0">
-            <span className="block truncate text-[11px] font-bold text-[#1B0E3D] sm:text-sm">
-              {label}
-            </span>
-
-            <span className="hidden text-[11px] text-slate-500 sm:block">
-              {sub}
-            </span>
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /* ========================================================================
    CATEGORY TABS
@@ -1194,14 +1138,6 @@ export default function LiveCourses({
               </p>
             )}
           </div>
-        </div>
-
-        {/* ================================================================
-           TRUST
-           ================================================================ */}
-
-        <div className="mt-6 sm:mt-10">
-          <TrustBar />
         </div>
 
         {/* ================================================================

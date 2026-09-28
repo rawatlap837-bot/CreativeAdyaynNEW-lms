@@ -4,8 +4,6 @@ import React, {
   useRef,
   useMemo,
   memo,
-  lazy,
-  Suspense,
 } from "react";
 import { Link } from "react-router-dom";
 import Button from "../components/Buttons";
@@ -23,12 +21,16 @@ import {
 } from "lucide-react";
 import "slot-text/style.css";
 import { SlotText } from "slot-text/react";
+import sohilAlvi from "../assets/Images/SohilAlvi.png";
+import carouselImage1 from "../assets/Images/img1.png";
+import carouselImage2 from "../assets/Images/img2.png";
+import carouselImage3 from "../assets/Images/img3.png";
+import carouselImage4 from "../assets/Images/img4.png";
+import carouselImage5 from "../assets/Images/img5.png";
 
 // Lazy-loaded: this pulls in the WebGL shader engine, so we defer it
 // until after the rest of the hero has mounted instead of blocking
 // the initial page load for every visitor.
-const GradientWaves = lazy(() => import("../Animiations/GradientWaves"));
-
 // react-router's Link wrapped in framer-motion so "Watch Demo" gets a
 // real client-side route change to the Short Courses page while
 // keeping the same whileHover/whileTap animation the old <motion.a>
@@ -41,9 +43,9 @@ const MotionLink = motion.create(Link);
 
 /**
  * TOKENS
- * background: GradientWaves shader (horizon violet → wave pink → crest white)
- * ink (on-wave text): #FFFFFF
- * muted (on-wave text): #D9D2F5
+ * background: white with soft violet side glows
+ * ink: #020617
+ * muted: #475569
  * violet accent: #6C5DD3
  * display: Tirra / body: Pliant / mono: Pochaevsk
  */
@@ -63,8 +65,8 @@ const QUICK_CATEGORIES = [
 ];
 
 const STATS = [
-  { icon: BookOpen, value: 50, suffix: "+", label: "Courses" },
-  { icon: Users, value: 12000, suffix: "+", label: "Learners" },
+  { icon: BookOpen, value: 25, suffix: "+", label: "Courses" },
+  { icon: Users, value: 1200, suffix: "+", label: "Learners" },
   { icon: Award, value: 4.8, decimals: 1, suffix: " / 5", label: "Avg. rating" },
 ];
 
@@ -86,118 +88,86 @@ const STATS = [
  * cramped/tall on narrow screens. Desktop still shows all 5.
  */
 const FAN_CARDS = [
-  { id: "c1", from: "#7C3AED", to: "#4C1D95", rotate: -16, offsetY: 75, z: 10 },
-  { id: "c2", from: "#A78BFA", to: "#5B21B6", rotate: -8, offsetY: 10, z: 20 },
-  { id: "c3", from: "#C4B2FF", to: "#6C5DD3", rotate: 0, offsetY: "10%", z: 40, featured: true },
-  { id: "c4", from: "#8B5CF6", to: "#4338CA", rotate: 8, offsetY: 10, z: 20 },
-  { id: "c5", from: "#6D28D9", to: "#2E1065", rotate: 16, offsetY: 75, z: 10 },
+  { id: "c1", src: carouselImage1, from: "#7C3AED", to: "#4C1D95", rotate: -16, offsetY: 75, z: 10 },
+  { id: "c2", src: carouselImage2, from: "#A78BFA", to: "#5B21B6", rotate: -8, offsetY: 10, z: 20 },
+  { id: "c3", src: sohilAlvi, from: "#C4B2FF", to: "#6C5DD3", rotate: 0, offsetY: "10%", z: 40, featured: true },
+  { id: "c4", src: carouselImage3, from: "#8B5CF6", to: "#4338CA", rotate: 8, offsetY: 10, z: 20 },
+  { id: "c5", src: carouselImage4, from: "#6D28D9", to: "#2E1065", rotate: 16, offsetY: 75, z: 10 },
+  { id: "c6", src: carouselImage5, from: "#A78BFA", to: "#6D28D9", rotate: 12, offsetY: 45, z: 15 },
 ];
 
-// The 3 center cards shown on mobile.
-const FAN_CARDS_MOBILE = FAN_CARDS.slice(1, 4);
-
-const FAN_CONTAINER_VARIANTS = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.15 } },
-};
-
-const FAN_CARD_VARIANTS = {
-  hidden: { opacity: 0, y: 60, rotate: 0, scale: 0.5 },
-  visible: (c) => ({
-    opacity: 1,
-    y: c.offsetY,
-    rotate: c.rotate,
-    scale: 1,
-    transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] },
-  }),
-};
-
-// Hoisted so these plain objects aren't re-created on every card render —
-// only two variants exist (featured vs. not), so we pick between them
-// instead of building a fresh object literal per card per render.
 const FAN_HOVER_FEATURED = {
   y: -3,
   scale: 1.008,
   transition: { duration: 0.25, ease: "easeOut" },
 };
-const FAN_HOVER_DEFAULT = {
-  y: -3,
-  scale: 1.005,
-  transition: { duration: 0.25, ease: "easeOut" },
-};
 
-const ImageCardFan = memo(function ImageCardFan({ isMobile }) {
-  // Recomputed only when `isMobile` actually flips (this component is
-  // memoized on that single prop), so the width/height clamp() strings
-  // and per-card style objects aren't rebuilt on unrelated parent renders.
-  //
-  // NOTE on the clamp() floors below: the desktop card sizes used to use
-  // small floors (e.g. clamp(118px, 25vw, 320px)) which meant the cards
-  // would visibly shrink any time the *browser window* got narrower —
-  // including just from having DevTools docked open — since `vw` tracks
-  // window width, not available content width. isMobile only flips on
-  // an actual touch/coarse pointer, so a narrowed desktop window still
-  // used these "desktop" sizes, just scaled down toward the floor. The
-  // floors are raised here so the cards stay at their full, intended
-  // size on desktop regardless of how narrow the window gets — only a
-  // true mobile/touch device (isMobile) drops to the smaller sizing.
-  const cards = useMemo(() => {
-    const source = isMobile ? FAN_CARDS_MOBILE : FAN_CARDS;
-    return source.map((c, i) => ({
-      ...c,
-      style: {
-        zIndex: c.z,
-        marginLeft: i === 0 ? 0 : "clamp(-60px, -6vw, -26px)",
-        width: isMobile
-          ? c.featured
-            ? "clamp(150px, 34vw, 220px)"
-            : "clamp(110px, 26vw, 170px)"
-          : c.featured
-            ? "clamp(220px, 25vw, 320px)"
-            : "clamp(165px, 18vw, 245px)",
-        height: isMobile
-          ? c.featured
-            ? "clamp(230px, 52vw, 330px)"
-            : "clamp(170px, 40vw, 250px)"
-          : c.featured
-            ? "clamp(310px, 36vw, 445px)"
-            : "clamp(235px, 27vw, 345px)",
-        background: `linear-gradient(160deg, ${c.from} 0%, ${c.to} 100%)`,
-      },
-      hover: c.featured ? FAN_HOVER_FEATURED : FAN_HOVER_DEFAULT,
-    }));
-  }, [isMobile]);
+const FixedImageCarousel = memo(function FixedImageCarousel() {
+  const featuredCard = FAN_CARDS.find((card) => card.featured);
+  const carouselCards = FAN_CARDS.filter((card) => !card.featured);
+  const loopCards = [...carouselCards, ...carouselCards];
 
   return (
-    <motion.div
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, amount: 0.4 }}
-      variants={FAN_CONTAINER_VARIANTS}
-      className={`relative mt-5 flex w-full items-end justify-center sm:mt-5 ${isMobile ? "translate-y-6" : ""
-        }`}
-    >
-      {cards.map((c) => (
+    <div className="relative mt-8 h-[clamp(280px,42vw,470px)] w-screen max-w-none overflow-hidden sm:mt-10">
+      {/* Duplicated track keeps the background carousel filled and seamless. */}
+      <div className="pointer-events-none absolute inset-0 z-20">
         <motion.div
-          key={c.id}
-          custom={c}
-          variants={FAN_CARD_VARIANTS}
-          whileHover={c.hover}
-          style={c.style}
-          className="relative flex-none origin-bottom overflow-hidden rounded-[16px] border border-white/15 shadow-[0_24px_52px_-13px_rgba(10,4,26,0.7)] sm:rounded-[28px]"
+          className="absolute bottom-0 left-0 flex w-max items-end gap-2"
+          animate={{ x: ["-50%", "0%"] }}
+          transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
         >
-          {/*
-            Placeholder tile — replace this whole block with:
-            <img src={c.src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" draggable={false} />
-          */}
-          <div className="flex h-full w-full items-center justify-center">
-            <span className="text-[10px] uppercase tracking-wide text-white/50 sm:text-sm">
-              image
+          {loopCards.map((card, index) => (
+            <div
+              key={`${card.id}-${index}`}
+              className="h-[250px] w-[130px] shrink-0 overflow-hidden rounded-[22px] border-2 border-white bg-white shadow-[0_20px_45px_-14px_rgba(76,29,149,0.7)] sm:h-[clamp(250px,35vw,400px)] sm:w-[clamp(130px,22vw,250px)] sm:rounded-[30px]"
+              style={{
+                background: `linear-gradient(160deg, ${card.from} 0%, ${card.to} 100%)`,
+              }}
+            >
+              <img
+                src={card.src}
+                alt=""
+                className="h-full w-full object-cover object-center grayscale contrast-110"
+                draggable={false}
+              />
+            </div>
+          ))}
+        </motion.div>
+      </div>
+
+      {/* This center card stays fixed. Add `src` to c3 in FAN_CARDS. */}
+      <div className="absolute bottom-0 left-1/2 z-30 -translate-x-1/2">
+        <motion.div
+          initial={{ opacity: 0, y: 45, scale: 0.9 }}
+          whileInView={{ opacity: 1, y: 0, scale: 1 }}
+          viewport={{ once: true, amount: 0.35 }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          whileHover={FAN_HOVER_FEATURED}
+          className="relative h-[clamp(280px,42vw,470px)] w-[clamp(185px,30vw,320px)] overflow-hidden rounded-[24px] border-2 border-white/80 shadow-[0_26px_65px_-22px_rgba(76,29,149,0.68)] sm:rounded-[34px]"
+          style={{
+            background: `linear-gradient(160deg, ${featuredCard.from} 0%, ${featuredCard.to} 100%)`,
+          }}
+        >
+          {featuredCard.src ? (
+            <img
+              src={featuredCard.src}
+              alt="Sohil Alvi"
+              className="h-full w-full object-cover object-top"
+              draggable={false}
+            />
+          ) : (
+            <span className="flex h-full items-center justify-center text-xs uppercase tracking-wider text-white/55 sm:text-sm">
+              add image
             </span>
+          )}
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 via-slate-950/55 to-transparent px-4 pb-4 pt-12 text-left text-white">
+            <p className="font-display text-lg font-bold leading-none sm:text-xl">
+              Sohil Alvi
+            </p>
           </div>
         </motion.div>
-      ))}
-    </motion.div>
+      </div>
+    </div>
   );
 });
 
@@ -212,48 +182,6 @@ const STATS_ITEM_VARIANTS = {
   hidden: { opacity: 0, y: 14 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
 };
-
-const SCRIM_MOBILE =
-  "linear-gradient(180deg, rgba(10,4,26,0.30) 0%, rgba(10,4,26,0.02) 35%, rgba(10,4,26,0.40) 100%)";
-const SCRIM_DESKTOP =
-  "linear-gradient(180deg, rgba(10,4,26,0.45) 0%, rgba(10,4,26,0.05) 35%, rgba(10,4,26,0.55) 100%)";
-
-/**
- * Responsive breakpoint hook. Uses matchMedia's native `change` event
- * rather than a `resize` listener, so it's already event-driven (fires
- * only when the query's truth value actually flips) instead of firing
- * on every pixel of a window drag — no manual debounce needed.
- */
-function useIsMobile(breakpoint = 768) {
-  const query = `(max-width: ${breakpoint - 1}px)`;
-  const pointerQuery = "(pointer: coarse)";
-
-  // Requires BOTH a narrow viewport AND a touch/coarse pointer, so
-  // resizing a desktop browser window (or opening dev tools) never
-  // flips this to true — only actual phones/tablets do.
-  const computeIsMobile = () =>
-    typeof window !== "undefined" &&
-    window.matchMedia(query).matches &&
-    window.matchMedia(pointerQuery).matches;
-
-  const [isMobile, setIsMobile] = useState(computeIsMobile);
-
-  useEffect(() => {
-    const widthMql = window.matchMedia(query);
-    const pointerMql = window.matchMedia(pointerQuery);
-    const handleChange = () =>
-      setIsMobile(widthMql.matches && pointerMql.matches);
-
-    widthMql.addEventListener("change", handleChange);
-    pointerMql.addEventListener("change", handleChange);
-    return () => {
-      widthMql.removeEventListener("change", handleChange);
-      pointerMql.removeEventListener("change", handleChange);
-    };
-  }, [query]);
-
-  return isMobile;
-}
 
 /**
  * ---- Animated count-up number ----
@@ -437,30 +365,36 @@ const StatsStrip = memo(function StatsStrip() {
       whileInView="visible"
       viewport={{ once: true, amount: 0.3 }}
       variants={STATS_CONTAINER_VARIANTS}
-      className="mt-3 grid grid-cols-3 gap-1.5 sm:gap-6"
+      className="relative mt-6 grid w-full max-w-xl grid-cols-3 overflow-hidden rounded-2xl border border-violet-200/70 bg-white/75 px-1 py-3 shadow-[0_14px_40px_-24px_rgba(109,40,217,0.55)] backdrop-blur-xl sm:rounded-3xl sm:px-3 sm:py-4"
     >
-      {STATS.map(({ icon: Icon, value, decimals, suffix, label }) => (
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-violet-400/60 to-transparent"
+      />
+      {STATS.map(({ icon: Icon, value, decimals, suffix, label }, index) => (
         <motion.div
           key={label}
           variants={STATS_ITEM_VARIANTS}
-          className="group flex flex-col items-center gap-0.5 rounded-xl border border-white/10 bg-white/5 px-2 py-1.5 backdrop-blur-sm transition duration-300 hover:border-white/20 hover:bg-white/[0.07] sm:rounded-2xl sm:px-8 sm:py-2"
+          className={`group relative flex min-w-0 items-center justify-center gap-2 px-1.5 py-1 transition duration-300 hover:-translate-y-0.5 sm:gap-3 sm:px-5 ${index > 0 ? "border-l border-violet-200/70" : ""}`}
         >
           {/*
             One icon element sized via CSS breakpoints instead of two
             SVGs toggled with sm:hidden / hidden sm:block — halves the
             icon DOM/paint cost per stat card.
           */}
-          <Icon
-            className="h-[13px] w-[13px] text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110 sm:h-4 sm:w-4"
-          />
-          <AnimatedStatValue
-            value={value}
-            decimals={decimals}
-            suffix={suffix}
-            className="font-display text-sm font-semibold tabular-nums text-white sm:text-xl"
-          />
-          <span className="text-center text-[8px] leading-tight uppercase tracking-wide text-white/60 sm:text-xs">
-            {label}
+          <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-purple-50 text-violet-600 ring-1 ring-violet-200/70 transition duration-300 group-hover:scale-105 group-hover:text-violet-700 sm:inline-flex">
+            <Icon className="h-4 w-4" strokeWidth={2} />
+          </span>
+          <span className="flex min-w-0 flex-col items-center sm:items-start">
+            <AnimatedStatValue
+              value={value}
+              decimals={decimals}
+              suffix={suffix}
+              className="font-display text-base font-bold leading-none tabular-nums tracking-tight text-slate-950 sm:text-xl"
+            />
+            <span className="mt-1 truncate text-center text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-slate-500 sm:text-[10px]">
+              {label}
+            </span>
           </span>
         </motion.div>
       ))}
@@ -469,60 +403,22 @@ const StatsStrip = memo(function StatsStrip() {
 });
 
 /** Shader background + glow blobs + scrim — isolated so it only re-renders when isMobile flips. */
-const HeroBackground = memo(function HeroBackground({ isMobile }) {
+const HeroBackground = memo(function HeroBackground() {
   return (
     <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
-        className="gradient-waves-container absolute inset-0 z-0"
-      >
-        <Suspense fallback={null}>
-          <GradientWaves
-            horizonColor="#a627ff"
-            waveColor="#7C3AED"
-            crestColor="#FFFFFF"
-            speed={0.8}
-            amplitude={2.5}
-            waveScale={0.75}
-            waveRatio={0.8}
-            swell={35}
-            turbulence={16.5}
-            tilt={0.92}
-            zoom={1.05}
-            height={3.5}
-            fogDepth={15}
-            detail="high"
-            brightness={1}
-            opacity={1}
-            mouseInteraction
-            parallaxStrength={0.23}
-            grain
-            grainIntensity={0.05}
-          />
-        </Suspense>
-      </motion.div>
-
       <div
-        className="pointer-events-none absolute -top-40 -left-40 z-[1] h-[520px] w-[520px] rounded-full blur-3xl"
-        style={{ background: "radial-gradient(circle, #6C5DD3 0%, transparent 70%)", opacity: 0.35 }}
+        className="pointer-events-none absolute -left-56 top-1/2 z-[1] h-[720px] w-[520px] -translate-y-1/2 rounded-full blur-3xl"
+        style={{ background: "radial-gradient(circle, rgba(139,92,246,0.34) 0%, rgba(196,181,253,0.16) 42%, transparent 72%)" }}
       />
       <div
-        className="pointer-events-none absolute -bottom-52 -right-32 z-[1] h-[600px] w-[600px] rounded-full blur-3xl"
-        style={{ background: "radial-gradient(circle, #8B5CF6 0%, transparent 70%)", opacity: 0.3 }}
-      />
-
-      <div
-        className="pointer-events-none absolute inset-0 z-[2]"
-        style={{ background: isMobile ? SCRIM_MOBILE : SCRIM_DESKTOP }}
+        className="pointer-events-none absolute -right-56 top-1/2 z-[1] h-[720px] w-[520px] -translate-y-1/2 rounded-full blur-3xl"
+        style={{ background: "radial-gradient(circle, rgba(124,58,237,0.32) 0%, rgba(196,181,253,0.14) 42%, transparent 72%)" }}
       />
     </>
   );
 });
 
 export default function Hero() {
-  const isMobile = useIsMobile();
 
   // Scroll to the very top whenever the Hero mounts — e.g. when the user
   // clicks the logo / "Home" in the navbar from somewhere scrolled down on
@@ -538,13 +434,12 @@ export default function Hero() {
   return (
     <>
       <section
-        className="relative w-full min-h-screen overflow-hidden"
-        style={{ background: "#150A30" }}
+        className="relative w-full min-h-screen overflow-hidden bg-white"
       >
-        <HeroBackground isMobile={isMobile} />
+        <HeroBackground />
 
         {/* content — single straight centered column, no side layout */}
-        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-4 py-10 pb-6 text-center font-body sm:px-6 sm:py-15 sm:pb-0">
+        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-1 py-10 pb-0 text-center font-body sm:px-6 sm:py-15 sm:pb-0">
           <span className="relative mt-16 inline-flex rounded-full p-[1.5px] sm:mt-20">
             <span
               aria-hidden
@@ -554,8 +449,8 @@ export default function Hero() {
                   "conic-gradient(from 0deg, transparent 0%, transparent 80%, #c4b5fd 92%, #ffffff 96%, transparent 100%)",
               }}
             />
-            <span className="relative z-10 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs text-white backdrop-blur-md">
-              <Star size={12} className="fill-white text-white" />
+            <span className="relative z-10 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white/75 px-4 py-1.5 text-xs text-violet-900 shadow-sm backdrop-blur-md">
+              <Star size={12} className="fill-violet-600 text-violet-600" />
               Skill OS for the AI era
             </span>
           </span>
@@ -565,18 +460,30 @@ export default function Hero() {
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: true, amount: 0.85 }}
             transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-6 text-center font-pliant text-[40px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
+            className="mt-6 w-full max-w-5xl text-center font-pliant text-[40px] font-bold leading-[1.08] tracking-tight text-slate-950 sm:text-7xl"
           >
-            <span className="block">Learn. Get Hired. Get Paid.</span>
-            <span className="flex flex-col items-center justify-center">
-              <span className="font-pliant mt-2.5 mb-5 inline-flex flex-wrap items-baseline justify-center gap-x-3 text-4xl sm:text-6xl text-[#C4B2FF] leading-none">
-                <span>Faster With</span>
-                <RotatingCourseWord words={ROTATING_COURSES} />
+              {/* Line 1 */}
+              <span className="block text-balance text-[2.5rem] min-[380px]:text-3xl sm:text-5xl lg:text-6xl text-slate-950">
+                Learn Digital Marketing & AI 
               </span>
-            </span>
+
+              {/* Line 2 + 3 */}
+              <span className="mt-2 flex flex-col items-center justify-center gap-1 sm:mt-3 sm:gap-2">
+                {/* <span className="font-pliant text-[2rem] min-[380px]:text-3xl sm:text-5xl lg:text-6xl text-[#C4B2FF] leading-none">
+                  
+                </span> */}
+
+                <span className="font-pliant text-[2.5rem] min-[380px]:text-4xl sm:text-6xl lg:text-7xl leading-none text-violet-600 drop-shadow-[0_0_20px_rgba(124,58,237,0.2)]">
+                   Create Your Own Career Path
+                </span>
+              </span>
           </motion.h1>
+          <p className="mt-4 max-w-5xl text-balance text-[1rem] leading-5 text-slate-600 sm:text-base lg:text-lg">
+            Build job-ready skills through expert-led, hands-on training in
+            Digital Marketing and AI—online or in our smart classrooms.
+          </p>
           <StatsStrip />
-          <div className="mt-9 flex w-full max-w-sm flex-nowrap items-center justify-center gap-3 sm:max-w-none sm:w-auto sm:gap-4">
+          <div className="mt-5 flex w-full max-w-sm flex-nowrap items-center justify-center gap-3 sm:max-w-none sm:w-auto sm:gap-4">
             <Button
               href="#live-courses"
               text="Explore Courses"
@@ -587,7 +494,7 @@ export default function Hero() {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
-              className="group relative flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-colors duration-300 hover:border-white/40 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4B2FF]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#150A30] sm:flex-none sm:gap-2.5 sm:px-8 sm:py-4 sm:text-base"
+              className="group relative flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap rounded-xl border border-violet-200 bg-white/70 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm backdrop-blur-sm transition-colors duration-300 hover:border-violet-300 hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:flex-none sm:gap-2.5 sm:px-8 sm:py-4 sm:text-base"
             >
               {/* soft sheen sweep on hover */}
               <span
@@ -602,7 +509,7 @@ export default function Hero() {
             </MotionLink>
           </div>
 
-          <ImageCardFan isMobile={isMobile} />
+          <FixedImageCarousel />
         </div>
       </section>
 
