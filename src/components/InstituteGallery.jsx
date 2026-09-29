@@ -95,10 +95,10 @@ export default function InstituteGallery() {
             id="institute-gallery-heading"
             className="font-pliant text-3xl font-bold tracking-tight text-[#1B0E3D] sm:text-5xl"
           >
-            Place Where You <span className="text-violet-600">Learn</span>
+            A Place to Learn, Grow & Build Your Future
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
-            Take a look inside Creative Adhyayan.
+            Discover a creative learning environment where you can develop practical skills, explore new opportunities, and take the first step toward a brighter future.
           </p>
         </div>
 
