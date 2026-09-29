@@ -55,31 +55,31 @@ const MetricCard = memo(function MetricCard({ card, index }) {
 
 export default function LearningEnvironmentSection() {
   return (
-    <section className="relative w-full overflow-hidden bg-[#F9F9FF] px-4 py-16 sm:px-8 sm:py-20" aria-labelledby="trust-heading">
+    <section className="relative w-full overflow-hidden bg-[#F9F9FF] px-4 py-14 sm:px-8 sm:py-20" aria-labelledby="trust-heading">
       <div className="pointer-events-none absolute -left-32 top-1/4 h-80 w-80 rounded-full bg-[#DDE7FF]/60 blur-3xl" />
       <div className="pointer-events-none absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-[#F0DEFF]/60 blur-3xl" />
 
       <div className="relative mx-auto max-w-6xl">
-        <h2 id="trust-heading" className="mx-auto max-w-4xl text-center font-pliant font-bold tracking-[-0.035em] text-[#080B24]">
-          <span className="block text-2xl leading-tight sm:text-4xl lg:text-5xl">Why Choose</span>
+        <h2 id="trust-heading" className="mx-auto max-w-7xl text-center font-pliant font-bold tracking-[-0.035em] text-[#080B24] lg:whitespace-nowrap">
+          <span className="block text-3xl leading-tight sm:text-4xl lg:inline lg:text-5xl">Why Choose</span>
           <span
-            className="mt-2 inline-block pb-2 leading-tight"
-            style={{ fontSize: "clamp(1.65rem, 5vw, 3.75rem)", color: "#7C3AED", backgroundImage: "linear-gradient(110deg, #5B21B6, #9333EA, #6366F1)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+            className="inline-block pb-2 leading-tight lg:ml-3 lg:mt-0"
+            style={{ fontSize: "clamp(2rem, 5vw, 3.75rem)", color: "#7C3AED", backgroundImage: "linear-gradient(110deg, #5B21B6, #9333EA, #6366F1)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
           >
             Creative Adhyayan
           </span>
         </h2>
 
-        <div className="mt-8 lg:grid lg:grid-cols-2 lg:items-center lg:gap-8 xl:mt-10 xl:gap-10">
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:gap-3">
+        <div className="lg:grid lg:grid-cols-2 lg:items-stretch lg:gap-8 xl:mt-10 xl:gap-10">
+          <div className="grid mt-4 grid-cols-2 gap-3 sm:gap-4 lg:gap-3">
             {CARDS.map((card, index) => <MetricCard key={card.id} card={card} index={index} />)}
           </div>
 
-          <figure className="mx-auto mt-8 w-full max-w-4xl overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-sm sm:mt-12 sm:rounded-3xl lg:ml-8 lg:mr-0 lg:mt-0 lg:w-[calc(100%-2rem)]">
-            <div className="bg-violet-50">
-              <img src={SECTION_IMAGE.src} alt={SECTION_IMAGE.alt} loading="lazy" decoding="async" className="block h-auto w-full lg:h-[390px] lg:object-cover" />
+          <figure className="mx-auto mt-8 w-full max-w-4xl overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-sm sm:mt-12 sm:rounded-3xl lg:ml-8 lg:mr-0 lg:mt-0 lg:flex lg:h-full lg:w-[calc(100%-2rem)] lg:flex-col">
+            <div className="bg-violet-50 lg:relative lg:min-h-0 lg:flex-1 overflow-hidden">
+              <img src={SECTION_IMAGE.src} alt={SECTION_IMAGE.alt} loading="lazy" decoding="async" className="block h-auto w-full lg:absolute lg:inset-0 lg:h-full lg:object-cover" />
             </div>
-            <figcaption className="border-t border-violet-200 bg-violet-50 px-4 py-4 text-center text-sm font-semibold leading-relaxed text-[#5B21B6] sm:px-6 sm:py-5 sm:text-lg">
+            <figcaption className="border-t border-violet-200 bg-violet-50 px-4 py-4 text-center text-sm font-extrabold leading-relaxed text-[#5B21B6] sm:px-6 sm:py-5 sm:text-xl">
               {SECTION_IMAGE.caption}
             </figcaption>
           </figure>

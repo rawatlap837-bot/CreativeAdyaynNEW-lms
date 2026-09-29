@@ -70,7 +70,7 @@ const STATS = [
   { icon: Award, value: 4.8, decimals: 1, suffix: " / 5", label: "Avg. rating" },
 ];
 
-/**
+/** 
  * ---- Fanned card stack (bottom of hero) ----
  *
  * One raised, oversized card in the center, flanked by shorter
@@ -365,7 +365,7 @@ const StatsStrip = memo(function StatsStrip() {
       whileInView="visible"
       viewport={{ once: true, amount: 0.3 }}
       variants={STATS_CONTAINER_VARIANTS}
-      className="relative mt-6 grid w-full max-w-xl grid-cols-3 overflow-hidden rounded-2xl border border-violet-200/70 bg-white/75 px-1 py-3 shadow-[0_14px_40px_-24px_rgba(109,40,217,0.55)] backdrop-blur-xl sm:rounded-3xl sm:px-3 sm:py-4"
+      className="relative mt-8 grid w-full max-w-2xl grid-cols-3 overflow-hidden rounded-2xl border border-violet-200/70 bg-white/75 px-2 py-4 shadow-[0_14px_40px_-24px_rgba(109,40,217,0.55)] backdrop-blur-xl sm:rounded-3xl sm:px-5 sm:py-5"
     >
       <div
         aria-hidden
@@ -375,7 +375,7 @@ const StatsStrip = memo(function StatsStrip() {
         <motion.div
           key={label}
           variants={STATS_ITEM_VARIANTS}
-          className={`group relative flex min-w-0 items-center justify-center gap-2 px-1.5 py-1 transition duration-300 hover:-translate-y-0.5 sm:gap-3 sm:px-5 ${index > 0 ? "border-l border-violet-200/70" : ""}`}
+          className={`group relative flex min-w-0 items-center justify-center gap-2 px-2 py-1 transition duration-300 hover:-translate-y-0.5 sm:gap-3 sm:px-5 ${index > 0 ? "border-l border-violet-200/70" : ""}`}
         >
           {/*
             One icon element sized via CSS breakpoints instead of two
@@ -439,7 +439,7 @@ export default function Hero() {
         <HeroBackground />
 
         {/* content — single straight centered column, no side layout */}
-        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-1 py-10 pb-0 text-center font-body sm:px-6 sm:py-15 sm:pb-0">
+        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-4 py-10 pb-0 text-center font-body sm:px-6 sm:py-15 sm:pb-0">
           <span className="relative mt-16 inline-flex rounded-full p-[1.5px] sm:mt-20">
             <span
               aria-hidden
@@ -449,9 +449,9 @@ export default function Hero() {
                   "conic-gradient(from 0deg, transparent 0%, transparent 80%, #c4b5fd 92%, #ffffff 96%, transparent 100%)",
               }}
             />
-            <span className="relative z-10 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white/75 px-4 py-1.5 text-xs text-violet-900 shadow-sm backdrop-blur-md">
+            <span className="relative z-10 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white/75 px-4 py-1.5  text-bold text-xs sm:text-[15px] text-violet-900 shadow-sm backdrop-blur-md">
               <Star size={12} className="fill-violet-600 text-violet-600" />
-              Skill OS for the AI era
+              Building Skills For The AI Era
             </span>
           </span>
 
@@ -462,28 +462,28 @@ export default function Hero() {
             transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1] }}
             className="mt-6 w-full max-w-5xl text-center font-pliant text-[40px] font-bold leading-[1.08] tracking-tight text-slate-950 sm:text-7xl"
           >
-              {/* Line 1 */}
-              <span className="block text-balance text-[2.5rem] min-[380px]:text-3xl sm:text-5xl lg:text-6xl text-slate-950">
-                Learn Digital Marketing & AI 
-              </span>
+            {/* Line 1 */}
+            <span className="block text-balance text-[2.5rem] min-[380px]:text-3xl sm:text-5xl lg:text-6xl text-slate-950">
+              Learn Digital Marketing & AI
+            </span>
 
-              {/* Line 2 + 3 */}
-              <span className="mt-2 flex flex-col items-center justify-center gap-1 sm:mt-3 sm:gap-2">
-                {/* <span className="font-pliant text-[2rem] min-[380px]:text-3xl sm:text-5xl lg:text-6xl text-[#C4B2FF] leading-none">
+            {/* Line 2 + 3 */}
+            <span className="mt-2 flex flex-col items-center justify-center gap-1 sm:mt-3 sm:gap-2">
+              {/* <span className="font-pliant text-[2rem] min-[380px]:text-3xl sm:text-5xl lg:text-6xl text-[#C4B2FF] leading-none">
                   
                 </span> */}
 
-                <span className="font-pliant text-[2.5rem] min-[380px]:text-4xl sm:text-6xl lg:text-7xl leading-none text-violet-600 drop-shadow-[0_0_20px_rgba(124,58,237,0.2)]">
-                   Create Your Own Career Path
-                </span>
+              <span className="font-pliant text-[2.5rem] min-[380px]:text-4xl sm:text-6xl lg:text-7xl leading-none text-violet-600 drop-shadow-[0_0_20px_rgba(124,58,237,0.2)]">
+                Create Your Own Career Path
               </span>
+            </span>
           </motion.h1>
-          <p className="mt-4 max-w-5xl text-balance text-[1rem] leading-5 text-slate-600 sm:text-base lg:text-lg">
-            Build job-ready skills through expert-led, hands-on training in
-            Digital Marketing and AI—online or in our smart classrooms.
+          <p className="mt-4 max-w-7xl  capitalize text-[1rem] leading-5 text-slate-600 sm:text-base lg:text-lg">
+            Build job ready skills through expert. hands on training in Digital Marketing and AI. in our smart classrooms.
+
           </p>
           <StatsStrip />
-          <div className="mt-5 flex w-full max-w-sm flex-nowrap items-center justify-center gap-3 sm:max-w-none sm:w-auto sm:gap-4">
+          <div className="mt-8 flex w-full max-w-md flex-wrap items-center justify-center gap-4 px-2 sm:w-auto sm:max-w-none sm:gap-6 sm:px-0">
             <Button
               href="#live-courses"
               text="Explore Courses"
