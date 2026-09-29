@@ -208,6 +208,12 @@ function PublicLayout() {
   const publicPage = !/^\/(dashboard|student|login|register|forgot-password|auth|admin|teacher)(\/|$)/i.test(pathname);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [pathname]);
+
+  useEffect(() => {
     if (!publicPage) {
       setRegistrationOpen(false);
       return undefined;
@@ -220,6 +226,15 @@ function PublicLayout() {
     }, 15000);
     return () => window.clearTimeout(timer);
   }, [publicPage]);
+
+  useEffect(() => {
+    const openFromPage = () => {
+      sessionStorage.setItem("course-registration-popup-shown", "true");
+      setRegistrationOpen(true);
+    };
+    window.addEventListener("open-course-registration", openFromPage);
+    return () => window.removeEventListener("open-course-registration", openFromPage);
+  }, []);
 
   const openRegistration = () => {
     sessionStorage.setItem("course-registration-popup-shown", "true");

@@ -2,7 +2,7 @@ import LegalPage from "./LegalPage";
 
 export default function PrivacyPolicy() {
   return (
-    <LegalPage eyebrow="Legal" title="Privacy Policy">
+    <LegalPage eyebrow="Legal" title="Privacy Policy" updated="September 29, 2026">
       <section><h2>Information we collect</h2><p>We collect account details such as name, email address, phone number, role, course enrollment, attendance, assignment activity, learning progress, certificates, support messages, and payment references. Payment card or bank credentials are handled by Razorpay and are not stored by this LMS.</p></section>
       <section><h2>How information is used</h2><ul><li>Provide authentication, courses, progress tracking, assessments, attendance, certificates, and support.</li><li>Process and reconcile payments, installments, refunds, and receipts.</li><li>Protect accounts, prevent fraud, enforce access rules, and diagnose failures.</li><li>Send service messages concerning courses, payments, and account activity.</li></ul></section>
       <section><h2>Service providers</h2><p>Information may be processed by providers needed to operate the service, including Supabase for authentication and data storage, Vercel for website delivery, Razorpay for payments, Resend for transactional email, Google for configured sign-in or administrative Sheets workflows, and embedded video providers. Each provider processes information under its own terms and privacy commitments.</p></section>

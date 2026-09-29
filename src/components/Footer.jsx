@@ -29,9 +29,9 @@ const DEFAULT_OTHER_LINKS = [
 ];
 
 const DEFAULT_SOCIAL_LINKS = [
-  { label: "Instagram", href: "https://instagram.com", icon: FaInstagram },
-  { label: "YouTube", href: "https://youtube.com", icon: FaYoutube },
-  { label: "Facebook", href: "https://facebook.com", icon: FaFacebook },
+  { label: "Instagram", href: "https://www.instagram.com/creativeadhyayan?stkn=MTY4ZWhvbHlidjJ2Mg==", icon: FaInstagram },
+  { label: "YouTube", href: "https://youtube.com/@creativeadhyayan?si=n-HGf8l8Gsi4kWIi", icon: FaYoutube },
+  { label: "Facebook", href: "https://www.facebook.com/share/1BaeP5SmJP/", icon: FaFacebook },
 ];
 
 const MAP_QUERY = encodeURIComponent("Building No. 532/1, First Floor, Bank Colony Deoli Village, New Delhi-110062");
@@ -82,7 +82,7 @@ export default function Footer({
   socialLinks = DEFAULT_SOCIAL_LINKS,
   courseLinks = DEFAULT_COURSE_LINKS,
   otherLinks = DEFAULT_OTHER_LINKS,
-  brandColor = "#3B1E8F",
+  brandColor = "#2D016E",
   onOpenRegistration,
 }) {
   const year = new Date().getFullYear();

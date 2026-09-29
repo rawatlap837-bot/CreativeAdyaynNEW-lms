@@ -5,7 +5,6 @@ import React, {
   useMemo,
   memo,
 } from "react";
-import { Link } from "react-router-dom";
 import Button from "../components/Buttons";
 import { motion, animate, useInView } from "framer-motion";
 import {
@@ -39,7 +38,6 @@ import carouselImage5 from "../assets/Images/img5.png";
 // motion.create(...) is the current Framer Motion API for wrapping an
 // arbitrary custom component — motion(Link) still works today but logs
 // a deprecation warning; motion.create is the same thing, just renamed.
-const MotionLink = motion.create(Link);
 
 /**
  * TOKENS
@@ -483,10 +481,11 @@ export default function Hero() {
 
           </p>
           <StatsStrip />
-          <div className="mt-8 flex w-full max-w-md flex-wrap items-center justify-center gap-4 px-2 sm:w-auto sm:max-w-none sm:gap-6 sm:px-0">
+          <div className="mt-8 flex w-full max-w-md  flex-wrap items-center justify-center gap-4 px-2 sm:w-auto sm:max-w-none sm:gap-6 sm:px-0">
             <Button
               href="#live-courses"
               text="Explore Courses"
+              bold
               shine
               onClick={(event) => {
                 const courses = document.getElementById("live-courses");
@@ -496,8 +495,9 @@ export default function Hero() {
               }}
               className="flex-1 min-w-0 sm:flex-none"
             />
-            <MotionLink
-              to="/ShortCourses"
+            <motion.button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event("open-course-registration"))}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
@@ -512,8 +512,8 @@ export default function Hero() {
                 size={18}
                 className="relative shrink-0 text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110 sm:size-5"
               />
-              <span className="relative">Watch Demo</span>
-            </MotionLink>
+              <span className="relative">Book a Call</span>
+            </motion.button>
           </div>
 
           <FixedImageCarousel />

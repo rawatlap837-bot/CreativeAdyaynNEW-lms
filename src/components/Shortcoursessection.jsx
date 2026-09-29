@@ -72,51 +72,6 @@ function isNewCourse(course) {
     return Date.now() - created <= NEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 }
 
-/* --- fallback so the section never renders empty pre-launch --- */
-
-const FALLBACK_GROUPS = [
-    {
-        id: "office",
-        label: "Office & Computer Basics",
-        courses: [
-            { id: "mword", title: "MS Word", duration: "1 Month", students: 480, category: "Office", price: 1999, thumbnailUrl: null, description: "Type, format, and produce professional documents." },
-            { id: "mexcel", title: "MS Excel", duration: "1 Month", students: 610, category: "Office", price: 2499, popular: true, thumbnailUrl: null, description: "Build spreadsheets, formulas, and simple reports." },
-            { id: "adv-excel", title: "Adv. Excel", duration: "1 Month", students: 340, category: "Office", price: 2999, thumbnailUrl: null, description: "Pivot tables, macros, and data analysis at scale." },
-            { id: "ppt", title: "MS PowerPoint", duration: "1 Month", students: 275, category: "Office", price: 1799, thumbnailUrl: null, description: "Design decks that pitch, teach, and persuade." },
-        ],
-    },
-    {
-        id: "programming",
-        label: "Programming & Development",
-        courses: [
-            { id: "python", title: "Python", duration: "3 Month", students: 920, category: "Programming", price: 6999, discountPrice: 4999, popular: true, thumbnailUrl: null, description: "The most in-demand language for scripting & data." },
-            { id: "java", title: "Core Java", duration: "3 Months", students: 540, category: "Programming", price: 5999, thumbnailUrl: null, description: "Master Java fundamentals and OOP concepts." },
-            { id: "cpp", title: "C++ Programming", duration: "3 Month", students: 300, category: "Programming", price: 4999, thumbnailUrl: null, description: "Object-oriented programming for real applications." },
-            { id: "mysql", title: "MySQL / MariaDB", duration: "2 Months", students: 210, category: "Programming", price: 3499, thumbnailUrl: null, description: "Query, manage, and structure relational databases." },
-        ],
-    },
-    {
-        id: "design",
-        label: "Design & Creative Tools",
-        courses: [
-            { id: "graphic", title: "Graphic Design", duration: "6 Month", students: 700, category: "Design", price: 8999, popular: true, thumbnailUrl: null, description: "Visual design fundamentals for branding & print." },
-            { id: "webdesign", title: "Web Designing", duration: "6 Months", students: 430, category: "Design", price: 7999, thumbnailUrl: null, description: "Design responsive, user-friendly websites." },
-            { id: "photoshop", title: "Photoshop", duration: "2 Month", students: 380, category: "Design", price: 3999, thumbnailUrl: null, description: "Photo editing, retouching, and digital art." },
-            { id: "illustrator", title: "Illustrator", duration: "1 Month", students: 190, category: "Design", price: 3499, thumbnailUrl: null, description: "Create scalable icons, logos, and artwork." },
-        ],
-    },
-    {
-        id: "web",
-        label: "Web & Scripting",
-        courses: [
-            { id: "html-css", title: "HTML & CSS", duration: "1 Month", students: 860, category: "Web", price: 1999, thumbnailUrl: null, description: "The building blocks of every website, from scratch." },
-            { id: "js", title: "JavaScript", duration: "1 Month", students: 730, category: "Web", price: 2999, popular: true, thumbnailUrl: null, description: "Add interactivity and logic to the modern web." },
-            { id: "wordpress", title: "WordPress", duration: "1 Month", students: 410, category: "Web", price: 2499, thumbnailUrl: null, description: "Build and manage websites without heavy coding." },
-            { id: "mis", title: "MIS", duration: "2 Month", students: 150, category: "Web", price: 3999, thumbnailUrl: null, description: "Manage information systems for business decisions." },
-        ],
-    },
-];
-
 /* --- motion --- */
 
 const gridVariants = {
@@ -144,7 +99,7 @@ export default function ShortCoursesSection({
     maxPerGroup = 4,
     exploreAllHref = "/ShortCourses",
 }) {
-    const { categories, coursesByCategory, loading } = usePublishedCoursesByCategory("short");
+    const { categories, coursesByCategory, loading, error } = usePublishedCoursesByCategory("short");
 
     const liveGroups = categories.map((label) => ({
         id: slugify(label) || label,
@@ -152,11 +107,12 @@ export default function ShortCoursesSection({
         courses: coursesByCategory[label],
     }));
 
-    const GROUPS = !loading && liveGroups.length > 0 ? liveGroups : FALLBACK_GROUPS;
+    const GROUPS = liveGroups;
     const totalCourses = GROUPS.reduce((sum, g) => sum + g.courses.length, 0);
 
-    const [activeId, setActiveId] = useState(GROUPS[0]?.id ?? null);
-    const activeGroup = GROUPS.find((g) => g.id === activeId) ?? GROUPS[0] ?? { id: "", label: "", courses: [] };
+    const [activeId, setActiveId] = useState(null);
+    const selectedGroupId = GROUPS.some((group) => group.id === activeId) ? activeId : GROUPS[0]?.id;
+    const activeGroup = GROUPS.find((g) => g.id === selectedGroupId) ?? { id: "", label: "", courses: [] };
     const visibleCourses = activeGroup.courses.slice(0, maxPerGroup);
 
     return (
@@ -190,6 +146,21 @@ export default function ShortCoursesSection({
                     </div>
                 </div>
 
+                {loading ? (
+                    <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4" role="status" aria-label="Loading short courses">
+                        {Array.from({ length: 4 }).map((_, index) => (
+                            <div key={index} className="overflow-hidden rounded-xl border border-violet-100 bg-white">
+                                <div className="aspect-[4/3] animate-pulse bg-violet-100" />
+                                <div className="space-y-2 p-3"><div className="h-4 animate-pulse rounded bg-violet-100" /><div className="h-3 w-2/3 animate-pulse rounded bg-violet-50" /></div>
+                            </div>
+                        ))}
+                    </div>
+                ) : error ? (
+                    <p role="alert" className="mt-8 rounded-xl border border-red-200 bg-white p-6 text-center text-sm text-red-700">Unable to load short courses: {error}</p>
+                ) : GROUPS.length === 0 ? (
+                    <p className="mt-8 rounded-xl border border-dashed border-violet-200 bg-white/70 p-8 text-center text-sm text-[#6b5f87]">Short courses will appear here once they are published.</p>
+                ) : (
+                <>
                 {/* ---------------- category tabs ---------------- */}
                 <div className="mt-6 flex gap-2 overflow-x-auto  [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {GROUPS.map((group) => {
@@ -231,7 +202,7 @@ export default function ShortCoursesSection({
                 </div>
 
                 {/* ---------------- mobile explore link ---------------- */}
-                <div className=" flex justify-center sm:hidden">
+                <div className=" mt-4 flex justify-center sm:hidden">
                     <Link
                         to={exploreAllHref}
                         className="inline-flex items-center gap-1.5 rounded-full bg-[#2E1A55] px-5 py-2.5 text-sm font-semibold text-white"
@@ -240,6 +211,8 @@ export default function ShortCoursesSection({
                         <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
                     </Link>
                 </div>
+                </>
+                )}
             </div>
         </section>
     );

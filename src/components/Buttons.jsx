@@ -1,10 +1,10 @@
 import React from 'react';
 import styled from 'styled-components';
 
-const Button = ({ href, text = 'Explore Courses', className = '', onClick, shine = false }) => {
+const Button = ({ href, text = 'Explore Courses', className = '', onClick, shine = false, bold = false }) => {
   return (
     <StyledWrapper>
-      <a href={href} onClick={onClick} className={`btn-donate ${shine ? 'btn-donate--shine' : ''} ${className}`}>
+      <a href={href} onClick={onClick} className={`btn-donate ${shine ? 'btn-donate--shine' : ''} ${bold ? 'btn-donate--bold' : ''} ${className}`}>
         {text}
       </a>
     </StyledWrapper>
@@ -58,6 +58,9 @@ const StyledWrapper = styled.div`
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.48), transparent);
     pointer-events: none;
     animation: button-shine 3s ease-in-out infinite;
+  }
+  .btn-donate--bold {
+    font-weight: 700;
   }
   @keyframes button-shine {
     0%, 55% { left: -60%; }
