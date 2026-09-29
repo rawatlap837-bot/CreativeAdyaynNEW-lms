@@ -392,7 +392,7 @@ const StatsStrip = memo(function StatsStrip() {
               suffix={suffix}
               className="font-display text-base font-bold leading-none tabular-nums tracking-tight text-slate-950 sm:text-xl"
             />
-            <span className="mt-1 truncate text-center text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-slate-500 sm:text-[10px]">
+            <span className="mt-1.5 whitespace-nowrap rounded-md bg-violet-100 px-1.5 py-1 text-center text-[9px] font-extrabold uppercase leading-none tracking-[0.03em] text-violet-800 sm:px-2 sm:text-[11px]">
               {label}
             </span>
           </span>

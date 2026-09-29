@@ -263,15 +263,15 @@ export default function ShortCourses() {
     });
   }, []);
 
-  /* Jump back to the top whenever the visible result set changes,
-     so a new filter never leaves the user mid-page. */
+  /* Start the page at the top once courses finish loading. Filter changes
+     stay in place so users can see the matching results where they are. */
   useEffect(() => {
     if (loading) {
       return;
     }
 
     scrollToTop();
-  }, [query, category, sort, loading, scrollToTop]);
+  }, [loading, scrollToTop]);
 
   /* --------------------------------------------------------------
      NEW LAUNCHES
@@ -836,9 +836,6 @@ function PageHeader({ courseCount }) {
               text-slate-600
           "
           >
-            <TrustPoint text="Practical learning" />
-            <TrustPoint text="Project-focused" />
-            <TrustPoint text="Learn at your pace" />
           </div>
 
         </div>
@@ -890,32 +887,17 @@ function FilterBar({
         backdrop-blur-xl
       `}
     >
-      <div
-        className="
-          mx-auto max-w-7xl
-          px-4 py-3
-          sm:px-6 sm:py-4
-          lg:px-8
-        "
-      >
-        <div
-          className="
-            flex flex-col gap-3
-            lg:flex-row
-            lg:items-center
-            lg:justify-between
-            lg:gap-6
-          "
-        >
-
-          {/* Search */}
-          <div className="relative w-full lg:max-w-md">
+      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch lg:items-center">
+          {/* Search and category filters stay together as one control group. */}
+          <div className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-2 shadow-sm transition focus-within:border-violet-300 focus-within:ring-4 focus-within:ring-violet-500/10">
+            <div className="relative">
 
             <Search
               size={18}
               className="
                 pointer-events-none
-                absolute left-4 top-1/2
+                absolute left-3 top-1/2
                 -translate-y-1/2
                 text-slate-400
               "
@@ -940,19 +922,14 @@ function FilterBar({
               className="
                 w-full
                 rounded-xl
-                border border-slate-200
-                bg-slate-50
-                py-3
-                pl-11 pr-11
+                border-0
+                bg-transparent
+                py-2.5
+                pl-10 pr-10
                 text-sm
                 text-slate-950
                 outline-none
-                transition
                 placeholder:text-slate-400
-                focus:border-violet-500
-                focus:bg-white
-                focus:ring-4
-                focus:ring-violet-500/10
                 disabled:opacity-60
               "
             />
@@ -963,7 +940,7 @@ function FilterBar({
                 onClick={() => onSearchChange("")}
                 aria-label="Clear search"
                 className="
-                  absolute right-3 top-1/2
+                  absolute right-2 top-1/2
                   -translate-y-1/2
                   rounded-full
                   p-1.5
@@ -976,21 +953,17 @@ function FilterBar({
                 <X size={16} />
               </button>
             )}
-          </div>
-
-          {/* Right controls */}
-          <div className="flex min-w-0 items-center gap-2">
+            </div>
 
             {showCategories && (
               <div
                 role="group"
                 aria-label="Course categories"
                 className="
-                  -mx-1
-                  flex min-w-0 flex-1
+                  mt-1 flex min-w-0
                   items-center gap-2
                   overflow-x-auto
-                  px-1 py-1
+                  border-t border-slate-200/80 px-1 pt-2 pb-1
                   [scrollbar-width:none]
                   [&::-webkit-scrollbar]:hidden
                 "
@@ -1011,8 +984,8 @@ function FilterBar({
                       className={`
                         shrink-0
                         rounded-full
-                        px-4 py-2
-                        text-sm
+                        px-3.5 py-1.5
+                        text-xs sm:text-sm
                         font-semibold
                         transition
                         disabled:opacity-60
@@ -1030,9 +1003,10 @@ function FilterBar({
                 })}
               </div>
             )}
+          </div>
 
-            {/* Sort */}
-            <div className="relative shrink-0">
+          {/* Sort remains next to the combined search and feature filters. */}
+          <div className="relative shrink-0 sm:self-center">
               <SlidersHorizontal
                 size={15}
                 className="
@@ -1058,10 +1032,11 @@ function FilterBar({
                   onSortChange(event.target.value)
                 }
                 className="
+                  w-full sm:w-auto
                   rounded-xl
                   border border-slate-200
-                  bg-slate-50
-                  py-2.5
+                  bg-white
+                  py-3 sm:py-2.5
                   pl-9 pr-8
                   text-sm
                   font-semibold
@@ -1083,8 +1058,6 @@ function FilterBar({
                   </option>
                 ))}
               </select>
-            </div>
-
           </div>
         </div>
       </div>

@@ -10,6 +10,7 @@ import {
 
 import {
   ArrowUpRight,
+  ArrowLeft,
   BookOpen,
   Calendar,
   CheckCircle2,
@@ -207,64 +208,64 @@ function CategoryTabs({ categories, activeIndex, onSelect, counts }) {
       >
         <div
           ref={listRef}
-        role="tablist"
-        aria-label="Course categories"
-        className="mx-auto flex w-max gap-2 sm:gap-2.5"
-      >
-        {categories.map((category, index) => {
-          const isActive = index === activeIndex;
-          const Icon = getCategoryIcon(category);
-          const count = counts?.[category] ?? 0;
+          role="tablist"
+          aria-label="Course categories"
+          className="mx-auto flex w-max gap-2 sm:gap-2.5"
+        >
+          {categories.map((category, index) => {
+            const isActive = index === activeIndex;
+            const Icon = getCategoryIcon(category);
+            const count = counts?.[category] ?? 0;
 
-          return (
-            <button
-              key={category}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              tabIndex={isActive ? 0 : -1}
-              onClick={() => onSelect(index)}
-              onKeyDown={(event) => handleKeyDown(event, index)}
-              className={[
-                "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[13px] font-semibold tracking-tight outline-none transition-colors duration-300",
-                "focus-visible:ring-2 focus-visible:ring-[#5227FF] focus-visible:ring-offset-2 focus-visible:ring-offset-violet-100",
-                isActive
-                  ? "text-white"
-                  : "border border-violet-200 bg-white text-[#1B0E3D] hover:border-violet-300",
-              ].join(" ")}
-            >
-              {isActive && (
-                <motion.span
-                  layoutId="category-pill-active"
-                  transition={{
-                    type: "spring",
-                    stiffness: 400,
-                    damping: 32,
-                  }}
-                  className="absolute inset-0 rounded-full shadow-[0_8px_20px_-8px_rgba(82,39,255,0.6)]"
-                  style={{
-                    background: "linear-gradient(120deg, #5227FF, #8B5CF6)",
-                  }}
-                />
-              )}
-
-              <Icon className="relative h-4 w-4 shrink-0" strokeWidth={2.2} />
-
-              <span className="relative">{category}</span>
-
-              <span
+            return (
+              <button
+                key={category}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => onSelect(index)}
+                onKeyDown={(event) => handleKeyDown(event, index)}
                 className={[
-                  "relative rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums",
+                  "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[13px] font-semibold tracking-tight outline-none transition-colors duration-300",
+                  "focus-visible:ring-2 focus-visible:ring-[#5227FF] focus-visible:ring-offset-2 focus-visible:ring-offset-violet-100",
                   isActive
-                    ? "bg-white/25 text-white"
-                    : "bg-violet-100 text-[#5227FF]",
+                    ? "text-white"
+                    : "border border-violet-200 bg-white text-[#1B0E3D] hover:border-violet-300",
                 ].join(" ")}
               >
-                {count}
-              </span>
-            </button>
-          );
-        })}
+                {isActive && (
+                  <motion.span
+                    layoutId="category-pill-active"
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 32,
+                    }}
+                    className="absolute inset-0 rounded-full shadow-[0_8px_20px_-8px_rgba(82,39,255,0.6)]"
+                    style={{
+                      background: "linear-gradient(120deg, #5227FF, #8B5CF6)",
+                    }}
+                  />
+                )}
+
+                <Icon className="relative h-4 w-4 shrink-0" strokeWidth={2.2} />
+
+                <span className="relative">{category}</span>
+
+                <span
+                  className={[
+                    "relative rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums",
+                    isActive
+                      ? "bg-white/25 text-white"
+                      : "bg-violet-100 text-[#5227FF]",
+                  ].join(" ")}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -763,6 +764,7 @@ export default function LiveCourses({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const [savedIds, setSavedIds] = useState(() => new Set());
+  const courseRailRef = useRef(null);
 
   const [searchParams] = useSearchParams();
   const requestedCategory = searchParams.get("category");
@@ -987,7 +989,7 @@ export default function LiveCourses({
         {/* HEADER — centered */}
         <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
           {title && (
-            <h2 className="font-[Space_Grotesk,sans-serif] text-3xl font-bold tracking-tight text-[#1B0E3D] sm:text-4xl lg:text-5xl">
+            <h2 className="font-[Space_Grotesk,sans-serif] text-[40px] font-bold tracking-tight text-[#1B0E3D] sm:text-4xl lg:text-5xl">
               {title === "Our Courses" ? (
                 <>Our <span className="text-[#5227FF]">Courses</span></>
               ) : title}
@@ -995,7 +997,7 @@ export default function LiveCourses({
           )}
 
           {subtitle && (
-            <p className=" max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base">
+            <p className=" max-w-xl text-sm leading-relaxed text-slate-900 sm:text-base">
               {subtitle}
             </p>
           )}
@@ -1026,7 +1028,7 @@ export default function LiveCourses({
               className="hidden h-px flex-1 bg-gradient-to-r from-transparent to-violet-300 sm:block"
             />
 
-            <p className="text-center text-xs font-medium text-slate-500">
+            <p className="text-center text-xs font-bold uppercase text-slate-500">
               {visibleCourses.length} course
               {visibleCourses.length > 1 ? "s" : ""} in {activeCategory}
 
@@ -1058,9 +1060,26 @@ export default function LiveCourses({
           </div>
         )}
 
-        {/* COURSES — centered wrapping layout so an incomplete last row
-            stays centered instead of hugging the left edge. */}
+        {/* Course cards scroll horizontally, including categories with only two courses. */}
         <div className="relative mt-5 min-w-0">
+          {visibleCourses.length > 1 && (
+            <div className="mb-3 flex justify-end gap-2">
+              <button type="button" aria-label="Scroll courses left" onClick={() => {
+                const rail = courseRailRef.current;
+                const step = (rail?.firstElementChild?.getBoundingClientRect().width || 0) + 24;
+                rail?.scrollBy({ left: -step, behavior: "smooth" });
+              }} className="flex h-9 w-9 items-center justify-center rounded-full border border-violet-300 bg-white text-[#5227FF] hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5227FF]">
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <button type="button" aria-label="Scroll courses right" onClick={() => {
+                const rail = courseRailRef.current;
+                const step = (rail?.firstElementChild?.getBoundingClientRect().width || 0) + 24;
+                rail?.scrollBy({ left: step, behavior: "smooth" });
+              }} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#5227FF] text-white hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5227FF] focus-visible:ring-offset-2">
+                <ChevronRight className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeCategory ?? "empty"}
@@ -1070,7 +1089,14 @@ export default function LiveCourses({
               transition={{ duration: 0.25 }}
             >
               {visibleCourses.length > 0 ? (
-                <div className="flex flex-wrap justify-center gap-6">
+                <div
+                  ref={courseRailRef}
+                  className={`mx-auto flex max-w-6xl snap-x snap-mandatory gap-6 overflow-x-auto pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                    visibleCourses.length === 1
+                      ? "justify-center"
+                      : "pr-[12%] sm:pr-0"
+                  }`}
+                >
                   {visibleCourses.map((course, index) => {
                     const id = course.id ?? course.title;
 
@@ -1081,7 +1107,7 @@ export default function LiveCourses({
                         index={index}
                         saved={savedIds.has(id)}
                         onToggleSave={() => toggleSaved(id)}
-                        className="w-full sm:w-[calc(50%_-_12px)] lg:w-[calc(33.333%_-_16px)] xl:w-[calc(25%_-_18px)]"
+                        className="w-[88%] shrink-0 snap-start sm:w-[60%] lg:w-[55%]"
                       />
                     );
                   })}

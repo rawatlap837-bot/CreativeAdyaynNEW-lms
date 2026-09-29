@@ -10,7 +10,7 @@ export default function FAQ() {
   };
 
   return (
-    <section className="w-full py-20 sm:py-28" style={{ background: "#F4F2FA" }}>
+    <section className="w-full py-10 sm:py-28" style={{ background: "#F4F2FA" }}>
       <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
         <div className="mb-4 flex justify-center">
           <span className="inline-flex items-center gap-2 rounded-full bg-black/5 px-3 py-1 text-[10px] uppercase tracking-widest text-black/50">
@@ -31,11 +31,10 @@ export default function FAQ() {
             return (
               <div
                 key={item.question}
-                className={`rounded-2xl border transition-colors duration-300 ${
-                  isOpen
+                className={`rounded-2xl border transition-colors duration-300 ${isOpen
                     ? "border-[#6C5DD3]/40 bg-white shadow-[0_8px_30px_rgba(108,93,211,0.12)]"
                     : "border-black/5 bg-[#F4F2FA] hover:border-black/10 hover:bg-white"
-                }`}
+                  }`}
               >
                 <button
                   type="button"
@@ -44,27 +43,24 @@ export default function FAQ() {
                   className="flex w-full items-center gap-4 px-5 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-[#6C5DD3] sm:px-6 sm:py-5"
                 >
                   <span
-                    className={`flex h-6 w-7 flex-none items-center justify-center rounded-full text-[11px] font-medium ${
-                      isOpen ? "bg-[#6C5DD3] text-white" : "bg-black/5 text-black/50"
-                    }`}
+                    className={`flex h-6 w-7 flex-none items-center justify-center rounded-full text-[11px] font-medium ${isOpen ? "bg-[#6C5DD3] text-white" : "bg-black/5 text-black/50"
+                      }`}
                   >
                     {String(i + 1).padStart(2, "0")}
                   </span>
 
                   <span
-                    className={`flex-1 text-sm font-semibold sm:text-base ${
-                      isOpen ? "text-[#150A30]" : "text-[#150A30]/80"
-                    }`}
+                    className={`flex-1 text-sm font-semibold sm:text-base ${isOpen ? "text-[#150A30]" : "text-[#150A30]/80"
+                      }`}
                   >
                     {item.question}
                   </span>
 
                   <span
-                    className={`flex h-8 w-8 flex-none items-center justify-center rounded-full transition-colors duration-300 ${
-                      isOpen
+                    className={`flex h-8 w-8 flex-none items-center justify-center rounded-full transition-colors duration-300 ${isOpen
                         ? "bg-white text-[#150A30] ring-1 ring-black/10"
                         : "bg-[#150A30] text-white"
-                    }`}
+                      }`}
                   >
                     {isOpen ? <X size={14} /> : <Plus size={14} />}
                   </span>

@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useState } from "react";
-import { Send, Loader2, ArrowRight } from "lucide-react";
+import { Send, Loader2, ArrowRight, MapPin, Mail, Phone } from "lucide-react";
 import { toast } from "react-toastify";
 import { submitToSheet } from "../services/contactSubmission";
 
@@ -22,7 +22,7 @@ const EMPTY_FORM = { name: "", surname: "", phone: "", email: "", subject: "", m
 
 const heroBlobStyle = { background: "radial-gradient(circle, #6D3FC0 0%, transparent 70%)" };
 const amberButtonStyle = { background: "linear-gradient(135deg, #F5C878, #E8A33D)" };
-const newsletterBarStyle = { background: "linear-gradient(120deg, #6D3FC0, #2E1A55)" };
+const MAP_QUERY = encodeURIComponent("Building No. 532/1, First Floor, Bank Colony Deoli Village, New Delhi-110062");
 
 const FIELD_CLASS_DARK =
   "w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none backdrop-blur-sm transition-colors focus:border-[#E8A33D] focus:ring-2 focus:ring-[#E8A33D]/30";
@@ -83,9 +83,6 @@ export default function ContactSection() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [status, setStatus] = useState("idle"); // idle | sending | sent | error
   const [errorMessage, setErrorMessage] = useState("");
-  const [newsletterEmail, setNewsletterEmail] = useState("");
-  const [newsletterStatus, setNewsletterStatus] = useState("idle"); // idle | sending | sent | error
-  const [newsletterError, setNewsletterError] = useState("");
 
   // Scroll to the very top whenever this page mounts — e.g. when the user
   // clicks "Contact" in the navbar from somewhere scrolled down on another
@@ -100,10 +97,6 @@ export default function ContactSection() {
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-  }, []);
-
-  const handleNewsletterEmailChange = useCallback((e) => {
-    setNewsletterEmail(e.target.value);
   }, []);
 
   const handleSubmit = useCallback(
@@ -127,30 +120,6 @@ export default function ContactSection() {
       }
     },
     [form]
-  );
-
-  const handleNewsletter = useCallback(
-    async (e) => {
-      e.preventDefault();
-      if (!newsletterEmail) return;
-      setNewsletterStatus("sending");
-      setNewsletterError("");
-
-      try {
-        await submitToSheet({ type: "newsletter", email: newsletterEmail });
-        setNewsletterStatus("sent");
-        setNewsletterEmail("");
-        toast.success("Subscribed! You'll hear from us about new batches.");
-        setTimeout(() => setNewsletterStatus("idle"), 3000);
-      } catch (err) {
-        setNewsletterStatus("error");
-        const message = "Couldn't subscribe — please try again.";
-        setNewsletterError(message);
-        toast.error(message);
-        setTimeout(() => setNewsletterStatus("idle"), 4000);
-      }
-    },
-    [newsletterEmail]
   );
 
   return (
@@ -184,7 +153,20 @@ export default function ContactSection() {
                 Have a question about a course, admissions, or partnering with
                 us? Send a message and our team will get back to you.
               </p>
-
+              <div className="mt-8 space-y-5 rounded-2xl border border-white/10 bg-white/[0.06] p-5 sm:p-6">
+                <h3 className="text-lg font-bold text-white">Office details</h3>
+                <div className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
+                  <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
+                  <p>Building No. 532/1, First Floor,<br />Bank Colony, Deoli Village,<br />New Delhi 110062<br />Near Shani Bazar Bandh Road</p>
+                </div>
+                <a href="mailto:contact@creativeadhyayan.com" className="flex items-center gap-3 text-sm text-white/70 transition hover:text-white">
+                  <Mail className="h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />contact@creativeadhyayan.com
+                </a>
+                <a href="tel:+919910232927" className="flex items-center gap-3 text-sm text-white/70 transition hover:text-white">
+                  <Phone className="h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />+91 9910232927
+                </a>
+                <a href="tel:+919910232941" className="flex items-center gap-3 pl-8 text-sm text-white/70 transition hover:text-white">+91 9910232941</a>
+              </div>
             </div>
 
             {/* right: glass form card — overlaps down over the map below */}
@@ -252,64 +234,6 @@ export default function ContactSection() {
         </div>
       </div>
 
-      {/* ================= NEWSLETTER CTA BAR ================= */}
-      <div className="relative mx-auto max-w-6xl px-6 py-16">
-        <form
-          onSubmit={handleNewsletter}
-          className="flex flex-col items-center justify-between gap-6 rounded-3xl px-8 py-10 sm:flex-row sm:px-12"
-          style={newsletterBarStyle}
-        >
-          <div className="text-center sm:text-left">
-            <h3 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              Stay updated on new courses
-            </h3>
-            <p className="mt-2 text-sm text-white/60">
-              Get batch openings and career tips straight to your inbox.
-            </p>
-          </div>
-
-          <div className="flex w-full max-w-md flex-col gap-2">
-            <div className="flex items-center gap-2 rounded-xl bg-white/10 p-1.5 backdrop-blur-sm">
-              <label htmlFor="newsletter-email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="newsletter-email"
-                type="email"
-                required
-                placeholder="Your email address"
-                value={newsletterEmail}
-                onChange={handleNewsletterEmailChange}
-                className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/50 outline-none"
-              />
-              <button
-                type="submit"
-                disabled={newsletterStatus === "sending"}
-                className="flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#2E1A55] transition-transform active:scale-[0.97] disabled:opacity-70"
-                style={amberButtonStyle}
-              >
-                {newsletterStatus === "sending" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : newsletterStatus === "sent" ? (
-                  "Done ✓"
-                ) : newsletterStatus === "error" ? (
-                  "Retry"
-                ) : (
-                  <>
-                    Submit
-                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                  </>
-                )}
-              </button>
-            </div>
-            {newsletterStatus === "error" && (
-              <p className="text-sm text-red-200" role="alert">
-                {newsletterError}
-              </p>
-            )}
-          </div>
-        </form>
-      </div>
     </section>
   );
 }

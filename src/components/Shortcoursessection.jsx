@@ -160,7 +160,7 @@ export default function ShortCoursesSection({
     const visibleCourses = activeGroup.courses.slice(0, maxPerGroup);
 
     return (
-        <section id="short-courses" className="bg-[#FAF9FC] px-5 py-14 sm:px-8 sm:py-16">
+        <section id="short-courses" className="bg-[#FAF9FC] px-5 py-8 sm:px-8 sm:py-16">
             <div className="mx-auto max-w-6xl">
                 {/* ---------------- header ---------------- */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -191,7 +191,7 @@ export default function ShortCoursesSection({
                 </div>
 
                 {/* ---------------- category tabs ---------------- */}
-                <div className="mt-6 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="mt-6 flex gap-2 overflow-x-auto  [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {GROUPS.map((group) => {
                         const GroupIcon = ICON_BY_LABEL[group.label] || BookOpen;
                         const isActive = activeGroup.id === group.id;
@@ -201,8 +201,8 @@ export default function ShortCoursesSection({
                                 type="button"
                                 onClick={() => setActiveId(group.id)}
                                 className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold transition-all ${isActive
-                                        ? "border-transparent bg-[#6D3FC0] text-white shadow-sm"
-                                        : "border-violet-100 bg-white text-[#4A3D66] hover:border-violet-200"
+                                    ? "border-transparent bg-[#6D3FC0] text-white shadow-sm"
+                                    : "border-violet-100 bg-white text-[#4A3D66] hover:border-violet-200"
                                     }`}
                             >
                                 <GroupIcon className="h-3.5 w-3.5" />
@@ -213,7 +213,7 @@ export default function ShortCoursesSection({
                 </div>
 
                 {/* ---------------- cards ---------------- */}
-                <div className="relative mt-6 min-h-[260px]">
+                <div className="relative mt-6 min-h-[225px]">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={activeGroup.id}
@@ -231,7 +231,7 @@ export default function ShortCoursesSection({
                 </div>
 
                 {/* ---------------- mobile explore link ---------------- */}
-                <div className="mt-8 flex justify-center sm:hidden">
+                <div className=" flex justify-center sm:hidden">
                     <Link
                         to={exploreAllHref}
                         className="inline-flex items-center gap-1.5 rounded-full bg-[#2E1A55] px-5 py-2.5 text-sm font-semibold text-white"

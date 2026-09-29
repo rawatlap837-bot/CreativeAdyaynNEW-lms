@@ -85,7 +85,7 @@ export default function CourseRegistrationModal({ onClose }) {
             <div className="relative mt-6 h-24 w-24 shrink-0 sm:h-36 sm:w-36">
               <svg className="registration-ring h-full w-full overflow-visible" viewBox="0 0 160 160" aria-hidden="true">
                 <defs><path id="registration-circle" d="M80,80 m-62,0 a62,62 0 1,1 124,0 a62,62 0 1,1 -124,0" /></defs>
-                <text fill="#6D3FC0" fontSize="11" fontWeight="700" letterSpacing="2.1"><textPath href="#registration-circle">CREATIVE ADHYAYAN • LEARN • GROW • CREATIVE ADHYAYAN • </textPath></text>
+                <text fill="#6D3FC0" fontSize="11" fontWeight="700" letterSpacing="2.1"><textPath href="#registration-circle">CREATIVE • LEARN • GROW • CREATIVE ADHYAYAN • </textPath></text>
               </svg>
               <div className="absolute inset-[19%] flex items-center justify-center rounded-full bg-gradient-to-br from-[#5227FF] to-[#3B1E8F] p-1 shadow-lg shadow-violet-500/25 sm:p-2">
                 <img src={CA2} alt="Creative Adhyayan" className="w-full object-contain" />
@@ -94,7 +94,7 @@ export default function CourseRegistrationModal({ onClose }) {
             <div className="min-w-0 flex-1 text-left">
               <p className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.06em] text-violet-700 sm:text-xs"><Users className="h-3 w-3 shrink-0" aria-hidden="true" />1,678 students enrolled</p>
               <h2 id="registration-title" className="mt-2 font-pliant text-[1.35rem] font-bold leading-tight text-[#1B0E3D] sm:text-3xl"><span className="text-[#5227FF]">learn</span> with us</h2>
-              <p className="mt-2 text-xs leading-relaxed text-slate-600 sm:text-sm">Choose a course and our team will get in touch.</p>
+              <p className="mt-2 text-xs leading-relaxed text-slate-600 sm:text-sm">Find the Right Skills for Your Future and Build a Career You Love.</p>
             </div>
           </div>
         </div>
