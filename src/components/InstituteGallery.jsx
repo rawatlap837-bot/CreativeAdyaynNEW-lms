@@ -1,11 +1,10 @@
 import { useEffect, useRef } from "react";
 import institute1 from "../assets/Images/institue1.jpeg";
-import institute2 from "../assets/Images/institue2.jpeg";
 import institute3 from "../assets/Images/institue3.jpeg";
 import institute4 from "../assets/Images/institue4.jpeg";
 import institute5 from "../assets/Images/institue5.jpeg";
 
-const images = [institute1, institute2, institute3, institute4, institute5];
+const images = [institute1, institute3, institute4, institute5];
 
 // Auto-scroll speed in pixels per millisecond (0.05 = 50px per second).
 const SPEED = 0.05;
