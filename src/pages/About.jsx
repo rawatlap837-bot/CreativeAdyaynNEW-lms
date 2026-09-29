@@ -1,8 +1,8 @@
 import React, { memo, useEffect } from "react";
 import { ArrowUpRight, Sparkles, Target, Users2 } from "lucide-react";
-import Sohilsir from "../assets/Images/Sohilsir.jpg";
+import Sohilsir from "../assets/Images/SohilAlvi.png";
 import Akashsir from "../assets/Images/Akashsir.jpg";
-import About from "../assets/Images/About.png";
+import About from "../assets/Images/teacher.png";
 import { motion } from "framer-motion";
 
 /**
@@ -123,11 +123,11 @@ const LeaderCard = memo(function LeaderCard({ leader }) {
   return (
     <article className="group relative overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-sm shadow-violet-900/5 transition-shadow hover:shadow-lg hover:shadow-violet-900/10">
       {/* photo */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-[#6D3FC0] to-[#2E1A55]">
+      <div className="relative aspect-[3/3] w-full overflow-hidden bg-gradient-to-br from-[#6D3FC0] to-[#2E1A55]">
         <img
           src={leader.image}
           alt={leader.name}
-          className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.02]"
+          className="h-full w-full scale-110 object-cover object-top transition-transform duration-500 group-hover:scale-[1.14]"
           loading="lazy"
           decoding="async"
           onError={hideBrokenImage}
@@ -181,10 +181,10 @@ export default function AboutSection() {
           About Creative Adhyayan
         </span>
 
-        <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
-          Empowering the{" "}
+        <h1 className="mt-6 max-w-3xl capitalize text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
+          Empowering The{" "}
           <span className="relative inline-block">
-            next generation
+            Next Generation
             <svg
               className="absolute -bottom-2 left-0 w-full"
               height="10"
@@ -201,7 +201,7 @@ export default function AboutSection() {
               />
             </svg>
           </span>{" "}
-          of digital professionals.
+          Of Digital Professionals.
         </h1>
 
         <p className="mt-8 max-w-xl text-lg leading-relaxed text-[#4A3D66]">

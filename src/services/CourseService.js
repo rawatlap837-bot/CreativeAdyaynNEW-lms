@@ -361,11 +361,11 @@ export async function updateCourse(courseId, courseData = {}) {
 /* ============================================================
    DELETE COURSE
 
-   Modules, lessons, enrollments, payments, assignments, and
+   Modules, lessons, enrollments, assignments, and
    certificates tied to this course all cascade-delete
    automatically via the "on delete cascade" foreign keys in the
    schema — Postgres handles that in one transaction, so there's
-   no manual walk-the-subcollections step here like Supabase database
+   no manual walk-the-subcollections step here for the database
    needed. We only need to clean up Storage files manually.
 ============================================================ */
 

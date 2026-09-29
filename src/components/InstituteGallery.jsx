@@ -11,7 +11,9 @@ const SPEED = 0.05;
 
 export default function InstituteGallery() {
   const trackRef = useRef(null);
-  const interactionRef = useRef({ hovered: false, focused: false, touching: false, resumeAt: 0 });
+  // `touching` is true only while a finger/pointer is physically dragging.
+  // `impulse` is the remaining distance (px) of an arrow-key nudge.
+  const stateRef = useRef({ touching: false, impulse: 0 });
 
   // Start in the middle copy so the visitor can scroll either way.
   useEffect(() => {
@@ -22,41 +24,52 @@ export default function InstituteGallery() {
   useEffect(() => {
     const track = trackRef.current;
     let frame;
-    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
     let previousTime = 0;
+    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-    // Browsers round scrollLeft to whole pixels on many screens, so a slow
-    // speed (a fraction of a pixel per frame) would never move. We keep the
-    // exact position in `offset` and write it back every frame instead.
+    // Browsers round scrollLeft to whole pixels, so we keep the exact
+    // position in `offset` and write it back every frame.
     let offset = track.scrollLeft;
 
     const loopWidth = () => track.children[images.length].offsetLeft - track.children[0].offsetLeft;
 
     const animate = (time) => {
       const width = loopWidth();
-      const interaction = interactionRef.current;
+      const state = stateRef.current;
       const elapsed = previousTime ? Math.min(time - previousTime, 50) : 0;
       previousTime = time;
 
-      const paused =
-        motionPreference.matches ||
-        interaction.hovered ||
-        interaction.focused ||
-        interaction.touching ||
-        time <= interaction.resumeAt;
-
-      // If the visitor swiped, used the wheel or arrow keys, follow their position.
-      if (paused || Math.abs(track.scrollLeft - offset) > 2) {
+      // If the visitor scrolled (drag, swipe, wheel, keys), follow their position.
+      if (Math.abs(track.scrollLeft - offset) > 1.5) {
         offset = track.scrollLeft;
       }
 
-      if (!paused) {
-        offset += elapsed * SPEED;
-        track.scrollLeft = offset;
+      if (state.touching) {
+        // While a finger is dragging, the user is in full control.
+        offset = track.scrollLeft;
+      } else {
+        let delta = 0;
+
+        // Auto-scroll never stops for hover, focus, wheel or keys.
+        if (!motionPreference.matches) delta += elapsed * SPEED;
+
+        // Smooth arrow-key nudge (eases out, works together with auto-scroll).
+        if (Math.abs(state.impulse) > 0.5) {
+          const step = state.impulse * 0.15;
+          delta += step;
+          state.impulse -= step;
+        } else {
+          state.impulse = 0;
+        }
+
+        if (delta !== 0) {
+          offset += delta;
+          track.scrollLeft = offset;
+        }
       }
 
       // Three identical copies let either end wrap without a visible jump.
-      if (!interaction.touching && width > 0) {
+      if (!state.touching && width > 0) {
         if (offset >= width * 2) {
           offset -= width;
           track.scrollLeft = offset;
@@ -73,14 +86,14 @@ export default function InstituteGallery() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  const move = (direction) => {
+  const nudge = (direction) => {
     const track = trackRef.current;
-    interactionRef.current.resumeAt = performance.now() + 4000;
     const step = track.children[1].offsetLeft - track.children[0].offsetLeft;
-    track.scrollBy({
-      left: direction * step,
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-    });
+    stateRef.current.impulse += direction * step;
+  };
+
+  const release = () => {
+    stateRef.current.touching = false;
   };
 
   return (
@@ -102,55 +115,39 @@ export default function InstituteGallery() {
         </div>
 
         <div
-          onMouseEnter={() => { interactionRef.current.hovered = true; }}
-          onMouseLeave={() => { interactionRef.current.hovered = false; }}
-          onFocusCapture={() => { interactionRef.current.focused = true; }}
-          onBlurCapture={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget)) interactionRef.current.focused = false;
+          ref={trackRef}
+          role="region"
+          aria-label="Institute photo gallery. Use arrow keys or swipe to scroll."
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+              event.preventDefault();
+              nudge(event.key === "ArrowLeft" ? -1 : 1);
+            }
           }}
+          onPointerDown={() => { stateRef.current.touching = true; }}
+          onPointerUp={release}
+          onPointerCancel={release}
+          onPointerLeave={(event) => {
+            if (event.pointerType === "mouse") release();
+          }}
+          className="relative flex gap-4 overflow-x-auto px-1 pb-4 [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 sm:gap-6 [&::-webkit-scrollbar]:hidden"
         >
-          <div
-            ref={trackRef}
-            role="region"
-            aria-label="Institute photo gallery. Use arrow keys or swipe to scroll."
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-                event.preventDefault();
-                move(event.key === "ArrowLeft" ? -1 : 1);
-              }
-            }}
-            onPointerDown={() => { interactionRef.current.touching = true; }}
-            onPointerLeave={(event) => {
-              if (event.pointerType === "mouse") interactionRef.current.touching = false;
-            }}
-            onPointerUp={() => {
-              interactionRef.current.touching = false;
-              interactionRef.current.resumeAt = performance.now() + 4000;
-            }}
-            onPointerCancel={() => {
-              interactionRef.current.touching = false;
-              interactionRef.current.resumeAt = performance.now() + 4000;
-            }}
-            onWheel={() => { interactionRef.current.resumeAt = performance.now() + 4000; }}
-            className="relative flex gap-4 overflow-x-auto px-1 pb-4 [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 sm:gap-6 [&::-webkit-scrollbar]:hidden"
-          >
-            {[...images, ...images, ...images].map((src, index) => (
-              <div
-                key={`${src}-${index}`}
-                aria-hidden={index < images.length || index >= images.length * 2 ? true : undefined}
-                className="w-[85%] shrink-0 overflow-hidden rounded-xl border border-violet-100 bg-white shadow-sm sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]"
-              >
-                <img
-                  src={src}
-                  alt={`Creative Adhyayan institute, view ${(index % images.length) + 1}`}
-                  draggable={false}
-                  loading="lazy"
-                  className="aspect-[4/3] w-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
+          {[...images, ...images, ...images].map((src, index) => (
+            <div
+              key={`${src}-${index}`}
+              aria-hidden={index < images.length || index >= images.length * 2 ? true : undefined}
+              className="w-[85%] shrink-0 overflow-hidden rounded-xl border border-violet-100 bg-white shadow-sm sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]"
+            >
+              <img
+                src={src}
+                alt={`Creative Adhyayan institute, view ${(index % images.length) + 1}`}
+                draggable={false}
+                loading="lazy"
+                className="aspect-[4/3] w-full object-cover"
+              />
+            </div>
+          ))}
         </div>
       </div>
     </section>
