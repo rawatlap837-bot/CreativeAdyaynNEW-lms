@@ -14,6 +14,7 @@ import {
 
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
+import CourseRegistrationModal from "./components/CourseRegistrationModal.jsx";
 import { MessageCircle, X } from "lucide-react";
 
 function WhatsAppIcon({ className = "" }) {
@@ -203,6 +204,27 @@ const HIDE_FOOTER_ON = [
 
 function PublicLayout() {
   const { pathname } = useLocation();
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+  const publicPage = !/^\/(dashboard|student|login|register|forgot-password|auth|admin|teacher)(\/|$)/i.test(pathname);
+
+  useEffect(() => {
+    if (!publicPage) {
+      setRegistrationOpen(false);
+      return undefined;
+    }
+    if (sessionStorage.getItem("course-registration-popup-shown")) return undefined;
+    const timer = window.setTimeout(() => {
+      if (sessionStorage.getItem("course-registration-popup-shown")) return;
+      sessionStorage.setItem("course-registration-popup-shown", "true");
+      setRegistrationOpen(true);
+    }, 15000);
+    return () => window.clearTimeout(timer);
+  }, [publicPage]);
+
+  const openRegistration = () => {
+    sessionStorage.setItem("course-registration-popup-shown", "true");
+    setRegistrationOpen(true);
+  };
 
   const hideFooter = HIDE_FOOTER_ON.some(
     (path) =>
@@ -216,7 +238,8 @@ function PublicLayout() {
 
       <Outlet />
 
-      {!hideFooter && <Footer />}
+      {!hideFooter && <Footer onOpenRegistration={publicPage ? openRegistration : undefined} />}
+      {publicPage && registrationOpen && <CourseRegistrationModal onClose={() => setRegistrationOpen(false)} />}
     </>
   );
 }

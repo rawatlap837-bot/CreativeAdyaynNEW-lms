@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useEffect, useState } from "react";
-import { MapPin, Mail, Phone, Send, Loader2, ArrowRight } from "lucide-react";
+import { Send, Loader2, ArrowRight } from "lucide-react";
 import { toast } from "react-toastify";
+import { submitToSheet } from "../services/contactSubmission";
 
 /**
  * Contact Us section — Creative Adhyayan (advanced layout)
@@ -15,68 +16,16 @@ import { toast } from "react-toastify";
 // Content-Type is deliberately "text/plain" below (not "application/json") —
 // Apps Script doesn't handle CORS preflight requests, and text/plain avoids
 // triggering one while the script still JSON.parses the body just fine.
-const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbx_cuxwBSk4MHGQASnrfQQ2Jw3Fdw5cGXHYqA96DEUPcBah2tgm-CYFKOKz0RQ152bS/exec";
-
-const CONTACT_POINTS = [
-  {
-    icon: MapPin,
-    label: "Head Office",
-    lines: [
-      "Building No. 532/1, First Floor,",
-      "Bank Colony Deoli Village, New Delhi-110062",
-      "Near by Shani Bazar Bandh Road.",
-    ],
-  },
-  {
-    icon: Mail,
-    label: "Email Support",
-    lines: ["contact@creativeadhyayan.com"],
-  },
-  {
-    icon: Phone,
-    label: "Let's Talk",
-    lines: ["+91 9910232927", "+91 9910232941"],
-  },
-];
-
-const MAP_QUERY = encodeURIComponent(
-  "Building No. 532/1, First Floor, Bank Colony Deoli Village, New Delhi-110062"
-);
-
 const EMPTY_FORM = { name: "", surname: "", phone: "", email: "", subject: "", message: "" };
 
 // ---- Static style objects, hoisted so they aren't re-allocated on render ----
 
 const heroBlobStyle = { background: "radial-gradient(circle, #6D3FC0 0%, transparent 70%)" };
-const iconTileStyle = { background: "linear-gradient(135deg, #6D3FC0, #E8A33D)" };
 const amberButtonStyle = { background: "linear-gradient(135deg, #F5C878, #E8A33D)" };
 const newsletterBarStyle = { background: "linear-gradient(120deg, #6D3FC0, #2E1A55)" };
 
 const FIELD_CLASS_DARK =
   "w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none backdrop-blur-sm transition-colors focus:border-[#E8A33D] focus:ring-2 focus:ring-[#E8A33D]/30";
-const FIELD_CLASS_LIGHT =
-  "w-full rounded-xl border border-violet-100 bg-white px-4 py-3 text-sm text-[#1F1533] placeholder:text-[#A79BC4] outline-none transition-colors focus:border-[#6D3FC0] focus:ring-2 focus:ring-[#6D3FC0]/20";
-
-// Posts JSON to the Apps Script endpoint. Throws on network failure or on
-// an { ok: false } response so callers can drive their own error state.
-async function submitToSheet(payload) {
-  const res = await fetch(SCRIPT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Request failed with status ${res.status}`);
-  }
-
-  const result = await res.json();
-  if (!result.ok) {
-    throw new Error(result.error || "Submission was rejected");
-  }
-  return result;
-}
 
 // Coordinates computed once at module load rather than on every DotGrid render.
 const DOT_GRID_POINTS = Array.from({ length: 7 }, (_, row) =>
@@ -94,7 +43,7 @@ const DotGrid = memo(function DotGrid({ className = "", dot = "fill-white/25" })
 });
 
 const Field = memo(function Field({ label, id, type = "text", placeholder, value, onChange, textarea, dark }) {
-  const shared = dark ? FIELD_CLASS_DARK : FIELD_CLASS_LIGHT;
+  const shared = FIELD_CLASS_DARK;
 
   return (
     <div>
@@ -126,24 +75,6 @@ const Field = memo(function Field({ label, id, type = "text", placeholder, value
           className={shared}
         />
       )}
-    </div>
-  );
-});
-
-const ContactPoint = memo(function ContactPoint({ icon: Icon, label, lines }) {
-  return (
-    <div className="flex gap-4">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={iconTileStyle}>
-        <Icon className="h-5 w-5 text-white" strokeWidth={2} aria-hidden="true" />
-      </div>
-      <div>
-        <p className="font-bold text-white">{label}</p>
-        {lines.map((line) => (
-          <p key={line} className="text-sm leading-relaxed text-white/60">
-            {line}
-          </p>
-        ))}
-      </div>
     </div>
   );
 });
@@ -225,7 +156,7 @@ export default function ContactSection() {
   return (
     <section className="relative bg-[#F8F6FC] text-[#1F1533]">
       {/* ================= DARK HERO ================= */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#1B0F38] via-[#2E1A55] to-[#3A2170] pb-10 sm:pb-40 pt-24 text-white sm:pt-32">
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#1B0F38] via-[#2E1A55] to-[#3A2170] pb-10 pt-24 text-white sm:pt-32">
         <DotGrid className="pointer-events-none absolute right-8 top-10 hidden sm:block" />
         <div
           aria-hidden="true"
@@ -254,18 +185,13 @@ export default function ContactSection() {
                 us? Send a message and our team will get back to you.
               </p>
 
-              <div className="mt-10 space-y-6">
-                {CONTACT_POINTS.map((point) => (
-                  <ContactPoint key={point.label} {...point} />
-                ))}
-              </div>
             </div>
 
             {/* right: glass form card — overlaps down over the map below */}
             <div className="lg:col-span-3">
               <form
                 onSubmit={handleSubmit}
-                className="rounded-3xl border border-white/10 bg-white/[0.07] p-5 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-10 lg:-mb-56"
+                className="rounded-3xl border border-white/10 bg-white/[0.07] p-5 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-10"
               >
                 <h3 className="text-2xl font-black tracking-tight text-white">
                   Send us a message
@@ -324,18 +250,6 @@ export default function ContactSection() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* ================= MAP (form card overlaps its top edge on desktop) ================= */}
-      <div className="relative">
-        <iframe
-          title="Creative Adhyayan — Head Office location"
-          src={`https://www.google.com/maps?q=${MAP_QUERY}&output=embed`}
-          className="h-[420px] w-full grayscale-[20%]"
-          style={{ border: 0 }}
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-        />
       </div>
 
       {/* ================= NEWSLETTER CTA BAR ================= */}

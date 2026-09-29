@@ -31,7 +31,7 @@ const features = [
 
 export default function WhyChooseUs() {
   return (
-    <section className="bg-white py-12 md:py-20 px-4 sm:px-6 md:px-10">
+    <section className="bg-white py-12 md:py-20 px-4 sm:px-6 md:px-10" aria-labelledby="why-choose-us-heading">
       <div className="max-w-6xl mx-auto">
         {/* <span className="inline-flex items-center bg-violet-100 text-violet-700 font-semibold text-xs uppercase tracking-wide px-4 py-2 rounded-full">
           Why Choose Us
@@ -41,8 +41,12 @@ export default function WhyChooseUs() {
           Skill.  
         </h2> */}
 
+        <h2 id="why-choose-us-heading" className="text-center font-pliant text-3xl font-bold tracking-tight text-[#1B0E3D] sm:text-4xl lg:text-5xl">
+          Why Choose Us
+        </h2>
+
         {/* outer frame */}
-        <div className="mt-8 md:mt-12 bg-white rounded-[24px] md:rounded-[40px] shadow-xl shadow-violet-900/5 border border-slate-400 p-2 sm:p-3 md:p-4">
+        <div className="mt-8 bg-white rounded-[24px] md:rounded-[40px] shadow-xl shadow-violet-900/5 border border-slate-400 p-2 sm:p-3 md:p-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3 md:gap-4 items-stretch">
             {/* Left: headline + photo — stacks on mobile, sits side by side from md up */}
             <div className="group relative rounded-[20px] md:rounded-[32px] overflow-hidden flex flex-col md:flex-row min-h-0 lg:min-h-[520px] bg-violet-700">

@@ -6,7 +6,7 @@ import teacherImage from "../assets/Images/teacher.PNG?url";
 const SECTION_IMAGE = {
   src: teacherImage,
   alt: "Teacher explaining digital marketing to students at Creative Adhyayan",
-  caption: "Live Mentor-Led Sessions, Hands-On Practical Training & Real-World Project Guidance.",
+  caption: "Live Mentor-Led Sessions, Hands-On Practical Training & Real-Project Guidance.",
 };
 
 const CARDS = [
@@ -79,7 +79,7 @@ export default function LearningEnvironmentSection() {
             <div className="bg-violet-50 lg:relative lg:min-h-0 lg:flex-1 overflow-hidden">
               <img src={SECTION_IMAGE.src} alt={SECTION_IMAGE.alt} loading="lazy" decoding="async" className="block h-auto w-full lg:absolute lg:inset-0 lg:h-full lg:object-cover" />
             </div>
-            <figcaption className="border-t border-violet-200 bg-violet-50 px-4 py-4 text-center text-sm font-extrabold leading-relaxed text-[#5B21B6] sm:px-6 sm:py-5 sm:text-xl">
+            <figcaption className="border-t border-violet-200 bg-violet-50 px-2 py-4 text-center text-[15px] font-extrabold leading-relaxed text-[#5B21B6] sm:px-6 sm:py-5 sm:text-xl">
               {SECTION_IMAGE.caption}
             </figcaption>
           </figure>

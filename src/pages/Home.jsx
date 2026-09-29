@@ -4,7 +4,8 @@ import Testimonials from "../components/Testimonials";
 import TrustSection from "../components/TrustSection";
 // import PopularCategory from "../components/Popularcategory";
 import ShortCourses from "../components/Shortcoursessection";
-import DashboardSection from "../components/Dashboard";
+import StudentCertificates from "../components/StudentCertificates";
+import WhyChooseUs from "../components/WhyChooseUs";
 // import InstructorExcellence from "../components/Instructorexcellence";
 import LiveCourses from "../components/Livecourses";
 import FAQ from "../components/FAQ";
@@ -51,8 +52,9 @@ export default function Home() {
       <TrustSection />
       {/* <PopularCategory /> */}
       <LiveCourses {...liveCoursesProps} />
-      <DashboardSection />
+      <WhyChooseUs />
       {/* <InstructorExcellence /> */}
+      <StudentCertificates />
       <ShortCourses />
       <FAQ />
       <Testimonials />

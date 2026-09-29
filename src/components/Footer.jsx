@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { FaInstagram, FaYoutube, FaFacebook } from "react-icons/fa";
+import { Mail, MapPin, Phone, Send } from "lucide-react";
 import CA2 from "../assets/Images/CA2.png"; // update path/filename to your actual logo
 
 const isExternalHref = (href) => typeof href === "string" && /^https?:\/\//.test(href);
@@ -32,6 +33,8 @@ const DEFAULT_SOCIAL_LINKS = [
   { label: "YouTube", href: "https://youtube.com", icon: FaYoutube },
   { label: "Facebook", href: "https://facebook.com", icon: FaFacebook },
 ];
+
+const MAP_QUERY = encodeURIComponent("Building No. 532/1, First Floor, Bank Colony Deoli Village, New Delhi-110062");
 
 function FooterLink({ label, to }) {
   if (isExternalHref(to)) {
@@ -80,12 +83,13 @@ export default function Footer({
   courseLinks = DEFAULT_COURSE_LINKS,
   otherLinks = DEFAULT_OTHER_LINKS,
   brandColor = "#3B1E8F",
+  onOpenRegistration,
 }) {
   const year = new Date().getFullYear();
 
   return (
     <footer className="w-full" style={{ background: brandColor }}>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 py-16 sm:flex-row sm:justify-between sm:py-20">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 py-6 sm:flex-row sm:justify-between sm:py-12">
         <div className="max-w-sm">
           <Link to="/" aria-label="Go to homepage">
             <img src={logoSrc} alt={logoAlt} className="h-10 w-auto object-contain" />
@@ -116,6 +120,28 @@ export default function Footer({
         <div className="flex gap-16 sm:gap-24">
           <FooterLinkList title="Courses" links={courseLinks} />
           <FooterLinkList title="Other Pages" links={otherLinks} />
+        </div>
+      </div>
+
+      <div className="border-t border-white/15">
+        <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-12 lg:grid-cols-2 lg:gap-12">
+          <div>
+            <h2 className="font-pliant text-2xl font-bold text-white sm:text-3xl">Get in touch</h2>
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-white/70">Questions about a course or admission? Contact our team.</p>
+            <div className="mt-6 space-y-5 text-sm text-white/80">
+              <div className="flex items-start gap-3"><MapPin className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" /><p>Building No. 532/1, First Floor,<br />Bank Colony Deoli Village, New Delhi-110062<br />Near by Shani Bazar Bandh Road.</p></div>
+              <a href="mailto:contact@creativeadhyayan.com" className="flex items-center gap-3 hover:text-white"><Mail className="h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />contact@creativeadhyayan.com</a>
+              <div className="flex items-start gap-3"><Phone className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" /><div><a href="tel:+919910232927" className="block hover:text-white">+91 9910232927</a><a href="tel:+919910232941" className="block hover:text-white">+91 9910232941</a></div></div>
+            </div>
+            {onOpenRegistration && (
+              <button type="button" onClick={onOpenRegistration} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-amber-300 px-5 py-3 font-semibold text-[#2E1A55] transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                Register for a course <Send className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-white/20 bg-white/10">
+            <iframe title="Creative Adhyayan head office location" src={`https://www.google.com/maps?q=${MAP_QUERY}&output=embed`} className="h-[320px] w-full sm:h-[360px]" style={{ border: 0 }} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+          </div>
         </div>
       </div>
 

@@ -1,10 +1,10 @@
 import React from 'react';
 import styled from 'styled-components';
 
-const Button = ({ href, text = 'Explore Courses', className = '' }) => {
+const Button = ({ href, text = 'Explore Courses', className = '', onClick, shine = false }) => {
   return (
     <StyledWrapper>
-      <a href={href} className={`btn-donate ${className}`}>
+      <a href={href} onClick={onClick} className={`btn-donate ${shine ? 'btn-donate--shine' : ''} ${className}`}>
         {text}
       </a>
     </StyledWrapper>
@@ -19,6 +19,8 @@ const StyledWrapper = styled.div`
     --btn-bg-color: hsla(360 100% 100% / 1);
     --radii: 0.5em;
     cursor: pointer;
+    position: relative;
+    overflow: hidden;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -44,6 +46,22 @@ const StyledWrapper = styled.div`
       0px 5px 5px -1px rgba(109, 63, 192, 0.25),
       inset 4px 4px 8px rgba(216, 189, 250, 0.5),
       inset -4px -4px 8px rgba(82, 39, 255, 0.35);
+  }
+  .btn-donate--shine::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    bottom: -50%;
+    left: -60%;
+    width: 35%;
+    transform: skewX(-25deg);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.48), transparent);
+    pointer-events: none;
+    animation: button-shine 3s ease-in-out infinite;
+  }
+  @keyframes button-shine {
+    0%, 55% { left: -60%; }
+    100% { left: 130%; }
   }
   .btn-donate:hover {
     background-position: right top;
@@ -73,6 +91,9 @@ const StyledWrapper = styled.div`
   @media (prefers-reduced-motion: reduce) {
     .btn-donate {
       transition: linear;
+    }
+    .btn-donate--shine::after {
+      animation: none;
     }
   }`;
 

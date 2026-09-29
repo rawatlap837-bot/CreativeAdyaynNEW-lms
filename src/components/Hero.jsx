@@ -487,6 +487,13 @@ export default function Hero() {
             <Button
               href="#live-courses"
               text="Explore Courses"
+              shine
+              onClick={(event) => {
+                const courses = document.getElementById("live-courses");
+                if (!courses) return;
+                event.preventDefault();
+                courses.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
               className="flex-1 min-w-0 sm:flex-none"
             />
             <MotionLink

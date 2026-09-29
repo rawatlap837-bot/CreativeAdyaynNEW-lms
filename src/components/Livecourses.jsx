@@ -14,6 +14,7 @@ import {
   Calendar,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Clock,
   Heart,
   Layers,
@@ -124,6 +125,20 @@ function AmbientBackground({ className = "" }) {
         }
       `}</style>
 
+      {/* Soft dot grid, fading out toward the bottom */}
+      <div
+        className="absolute inset-0 opacity-60"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(82,39,255,0.18) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+          maskImage:
+            "linear-gradient(to bottom, #000 0%, #000 35%, transparent 90%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, #000 0%, #000 35%, transparent 90%)",
+        }}
+      />
+
       <div
         className="course-ambient-blob absolute left-1/2 top-0 h-[380px] w-[380px] opacity-20 blur-[90px] sm:h-[520px] sm:w-[520px]"
         style={{
@@ -131,31 +146,30 @@ function AmbientBackground({ className = "" }) {
           animation: "courseAmbientDrift 18s ease-in-out infinite",
         }}
       />
+
+      {/* Second, static glow for balance at the bottom-right */}
+      <div className="absolute -bottom-32 -right-24 h-[320px] w-[320px] rounded-full bg-[#8B5CF6] opacity-15 blur-[100px] sm:h-[420px] sm:w-[420px]" />
     </div>
   );
 }
 
 /* ========================================================================
    CATEGORY TABS
-   Layout: one scrollable, left-aligned row at every screen size (no more
-   wrapping into several rows), with soft faded edges so it's obvious the
-   row scrolls. Behaviour (click, arrow keys, auto-scroll to the active tab)
-   is unchanged.
+   Centered when they fit; scroll sideways (with faded edges) when they
+   don't. Click, arrow-key and auto-scroll behaviour is unchanged.
    ======================================================================== */
 
 function CategoryTabs({ categories, activeIndex, onSelect, counts }) {
-  const railRef = useRef(null);
+  const scrollRef = useRef(null);
+  const listRef = useRef(null);
 
   useEffect(() => {
-    const rail = railRef.current;
+    const scroller = scrollRef.current;
+    const btn = listRef.current?.children[activeIndex];
 
-    if (!rail) return;
+    if (!scroller || !btn) return;
 
-    const btn = rail.children[activeIndex];
-
-    if (!btn) return;
-
-    const railBox = rail.getBoundingClientRect();
+    const railBox = scroller.getBoundingClientRect();
     const btnBox = btn.getBoundingClientRect();
 
     if (btnBox.left < railBox.left || btnBox.right > railBox.right) {
@@ -182,73 +196,77 @@ function CategoryTabs({ categories, activeIndex, onSelect, counts }) {
   };
 
   const fade =
-    "linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 28px), transparent 100%)";
+    "linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%)";
 
   return (
-    <div
-      ref={railRef}
-      role="tablist"
-      aria-label="Course categories"
-      className="-mx-5 flex gap-2 overflow-x-auto px-5 py-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:-mx-8 sm:px-8 sm:gap-2.5 xl:-mx-12 xl:px-12 [&::-webkit-scrollbar]:hidden"
-      style={{ maskImage: fade, WebkitMaskImage: fade }}
-    >
-      {categories.map((category, index) => {
-        const isActive = index === activeIndex;
-        const Icon = getCategoryIcon(category);
-        const count = counts?.[category] ?? 0;
+    <div className="relative">
+      <div
+        ref={scrollRef}
+        className="-mx-5 overflow-x-auto px-5 py-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:-mx-8 sm:px-8 xl:-mx-12 xl:px-12 [&::-webkit-scrollbar]:hidden"
+        style={{ maskImage: fade, WebkitMaskImage: fade }}
+      >
+        <div
+          ref={listRef}
+        role="tablist"
+        aria-label="Course categories"
+        className="mx-auto flex w-max gap-2 sm:gap-2.5"
+      >
+        {categories.map((category, index) => {
+          const isActive = index === activeIndex;
+          const Icon = getCategoryIcon(category);
+          const count = counts?.[category] ?? 0;
 
-        return (
-          <button
-            key={category}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            tabIndex={isActive ? 0 : -1}
-            onClick={() => onSelect(index)}
-            onKeyDown={(event) => handleKeyDown(event, index)}
-            className={[
-              "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[13px] font-semibold tracking-tight outline-none transition-colors duration-300",
-              "focus-visible:ring-2 focus-visible:ring-[#5227FF] focus-visible:ring-offset-2 focus-visible:ring-offset-violet-100",
-              isActive
-                ? "text-white"
-                : "border border-violet-200 bg-white text-[#1B0E3D] hover:border-violet-300",
-            ].join(" ")}
-          >
-            {isActive && (
-              <motion.span
-                layoutId="category-pill-active"
-                transition={{
-                  type: "spring",
-                  stiffness: 400,
-                  damping: 32,
-                }}
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: "linear-gradient(120deg, #5227FF, #8B5CF6)",
-                }}
-              />
-            )}
-
-            <Icon
-              className="relative h-4 w-4 shrink-0"
-              strokeWidth={2.2}
-            />
-
-            <span className="relative">{category}</span>
-
-            <span
+          return (
+            <button
+              key={category}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => onSelect(index)}
+              onKeyDown={(event) => handleKeyDown(event, index)}
               className={[
-                "relative rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums",
+                "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[13px] font-semibold tracking-tight outline-none transition-colors duration-300",
+                "focus-visible:ring-2 focus-visible:ring-[#5227FF] focus-visible:ring-offset-2 focus-visible:ring-offset-violet-100",
                 isActive
-                  ? "bg-white/25 text-white"
-                  : "bg-violet-100 text-[#5227FF]",
+                  ? "text-white"
+                  : "border border-violet-200 bg-white text-[#1B0E3D] hover:border-violet-300",
               ].join(" ")}
             >
-              {count}
-            </span>
-          </button>
-        );
-      })}
+              {isActive && (
+                <motion.span
+                  layoutId="category-pill-active"
+                  transition={{
+                    type: "spring",
+                    stiffness: 400,
+                    damping: 32,
+                  }}
+                  className="absolute inset-0 rounded-full shadow-[0_8px_20px_-8px_rgba(82,39,255,0.6)]"
+                  style={{
+                    background: "linear-gradient(120deg, #5227FF, #8B5CF6)",
+                  }}
+                />
+              )}
+
+              <Icon className="relative h-4 w-4 shrink-0" strokeWidth={2.2} />
+
+              <span className="relative">{category}</span>
+
+              <span
+                className={[
+                  "relative rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums",
+                  isActive
+                    ? "bg-white/25 text-white"
+                    : "bg-violet-100 text-[#5227FF]",
+                ].join(" ")}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -404,15 +422,11 @@ function CourseMedia({
 
 /* ========================================================================
    COURSE CARD
-   Layout: category → title → blurb → tags → (collapsible details) and a
-   footer that is pinned to the bottom of the card, so the "View Course"
-   buttons line up across a row even when one card has its benefits list
-   expanded. All toggles / tilt / hover behaviour are the same as before.
    ======================================================================== */
 
 const FEATURES_PREVIEW_COUNT = 3;
 
-function CourseCard({ course, index, saved, onToggleSave }) {
+function CourseCard({ course, index, saved, onToggleSave, className = "" }) {
   const allFeatures = Array.isArray(course.features) ? course.features : [];
 
   const extraFeatureCount = Math.max(
@@ -427,8 +441,6 @@ function CourseCard({ course, index, saved, onToggleSave }) {
   // and up everything is always shown.
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  // If a course has no feature list, there's nothing for the toggle to
-  // gate, so the meta row stays visible on mobile too.
   const hasCollapsibleDetails = allFeatures.length > 0;
 
   const visibleFeatures = showAllFeatures
@@ -535,8 +547,14 @@ function CourseCard({ course, index, saved, onToggleSave }) {
         rotateY,
         transformPerspective: 1000,
       }}
-      className="group flex h-full flex-col overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-[0_1px_2px_rgba(27,14,61,0.04),0_8px_24px_-12px_rgba(27,14,61,0.12)] transition-all duration-300 hover:border-violet-200 hover:shadow-[0_1px_2px_rgba(27,14,61,0.06),0_24px_48px_-16px_rgba(82,39,255,0.28)]"
+      className={`group relative flex flex-col overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-[0_1px_2px_rgba(27,14,61,0.04),0_8px_24px_-12px_rgba(27,14,61,0.12)] transition-all duration-300 hover:border-violet-200 hover:shadow-[0_1px_2px_rgba(27,14,61,0.06),0_24px_48px_-16px_rgba(82,39,255,0.28)] ${className}`}
     >
+      {/* Decorative accent bar — appears on hover */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-1 bg-gradient-to-r from-[#5227FF] via-[#8B5CF6] to-[#5227FF] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+      />
+
       <CourseLink
         {...courseLinkProps}
         className="block"
@@ -554,7 +572,8 @@ function CourseCard({ course, index, saved, onToggleSave }) {
 
       <div className="flex flex-1 flex-col p-4 sm:p-5">
         {course.category && (
-          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[#5227FF]">
+          <div className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-bold text-[#5227FF]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#5227FF]" />
             {course.category}
           </div>
         )}
@@ -584,8 +603,6 @@ function CourseCard({ course, index, saved, onToggleSave }) {
           </div>
         )}
 
-        {/* Features — collapsed behind a toggle on mobile, always shown
-            from sm: upward. */}
         {allFeatures.length > 0 && (
           <div className="mt-4 border-t border-violet-50 pt-4">
             <button
@@ -636,7 +653,6 @@ function CourseCard({ course, index, saved, onToggleSave }) {
                 </motion.li>
               ))}
 
-              {/* Desktop-only "+N more benefits" toggle. */}
               {extraFeatureCount > 0 && (
                 <li>
                   <button
@@ -674,52 +690,54 @@ function CourseCard({ course, index, saved, onToggleSave }) {
         )}
 
         {/* Footer — pinned to the bottom of every card. */}
-        <div className="mt-auto flex flex-col gap-3 pt-5">
-          {hasMeta && (
-            <div
-              className={[
-                "flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-violet-50 pt-4 text-xs text-slate-500",
-                hasCollapsibleDetails
-                  ? detailsOpen
-                    ? "flex"
-                    : "hidden"
-                  : "flex",
-                "sm:flex",
-              ].join(" ")}
+        <div className="mt-auto pt-5">
+          <div className="-mx-4 -mb-4 flex flex-col gap-3 border-t border-violet-100 bg-violet-50/50 px-4 py-4 sm:-mx-5 sm:-mb-5 sm:px-5 sm:py-5">
+            {hasMeta && (
+              <div
+                className={[
+                  "flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500",
+                  hasCollapsibleDetails
+                    ? detailsOpen
+                      ? "flex"
+                      : "hidden"
+                    : "flex",
+                  "sm:flex",
+                ].join(" ")}
+              >
+                {course.mode && (
+                  <span className="font-medium leading-snug text-slate-600">
+                    {course.mode}
+                  </span>
+                )}
+
+                {course.studentCount > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5 text-[#5227FF]" />
+
+                    {Number(course.studentCount).toLocaleString("en-IN")}
+                  </span>
+                )}
+
+                {course.startDate && (
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5 text-[#5227FF]" />
+                    Starts {formatDate(course.startDate)}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <CourseLink
+              {...courseLinkProps}
+              className="group/cta inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#1B0E3D] px-5 py-2.5 text-sm font-semibold text-white outline-none transition-colors duration-200 hover:bg-[#5227FF] focus-visible:ring-2 focus-visible:ring-[#5227FF] focus-visible:ring-offset-2"
             >
-              {course.mode && (
-                <span className="font-medium leading-snug text-slate-600">
-                  {course.mode}
-                </span>
-              )}
-
-              {course.studentCount > 0 && (
-                <span className="inline-flex items-center gap-1">
-                  <Users className="h-3.5 w-3.5 text-[#5227FF]" />
-
-                  {Number(course.studentCount).toLocaleString("en-IN")}
-                </span>
-              )}
-
-              {course.startDate && (
-                <span className="inline-flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5 text-[#5227FF]" />
-                  Starts {formatDate(course.startDate)}
-                </span>
-              )}
-            </div>
-          )}
-
-          <CourseLink
-            {...courseLinkProps}
-            className="group/cta inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#1B0E3D] px-5 py-2.5 text-sm font-semibold text-white outline-none transition-colors duration-200 hover:bg-[#5227FF] focus-visible:ring-2 focus-visible:ring-[#5227FF] focus-visible:ring-offset-2"
-          >
-            View Course
-            <ArrowUpRight
-              className="h-4 w-4 transition-transform duration-200 group-hover/cta:-translate-y-0.5 group-hover/cta:translate-x-0.5"
-              strokeWidth={2.5}
-            />
-          </CourseLink>
+              View Course
+              <ArrowUpRight
+                className="h-4 w-4 transition-transform duration-200 group-hover/cta:-translate-y-0.5 group-hover/cta:translate-x-0.5"
+                strokeWidth={2.5}
+              />
+            </CourseLink>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -731,9 +749,9 @@ function CourseCard({ course, index, saved, onToggleSave }) {
    ======================================================================== */
 
 export default function LiveCourses({
-  eyebrow = "Our Programs",
   title = "Our Courses",
   subtitle = "Real-Time Learning With Lifetime Access.",
+  // eslint-disable-next-line no-unused-vars
   exploreAllHref = "/courses",
 }) {
   /*
@@ -966,31 +984,31 @@ export default function LiveCourses({
       <AmbientBackground />
 
       <div className="relative z-10 mx-auto max-w-[1440px] px-5 sm:px-8 xl:px-12">
-        {/* HEADER — left-aligned at every size so it lines up with the
-            tabs and the card grid below. */}
-        <div className="max-w-2xl">
-          {eyebrow && (
-            <span className="text-xs font-bold uppercase tracking-[0.14em] text-[#5227FF]">
-              {eyebrow}
-            </span>
-          )}
-
+        {/* HEADER — centered */}
+        <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
           {title && (
-            <h2 className="mt-1.5 font-[Space_Grotesk,sans-serif] text-3xl font-bold tracking-tight text-[#1B0E3D] lg:text-5xl">
-              {title}
+            <h2 className="font-[Space_Grotesk,sans-serif] text-3xl font-bold tracking-tight text-[#1B0E3D] sm:text-4xl lg:text-5xl">
+              {title === "Our Courses" ? (
+                <>Our <span className="text-[#5227FF]">Courses</span></>
+              ) : title}
             </h2>
           )}
 
           {subtitle && (
-            <p className="mt-3 text-sm text-slate-600 sm:text-base">
+            <p className=" max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base">
               {subtitle}
             </p>
           )}
+
+          <span
+            aria-hidden="true"
+            className="mt-3 block h-1 w-40 rounded-full bg-gradient-to-r from-[#5227FF] to-[#8B5CF6]"
+          />
         </div>
 
         {/* CATEGORIES */}
         {categories.length > 0 && (
-          <div className="mt-8 sm:mt-10">
+          <div className="mt-5 sm:mt-8">
             <CategoryTabs
               categories={categories}
               activeIndex={activeIndex}
@@ -1002,22 +1020,47 @@ export default function LiveCourses({
 
         {/* COURSE COUNT */}
         {visibleCourses.length > 0 && (
-          <p className="mt-5 text-xs font-medium text-slate-500">
-            {visibleCourses.length} course
-            {visibleCourses.length > 1 ? "s" : ""} in {activeCategory}
+          <div className="relative mx-auto mt-2 flex w-full items-center justify-center gap-2 sm:mt-6 sm:max-w-xl sm:gap-4">
+            <span
+              aria-hidden="true"
+              className="hidden h-px flex-1 bg-gradient-to-r from-transparent to-violet-300 sm:block"
+            />
 
-            {savedIds.size > 0 && (
-              <span className="ml-3 inline-flex items-center gap-1 text-rose-500">
-                <Heart className="h-3 w-3 fill-rose-500" />
+            <p className="text-center text-xs font-medium text-slate-500">
+              {visibleCourses.length} course
+              {visibleCourses.length > 1 ? "s" : ""} in {activeCategory}
 
-                {savedIds.size} saved
-              </span>
+              {savedIds.size > 0 && (
+                <span className="ml-3 inline-flex items-center gap-1 text-rose-500">
+                  <Heart className="h-3 w-3 fill-rose-500" />
+
+                  {savedIds.size} saved
+                </span>
+              )}
+            </p>
+
+            <span
+              aria-hidden="true"
+              className="hidden h-px flex-1 bg-gradient-to-l from-transparent to-violet-300 sm:block"
+            />
+            {categories.length > 1 && (
+              <motion.button
+                type="button"
+                aria-label="Show next course category"
+                onClick={() => setActiveIndex((activeIndex + 1) % categories.length)}
+                animate={{ x: [0, 6, 0] }}
+                transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute right-0 flex h-8 w-10 items-center justify-center text-[#5227FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5227FF] sm:hidden"
+              >
+                <ChevronRight className="h-6 w-6" aria-hidden="true" />
+              </motion.button>
             )}
-          </p>
+          </div>
         )}
 
-        {/* COURSES */}
-        <div className="relative mt-4 min-w-0">
+        {/* COURSES — centered wrapping layout so an incomplete last row
+            stays centered instead of hugging the left edge. */}
+        <div className="relative mt-5 min-w-0">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeCategory ?? "empty"}
@@ -1027,7 +1070,7 @@ export default function LiveCourses({
               transition={{ duration: 0.25 }}
             >
               {visibleCourses.length > 0 ? (
-                <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="flex flex-wrap justify-center gap-6">
                   {visibleCourses.map((course, index) => {
                     const id = course.id ?? course.title;
 
@@ -1038,18 +1081,21 @@ export default function LiveCourses({
                         index={index}
                         saved={savedIds.has(id)}
                         onToggleSave={() => toggleSaved(id)}
+                        className="w-full sm:w-[calc(50%_-_12px)] lg:w-[calc(33.333%_-_16px)] xl:w-[calc(25%_-_18px)]"
                       />
                     );
                   })}
                 </div>
               ) : (
-                <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-violet-200 bg-white/50 py-12 text-center">
-                  <BookOpen
-                    className="h-8 w-8 text-violet-300"
-                    strokeWidth={1.5}
-                  />
+                <div className="mx-auto flex max-w-xl flex-col items-center gap-3 rounded-3xl border border-dashed border-violet-300 bg-white/60 py-14 text-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-violet-100">
+                    <BookOpen
+                      className="h-7 w-7 text-[#5227FF]"
+                      strokeWidth={1.6}
+                    />
+                  </span>
 
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-slate-500">
                     {courses.length === 0
                       ? "No published live courses yet."
                       : "No courses in this category yet."}
