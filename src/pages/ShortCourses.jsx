@@ -1177,7 +1177,7 @@ function CourseCard({ course }) {
       <div
         className="
           relative
-          aspect-[16/9]
+          aspect-[16/6]
           overflow-hidden
           bg-gradient-to-br
           from-violet-100
@@ -1212,7 +1212,7 @@ function CourseCard({ course }) {
               text-violet-300
             "
           >
-            <BookOpen size={44} />
+            <BookOpen size={36} />
           </div>
         )}
 
@@ -1231,7 +1231,7 @@ function CourseCard({ course }) {
         {/* Top badges */}
         <div
           className="
-            absolute inset-x-3 top-3
+            absolute inset-x-2.5 top-2.5
             flex items-start
             justify-between
             gap-2
@@ -1245,7 +1245,7 @@ function CourseCard({ course }) {
                   inline-flex items-center gap-1.5
                   rounded-full
                   bg-orange-500
-                  px-3 py-1.5
+                  px-2.5 py-1
                   text-xs
                   font-bold
                   text-white
@@ -1264,7 +1264,7 @@ function CourseCard({ course }) {
                   inline-flex items-center gap-1.5
                   rounded-full
                   bg-white/95
-                  px-3 py-1.5
+                  px-2.5 py-1
                   text-xs
                   font-bold
                   text-violet-700
@@ -1283,7 +1283,7 @@ function CourseCard({ course }) {
                 className="
                   rounded-full
                   bg-violet-700
-                  px-3 py-1.5
+                  px-2.5 py-1
                   text-xs
                   font-bold
                   text-white
@@ -1318,10 +1318,10 @@ function CourseCard({ course }) {
           <span
             className="
               absolute
-              bottom-3 left-3
+              bottom-2.5 left-2.5
               rounded-full
               bg-black/60
-              px-3 py-1.5
+              px-2.5 py-1
               text-[11px]
               font-semibold
               text-white
@@ -1337,36 +1337,32 @@ function CourseCard({ course }) {
           CONTENT
       ---------------------------------------------------------- */}
 
-      <div className="flex flex-1 flex-col p-5">
+      <div className="flex flex-1 flex-col p-3 sm:p-4">
 
-        {/* Title */}
-        <h3
-          className="
-            text-lg
-            font-bold
-            leading-7
-            text-slate-950
-          "
-        >
-          <Link
-            to={href}
-            className="
-              transition
-              group-hover:text-violet-700
-              focus-visible:outline-none
-            "
-          >
-            {title}
-          </Link>
-        </h3>
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          {/* Title */}
+          <h3 className="min-w-0 text-[15px] font-bold leading-5 text-slate-950 sm:text-base sm:leading-6">
+            <Link
+              to={href}
+              className="transition group-hover:text-violet-700 focus-visible:outline-none"
+            >
+              {title}
+            </Link>
+          </h3>
+
+          {/* Mode */}
+          <span className="inline-flex shrink-0 rounded-md bg-slate-50 px-2 py-0.5 text-[11px] font-medium leading-4 text-slate-600 sm:text-xs">
+            {getMode(course)}
+          </span>
+        </div>
 
         {/* Description */}
         <p
           className="
-            mt-2
+            mt-1 sm:mt-1.5
             line-clamp-2
             text-sm
-            leading-6
+            leading-5
             text-slate-500
           "
         >
@@ -1379,9 +1375,9 @@ function CourseCard({ course }) {
 
         <div
           className="
-            mt-4
+            mt-2.5 sm:mt-3
             flex flex-wrap
-            gap-x-4 gap-y-2
+            gap-x-2.5 gap-y-1 sm:gap-x-3 sm:gap-y-1.5
             text-xs
             text-slate-500
           "
@@ -1411,30 +1407,13 @@ function CourseCard({ course }) {
           )}
         </div>
 
-        {/* Mode */}
-        <div className="mt-3">
-          <span
-            className="
-              inline-flex
-              rounded-md
-              bg-slate-50
-              px-2.5 py-1
-              text-xs
-              font-medium
-              text-slate-600
-            "
-          >
-            {getMode(course)}
-          </span>
-        </div>
-
         {/* --------------------------------------------------------
             FOOTER
         -------------------------------------------------------- */}
 
-        <div className="mt-auto pt-5">
+        <div className="mt-auto pt-3 sm:pt-4">
 
-          <div className="mb-5 h-px bg-slate-100" />
+          <div className="mb-3 sm:mb-4 h-px bg-slate-100" />
 
           <div
             className="
@@ -1460,7 +1439,7 @@ function CourseCard({ course }) {
                 gap-2
                 rounded-xl
                 bg-violet-700
-                px-4 py-2.5
+                px-3 py-2 sm:px-3.5 sm:py-2
                 text-sm
                 font-semibold
                 text-white
