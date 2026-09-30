@@ -936,6 +936,17 @@ export default function CourseDetails() {
 
                 </div>
 
+                <div className="mt-8 border-t border-violet-100 pt-7">
+                  <h2 className="text-2xl font-bold text-gray-950 sm:text-3xl">
+                    About This Course
+                  </h2>
+                  <div className="mt-4 whitespace-pre-line text-base leading-8 text-gray-600">
+                    {course.description ||
+                      course.shortDescription ||
+                      "No course description available."}
+                  </div>
+                </div>
+
               </div>
 
 
@@ -1159,33 +1170,6 @@ export default function CourseDetails() {
 
                 </div>
 
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
-
-
-        {/* =====================================================
-            ABOUT COURSE
-        ===================================================== */}
-
-        <section className="border-b border-gray-200 bg-white">
-
-          <div className="mx-auto max-w-7xl px-5 py-14 sm:px-6 lg:px-8">
-
-            <div className="max-w-4xl">
-
-              <h2 className="text-2xl font-bold text-gray-950 sm:text-3xl">
-                About This Course
-              </h2>
-
-              <div className="mt-6 whitespace-pre-line text-base leading-8 text-gray-600">
-                {course.description ||
-                  course.shortDescription ||
-                  "No course description available."}
               </div>
 
             </div>

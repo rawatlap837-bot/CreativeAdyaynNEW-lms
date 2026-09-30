@@ -312,7 +312,7 @@ function CourseMedia({
 
   return (
     <div
-      className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100"
+      className="relative aspect-video w-full overflow-hidden bg-slate-100"
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
@@ -1107,7 +1107,7 @@ export default function LiveCourses({
                         index={index}
                         saved={savedIds.has(id)}
                         onToggleSave={() => toggleSaved(id)}
-                        className="w-[88%] shrink-0 snap-start sm:w-[60%] lg:w-[55%]"
+                        className="w-[88%] shrink-0 snap-start sm:w-[46%] lg:w-[42%]"
                       />
                     );
                   })}
