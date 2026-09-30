@@ -48,6 +48,13 @@ export function slugify(title = "") {
     .replace(/(^-|-$)/g, "");
 }
 
+// Slugs are unique across the whole catalog. Suffix with the course UUID so
+// titles may safely repeat while each course still has a stable URL key.
+function courseSlug(title, id, providedSlug) {
+  const base = slugify(providedSlug || title) || "course";
+  return `${base}-${id.slice(0, 8)}`;
+}
+
 function sortCourses(a, b) {
   const orderA = typeof a.course_order === "number" ? a.course_order : 999999;
   const orderB = typeof b.course_order === "number" ? b.course_order : 999999;
@@ -233,10 +240,11 @@ export async function createCourse(courseData = {}) {
     throw new Error("Course type must be short or long.");
   }
 
+  const id = crypto.randomUUID();
   const course = {
-    id: crypto.randomUUID(),
+    id,
     title,
-    slug: courseData.slug?.trim() || slugify(title),
+    slug: courseSlug(title, id, courseData.slug?.trim()),
     description: courseData.description?.trim() || "",
     short_description: courseData.shortDescription?.trim() || "",
     category: courseData.category?.trim() || "",
@@ -301,6 +309,7 @@ export async function updateCourse(courseId, courseData = {}) {
   const editableFieldMap = {
     description: "description",
     shortDescription: "short_description",
+    instructorName: "instructor_name",
     category: "category",
     level: "level",
     duration: "duration",

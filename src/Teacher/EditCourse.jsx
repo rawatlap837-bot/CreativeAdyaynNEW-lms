@@ -27,6 +27,7 @@ export default function EditCourse() {
 
   const [form, setForm] = useState({
     title: "",
+    instructorName: "",
     shortDescription: "",
     description: "",
     category: "",
@@ -92,6 +93,7 @@ export default function EditCourse() {
 
       setForm({
         title: courseData.title || "",
+        instructorName: courseData.instructorName || "",
         shortDescription: courseData.shortDescription || "",
         description: courseData.description || "",
         category: courseData.category || "",
@@ -246,6 +248,7 @@ export default function EditCourse() {
 
       const updatedData = {
         title: form.title.trim(),
+        instructorName: form.instructorName.trim(),
         shortDescription: form.shortDescription.trim(),
         description: form.description.trim(),
         category: form.category.trim(),
@@ -473,6 +476,23 @@ export default function EditCourse() {
                   />
                 </div>
 
+                <div>
+                  <label htmlFor="edit-instructor-name" className="mb-2 block text-sm font-medium text-slate-700">
+                    Instructor Name
+                  </label>
+                  <input
+                    id="edit-instructor-name"
+                    name="instructorName"
+                    value={form.instructorName}
+                    onChange={handleChange}
+                    disabled={isLocked || saving}
+                    maxLength={120}
+                    placeholder="Name shown to students"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-violet-50"
+                  />
+                  <p className="mt-1.5 text-xs text-slate-500">This name appears to students on the course.</p>
+                </div>
+
                 {/* Type */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -601,6 +621,7 @@ export default function EditCourse() {
                     name="category"
                     value={form.category}
                     onChange={handleChange}
+                    onCategoryRenamed={(oldName, newName) => setForm((previous) => ({ ...previous, category: previous.category === oldName ? newName : previous.category }))}
                     disabled={isLocked || saving}
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-violet-50"
                   />

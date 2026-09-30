@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import CourseCategorySelect from "./CourseCategorySelect";
+import CourseCategorySelect, { NEW_CATEGORY_VALUE } from "./CourseCategorySelect";
 import { useToastState } from "../hooks/useToastState";
 
 import {
@@ -23,13 +23,16 @@ import {
   updateCourse,
   uploadCourseThumbnail,
 } from "../services/CourseService";
+import { createCourseCategory } from "../services/CourseCategoryService";
 
 const INITIAL_FORM = {
   type: "short",
   title: "",
+  instructorName: "",
   shortDescription: "",
   description: "",
   category: "",
+  categoryMode: "existing",
   level: "",
   duration: "",
   price: "",
@@ -85,11 +88,15 @@ export default function CreateCourse() {
      ============================================================ */
 
   useEffect(() => {
-    if (!auth.currentUser) {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
       navigate("/login", {
         replace: true,
       });
+      return;
     }
+    const displayName = currentUser.displayName || currentUser.user_metadata?.name || "";
+    setForm((previous) => ({ ...previous, instructorName: previous.instructorName || displayName }));
   }, [navigate]);
 
   /* ============================================================
@@ -118,7 +125,8 @@ export default function CreateCourse() {
 
     setForm((previous) => ({
       ...previous,
-      [name]: value,
+      [name]: name === "category" && value === NEW_CATEGORY_VALUE ? previous.category : value,
+      ...(name === "category" ? { categoryMode: value === NEW_CATEGORY_VALUE ? "new" : "existing" } : {}),
     }));
 
     setError("");
@@ -323,12 +331,17 @@ export default function CreateCourse() {
          STEP 1 — CREATE Supabase database COURSE
          ======================================================== */
 
+      if (form.categoryMode === "new") await createCourseCategory(form.category);
+
       const createdCourse =
         await createCourse({
           type: form.type,
 
           title:
             form.title.trim(),
+
+          instructorName:
+            form.instructorName.trim(),
 
           shortDescription:
             form.shortDescription.trim(),
@@ -665,6 +678,23 @@ export default function CreateCourse() {
                 />
               </div>
 
+              <div>
+                <label htmlFor="instructorName" className="mb-2 block text-sm font-medium text-slate-700">
+                  Instructor Name
+                </label>
+                <input
+                  id="instructorName"
+                  name="instructorName"
+                  value={form.instructorName}
+                  onChange={handleChange}
+                  placeholder="Name shown to students"
+                  maxLength={120}
+                  disabled={creating || uploading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
+                />
+                <p className="mt-1.5 text-xs text-slate-500">This name appears to students on the course.</p>
+              </div>
+
               {/* SHORT DESCRIPTION */}
 
               <div>
@@ -747,14 +777,14 @@ export default function CreateCourse() {
                   </label>
 
                   <CourseCategorySelect
+                    allowCreate
                     id="category"
                     name="category"
-                    value={
-                      form.category
-                    }
+                    value={form.categoryMode === "new" ? NEW_CATEGORY_VALUE : form.category}
                     onChange={
                       handleChange
                     }
+                    onCategoryRenamed={(oldName, newName) => setForm((previous) => ({ ...previous, category: previous.category === oldName ? newName : previous.category }))}
                     required
                     disabled={
                       creating ||
@@ -762,6 +792,20 @@ export default function CreateCourse() {
                     }
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
                   />
+                  {form.categoryMode === "new" && (
+                    <input
+                      autoFocus
+                      type="text"
+                      value={form.category}
+                      onChange={(event) => setForm((previous) => ({ ...previous, category: event.target.value }))}
+                      placeholder="Enter new category name"
+                      maxLength={80}
+                      required
+                      disabled={creating || uploading}
+                      className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50"
+                      aria-label="New category name"
+                    />
+                  )}
                 </div>
 
                 <div>

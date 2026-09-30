@@ -135,6 +135,12 @@ async function commit(operations, reads = []) {
   const { data, error } = await supabase.rpc("lms_write_records", { operations, reads });
   if (error) {
     const details = [error.message, error.details, error.hint].filter(Boolean).join(" — ");
+    if (error.code === "PGRST202" || /could not find the function.*lms_write_records/i.test(details)) {
+      throw new Error("The live database is missing the LMS write function. Apply the latest Supabase migrations, then try again.");
+    }
+    if (error.code === "42501" || /row-level security|access denied/i.test(details)) {
+      throw new Error("You do not have permission to edit this course. Confirm that you are its teacher and that the course is not archived.");
+    }
     throw new Error(details || "The database rejected this change. Please try again.");
   }
   return data;

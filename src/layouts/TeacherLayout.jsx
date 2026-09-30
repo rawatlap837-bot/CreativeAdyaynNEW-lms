@@ -346,7 +346,7 @@ const TeacherLayout = () => {
             <img
               src={CA2Logo}
               alt="Creative Adhyayan"
-              className="h-9 w-9 rounded-lg object-contain"
+              className="h-10 w-36 object-contain"
             />
 
           </div>
@@ -399,12 +399,12 @@ const TeacherLayout = () => {
 
           <div className="flex min-w-0 items-center gap-3">
 
-            <div className="flex h-full w-full shrink-0 items-center justify-center rounded-xl p-1.5">
+            <div className="flex h-full w-full shrink-0 items-center justify-center rounded-xl px-3 py-2">
 
               <img
                 src={CA2Logo}
                 alt="Creative Adhyayan"
-                className="h-full w-full object-contain"
+                className="h-11 w-40 max-w-full object-contain"
               />
 
             </div>
