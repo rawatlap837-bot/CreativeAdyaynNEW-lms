@@ -31,6 +31,9 @@ export default defineConfig({
   },
 
   build: {
+    // The production host serves Apache (see the live 404 page). Ship its
+    // SPA fallback with the built app so direct route requests reach React Router.
+    copyPublicDir: true,
     rollupOptions: {
       output: {
         manualChunks: {
