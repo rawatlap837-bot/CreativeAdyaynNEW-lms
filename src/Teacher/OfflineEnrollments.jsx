@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Search, UserPlus } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { getMyCourses } from "../services/CourseService";
+import { fromRow } from "../lib/records";
 import { useToastState } from "../hooks/useToastState";
 
 export default function OfflineEnrollments() {
@@ -22,10 +22,11 @@ export default function OfflineEnrollments() {
   );
 
   useEffect(() => {
-    getMyCourses()
-      .then((rows) => setCourses(rows.filter((course) => course.status === "published")))
-      .catch((reason) => setError(reason.message || "Unable to load your courses."))
-      .finally(() => setLoading(false));
+    supabase.from("lms_courses").select("*").order("title").then(({ data, error: courseError }) => {
+      if (courseError) setError(courseError.message || "Unable to load courses.");
+      else setCourses((data || []).map((row) => fromRow("courses", row)).filter((course) => String(course.status || "").trim().toLowerCase() !== "archived"));
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -94,14 +95,14 @@ export default function OfflineEnrollments() {
       <div className="mb-6">
         <p className="text-sm text-violet-600">OFFLINE ADMISSIONS</p>
         <h1 className="mt-1 text-2xl font-semibold text-slate-900 sm:text-3xl">Grant course access</h1>
-        <p className="mt-2 text-sm text-slate-500">Record an offline fee using any email. Existing students receive access now; new emails receive the course automatically when they register.</p>
+        <p className="mt-2 text-sm text-slate-500">Record an offline fee for any course using any email. Existing students receive access now; new emails receive the course automatically when they register. Unpublished courses become available when published.</p>
       </div>
 
       <form onSubmit={grantAccess} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="text-sm font-medium text-slate-700">Course
             <select value={courseId} onChange={chooseCourse} disabled={loading} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-violet-500">
-              <option value="">Select your published course</option>
+              <option value="">Select one of your courses</option>
               {courses.map((course) => <option key={course.id} value={course.id}>{course.title || course.name}</option>)}
             </select>
           </label>

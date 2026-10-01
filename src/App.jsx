@@ -107,6 +107,10 @@ const AdminPayments = lazy(() =>
   import("./Admin/Payments.jsx")
 );
 
+const OfflineEnrollments = lazy(() =>
+  import("./Teacher/OfflineEnrollments.jsx")
+);
+
 const ExportReports = lazy(() =>
   import("./Admin/ExportReports.jsx")
 );
@@ -137,10 +141,6 @@ const TeacherCourses = lazy(() =>
 
 const TeacherAttendance = lazy(() =>
   import("./Teacher/Attendance.jsx")
-);
-
-const TeacherOfflineEnrollments = lazy(() =>
-  import("./Teacher/OfflineEnrollments.jsx")
 );
 
 const TeacherBatchList = lazy(() =>
@@ -482,11 +482,6 @@ function App() {
             />
 
             <Route
-              path="offline-enrollments"
-              element={<TeacherOfflineEnrollments />}
-            />
-
-            <Route
               path="announcements"
               element={<Announcements />}
             />
@@ -571,6 +566,11 @@ function App() {
             <Route
               path="payments"
               element={<AdminPayments />}
+            />
+
+            <Route
+              path="offline-enrollments"
+              element={<OfflineEnrollments />}
             />
 
             <Route

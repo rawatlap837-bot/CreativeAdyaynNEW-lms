@@ -20,7 +20,6 @@ import {
   Megaphone,
   Check,
   Loader2,
-  Receipt,
 } from "lucide-react";
 
 import { useEffect, useRef, useState } from "react";
@@ -245,11 +244,6 @@ const TeacherLayout = () => {
       icon: BookOpen,
     },
     {
-      name: "Offline admissions",
-      path: "/teacher/offline-enrollments",
-      icon: Receipt,
-    },
-    {
       name: "Batches",
       path: "/teacher/batches",
       icon: Users,
@@ -271,10 +265,6 @@ const TeacherLayout = () => {
 
     if (location.pathname === "/teacher/courses") {
       return "My Courses";
-    }
-
-    if (location.pathname === "/teacher/offline-enrollments") {
-      return "Offline Admissions";
     }
 
     if (location.pathname === "/teacher/batches") {

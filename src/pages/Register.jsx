@@ -378,7 +378,7 @@ export default function RegisterForm() {
                 )}
               </div>
 
-              <div className="hidden">
+              <div>
                 <label htmlFor="confirm" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                   Confirm password
                 </label>

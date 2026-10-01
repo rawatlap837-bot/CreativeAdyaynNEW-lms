@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Megaphone,
   FileDown,
+  Receipt,
 } from "lucide-react";
 
 import { AT } from "../Admin/AdminUI";
@@ -55,6 +56,11 @@ const NAV = [
     to: "/admin/payments",
     label: "Payments",
     icon: Wallet,
+  },
+  {
+    to: "/admin/offline-enrollments",
+    label: "Offline admissions",
+    icon: Receipt,
   },
   {
     to: "/admin/analytics",

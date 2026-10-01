@@ -159,7 +159,9 @@ export default function LoginForm() {
 
       const dest = await resolvePostLoginRoute(data.user.id);
       setStatus("idle");
-      navigate(dest);
+      // Replace the login entry so Back does not return to the public home
+      // page immediately after a successful sign-in.
+      navigate(dest, { replace: true });
     } catch (err) {
       setStatus("error");
       setErrorMsg(supabaseAuthErrorMessage(err));
