@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,{auth:{persistSession:false}});
 const keyId=Deno.env.get("RAZORPAY_KEY_ID")||"";
 const keySecret=Deno.env.get("RAZORPAY_KEY_SECRET")||"";
-const origins=(Deno.env.get("APP_ORIGINS")||"http://localhost:5173").split(",").map(v=>v.trim());
+const origins=(Deno.env.get("APP_ORIGINS")||"https://creativeadhyayan.com,https://www.creativeadhyayan.com,http://localhost:5173").split(",").map(v=>v.trim()).filter(Boolean);
 
 Deno.serve(async(request:Request)=>{
   const origin=request.headers.get("origin")||"";

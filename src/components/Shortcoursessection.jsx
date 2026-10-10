@@ -232,13 +232,13 @@ function CompactCourseCard({ course }) {
 
     return (
         <motion.div variants={cardVariants} className="group flex flex-col overflow-hidden rounded-xl border border-violet-100 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md hover:shadow-violet-900/[0.06]">
-            <Link to={href} className="relative block aspect-[4/3] w-full shrink-0 overflow-hidden bg-gradient-to-br from-violet-100 to-orange-50">
+            <Link to={href} className="relative block aspect-[16/9] w-full shrink-0 overflow-hidden bg-gradient-to-br from-violet-100 to-orange-50">
                 {thumbnail ? (
                     <img
                         src={thumbnail}
                         alt=""
                         loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="h-full w-full bg-slate-50 object-contain transition-transform duration-500 group-hover:scale-[1.02]"
                     />
                 ) : (
                     <div className="flex h-full w-full items-center justify-center text-violet-300">

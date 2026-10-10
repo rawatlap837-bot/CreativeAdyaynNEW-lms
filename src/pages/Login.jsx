@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import Cubes from "../Animiations/Cubes";
 import { supabase } from "../lib/supabase";
@@ -319,15 +320,23 @@ export default function LoginForm() {
                 </div>
               </div>
 
-              <label className="flex select-none items-center gap-2 text-sm text-[#4A3D66]">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  className="h-4 w-4 rounded border-violet-200 text-[#6D3FC0] focus:ring-[#6D3FC0]/30"
-                />
-                Remember me
-              </label>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <label className="flex select-none items-center gap-2 text-[#4A3D66]">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    className="h-4 w-4 rounded border-violet-200 text-[#6D3FC0] focus:ring-[#6D3FC0]/30"
+                  />
+                  Remember me
+                </label>
+                <Link
+                  to="/forgot-password"
+                  className="font-semibold text-[#6D3FC0] hover:text-[#4D2793] hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
 
               {status === "error" && errorMsg && (
                 <motion.p

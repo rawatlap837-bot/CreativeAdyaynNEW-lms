@@ -1177,7 +1177,7 @@ function CourseCard({ course }) {
       <div
         className="
           relative
-          aspect-[16/6]
+          aspect-[16/9]
           overflow-hidden
           bg-gradient-to-br
           from-violet-100
@@ -1195,7 +1195,8 @@ function CourseCard({ course }) {
             }
             className="
               h-full w-full
-              object-cover
+              object-contain
+              bg-slate-50
               transition duration-500
               group-hover:scale-105
             "

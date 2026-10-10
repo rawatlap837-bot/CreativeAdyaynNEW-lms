@@ -5,7 +5,7 @@ import { sendPaymentReceipt } from "../_shared/receipts.js";
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 const keyId = Deno.env.get("RAZORPAY_KEY_ID") || "";
 const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET") || "";
-const allowedOrigins = (Deno.env.get("APP_ORIGINS") || "http://localhost:5173").split(",").map((value) => value.trim());
+const allowedOrigins = (Deno.env.get("APP_ORIGINS") || "https://creativeadhyayan.com,https://www.creativeadhyayan.com,http://localhost:5173").split(",").map((value) => value.trim()).filter(Boolean);
 const REGISTRATION_FEE = 200000;
 
 async function applyProcessedRefund(order: Record<string, any>, refund: Record<string, any>, requestedBy: string) {

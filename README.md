@@ -17,6 +17,16 @@ React and Tailwind LMS backed by Supabase.
 
 ## Payment receipts by email
 
+Set `APP_ORIGINS` in Supabase Edge Function secrets to a comma-separated list of the exact site origins that may initiate payments. Include `https://creativeadhyayan.com` (and `https://www.creativeadhyayan.com` if that hostname is used), plus any local development origin you need. The payment and EMI order functions allow these origins for browser requests.
+
+```sh
+npx supabase secrets set APP_ORIGINS 'https://creativeadhyayan.com,https://www.creativeadhyayan.com,http://localhost:5173'
+npx supabase functions deploy lms-payments
+npx supabase functions deploy lms-emi-create-order
+```
+
+Deploying the functions after setting this secret applies the live CORS configuration.
+
 Successful online payments send a transactional receipt through Brevo from the `lms-payments` Edge Function. Configure and verify a sender/domain in Brevo, then set these Supabase Edge Function secrets before deploying:
 
 - `BREVO_API_KEY`: a Brevo API v3 key. Keep it only in Supabase Edge Function secrets.
@@ -27,9 +37,9 @@ Successful online payments send a transactional receipt through Brevo from the `
 Example configuration and deployment:
 
 ```sh
-supabase secrets set BREVO_API_KEY=xkeysib-your-key PAYMENT_RECEIPT_FROM_EMAIL=receipts@example.com PAYMENT_RECEIPT_FROM_NAME="Creative Adhyayan" PAYMENT_RECEIPT_REPLY_TO=support@example.com
-supabase functions deploy lms-payments
-supabase functions deploy lms-payment-webhook --no-verify-jwt
+npx supabase secrets set BREVO_API_KEY=xkeysib-your-key PAYMENT_RECEIPT_FROM_EMAIL=receipts@example.com PAYMENT_RECEIPT_FROM_NAME="Creative Adhyayan" PAYMENT_RECEIPT_REPLY_TO=support@example.com
+npx supabase functions deploy lms-payments
+npx supabase functions deploy lms-payment-webhook --no-verify-jwt
 ```
 
 Deploy both `lms-payments` and `lms-payment-webhook` so receipts send whether the student completes checkout in the open browser or Razorpay reports capture through its webhook. If email delivery is unavailable, payment verification and course enrollment still succeed, and the checkout displays that the receipt is available in the student dashboard.
